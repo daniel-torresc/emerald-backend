@@ -6,8 +6,8 @@ including authentication queries, profile management, and user filtering.
 """
 
 import uuid
-from typing import Optional
 
+from pydantic import EmailStr
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -258,7 +258,7 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(query)
         return result.scalar_one()
 
-    async def email_exists(self, email: str, exclude_user_id: uuid.UUID | None = None) -> bool:
+    async def email_exists(self, email: EmailStr, exclude_user_id: uuid.UUID | None = None) -> bool:
         """
         Check if email is already in use by another user.
 
