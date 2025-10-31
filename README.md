@@ -276,19 +276,209 @@ See `.env.example` for all available configuration options.
 
 ## Development
 
-```bash
-# Run tests
-uv run pytest --cov=src
+### Running Tests
 
-# Format code
+The project uses pytest for testing with comprehensive coverage tracking.
+
+#### Prerequisites
+
+Before running tests, ensure:
+1. Docker services are running (PostgreSQL and Redis)
+2. Dependencies are installed
+
+```bash
+# Start Docker services
+docker-compose up -d
+
+# Verify services are running
+docker-compose ps
+```
+
+#### Basic Test Commands
+
+```bash
+# Run all tests
+uv run pytest tests/
+
+# Run tests with verbose output
+uv run pytest tests/ -v
+
+# Run tests with coverage report
+uv run pytest tests/ --cov=src --cov-report=term-missing
+
+# Run tests with coverage JSON output
+uv run pytest tests/ --cov=src --cov-report=json
+
+# Run specific test file
+uv run pytest tests/integration/test_auth_routes.py
+
+# Run specific test class
+uv run pytest tests/integration/test_auth_routes.py::TestRegistration
+
+# Run specific test method
+uv run pytest tests/integration/test_auth_routes.py::TestRegistration::test_register_success
+
+# Run tests and stop on first failure
+uv run pytest tests/ -x
+
+# Run tests in parallel (faster)
+uv run pytest tests/ -n auto
+```
+
+#### Test Coverage Requirements
+
+- **Overall code coverage**: 80% minimum
+- **Critical paths**: 100% coverage (authentication, payments, data integrity)
+- **All public API endpoints**: 100% coverage
+- **Business logic**: 90% minimum coverage
+
+#### Current Test Status
+
+```bash
+# Check current coverage
+uv run pytest tests/ --cov=src --cov-report=term-missing
+
+# View coverage by module
+uv run pytest tests/ --cov=src --cov-report=term
+
+# Generate HTML coverage report
+uv run pytest tests/ --cov=src --cov-report=html
+# Open htmlcov/index.html in your browser
+```
+
+**Current Coverage**: 67% (Target: 80%)
+
+#### Test Structure
+
+```
+tests/
+├── conftest.py              # Shared fixtures and configuration
+├── integration/             # Integration tests (API routes, DB)
+│   └── test_auth_routes.py  # Authentication endpoint tests
+├── unit/                    # Unit tests (isolated components)
+│   ├── core/
+│   └── services/
+└── e2e/                     # End-to-end tests (complete workflows)
+```
+
+#### Common Test Issues & Solutions
+
+1. **Rate Limiting Errors (429)**
+   - The test fixtures automatically clear Redis between tests
+   - If you see rate limit errors, ensure Redis is running:
+     ```bash
+     docker-compose restart redis
+     ```
+
+2. **Database Connection Errors**
+   - Ensure PostgreSQL is running:
+     ```bash
+     docker-compose ps postgres
+     docker-compose restart postgres
+     ```
+   - Check database configuration in `.env` matches `docker-compose.yml`
+
+3. **Test Database Cleanup**
+   - Tests automatically clean up data after each test
+   - To manually clean test database:
+     ```bash
+     docker exec -it emerald-postgres psql -U emerald_user -d emerald_db_test -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+     ```
+
+4. **Port Conflicts**
+   - If tests fail with "address already in use":
+     ```bash
+     # Check what's using the port
+     lsof -i :8000
+     # Kill the process if needed
+     kill -9 <PID>
+     ```
+
+#### Writing New Tests
+
+Follow these guidelines when adding tests:
+
+1. **Unit Tests**: Test individual functions/classes in isolation
+   ```python
+   # tests/unit/services/test_auth_service.py
+   import pytest
+   from src.services.auth_service import AuthService
+
+   @pytest.mark.asyncio
+   async def test_hash_password():
+       service = AuthService()
+       hashed = service.hash_password("TestPass123!")
+       assert hashed != "TestPass123!"
+   ```
+
+2. **Integration Tests**: Test component interactions
+   ```python
+   # tests/integration/test_user_routes.py
+   @pytest.mark.asyncio
+   async def test_get_user(async_client: AsyncClient, test_user: User):
+       response = await async_client.get(f"/api/v1/users/{test_user.id}")
+       assert response.status_code == 200
+   ```
+
+3. **Use Fixtures**: Leverage existing fixtures in `conftest.py`
+   - `async_client`: HTTP client for API testing
+   - `test_user`: Pre-created test user
+   - `admin_user`: Pre-created admin user
+   - `user_token`: Authentication tokens for test user
+
+4. **Test Naming**: Use descriptive names
+   ```
+   test_[function]_[scenario]_[expected_result]
+   Example: test_login_invalid_password_returns_401
+   ```
+
+#### Continuous Integration
+
+Tests are automatically run in CI/CD:
+- All tests must pass before merge
+- Coverage must not decrease
+- Failed tests block deployment
+
+#### Code Quality Commands
+
+```bash
+# Format code (auto-fix)
 uv run ruff format .
 
-# Lint code
+# Lint code (auto-fix)
 uv run ruff check --fix .
+
+# Lint without auto-fix
+uv run ruff check .
 
 # Type checking
 uv run mypy src/
+
+# Run all quality checks
+uv run ruff format . && uv run ruff check --fix . && uv run mypy src/ && uv run pytest tests/ --cov=src
 ```
+
+#### Pre-commit Hooks
+
+Install pre-commit hooks to automatically run checks:
+
+```bash
+# Install hooks
+uv run pre-commit install
+
+# Run hooks manually
+uv run pre-commit run --all-files
+
+# Update hooks
+uv run pre-commit autoupdate
+```
+
+The hooks will run on every commit and ensure:
+- Code is formatted with Ruff
+- Linting passes
+- No trailing whitespace
+- Files end with newline
+- YAML/JSON syntax is valid
 
 ## Phase Roadmap
 
