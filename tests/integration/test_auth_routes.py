@@ -41,7 +41,7 @@ class TestRegistration:
         assert data["email"] == "newuser@example.com"
         assert data["username"] == "newuser"
         assert data["is_active"] is True
-        assert data["is_superuser"] is False
+        assert data["is_admin"] is False
         assert "id" in data
         assert "created_at" in data
 
