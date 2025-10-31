@@ -13,17 +13,15 @@ Architecture:
   Examples: "users:read:self", "users:write:all", "audit_logs:read:all"
 """
 
-import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, String, Table
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
 from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
-
 
 # =============================================================================
 # UserRole Junction Table (Many-to-Many)
@@ -155,6 +153,8 @@ class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         secondary=user_roles,
         back_populates="users",
         lazy="selectin",  # Load roles automatically
+        primaryjoin="User.id == user_roles.c.user_id",
+        secondaryjoin="Role.id == user_roles.c.role_id",
     )
 
     # Indexes for common queries will be created in migration
@@ -230,6 +230,8 @@ class Role(Base, TimestampMixin):
         "User",
         secondary=user_roles,
         back_populates="roles",
+        primaryjoin="Role.id == user_roles.c.role_id",
+        secondaryjoin="User.id == user_roles.c.user_id",
     )
 
     def __repr__(self) -> str:

@@ -10,6 +10,7 @@ This module implements immutable audit logging for:
 Audit logs are WRITE-ONCE - they cannot be modified or deleted after creation.
 """
 
+import enum
 import uuid
 from datetime import UTC, datetime
 from typing import Any, Optional
@@ -17,7 +18,6 @@ from typing import Any, Optional
 from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-import enum
 
 from src.models.base import Base
 
