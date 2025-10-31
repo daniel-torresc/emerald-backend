@@ -8,8 +8,8 @@ dependency injection for FastAPI routes.
 
 import logging
 from collections.abc import AsyncGenerator
-from typing import Any
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -43,7 +43,7 @@ def create_database_engine(database_url: str | None = None) -> AsyncEngine:
         - pool_pre_ping: Test connection before use (default: True)
         - pool_recycle: Recycle connections after N seconds (default: 3600)
     """
-    url = database_url or settings.database_url_str
+    url = database_url or str(settings.database_url)
 
     engine = create_async_engine(
         url,
@@ -137,7 +137,7 @@ async def check_database_connection() -> bool:
     """
     try:
         async with AsyncSessionLocal() as session:
-            await session.execute("SELECT 1")
+            await session.execute(text("SELECT 1"))
             return True
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
@@ -155,7 +155,7 @@ async def close_database_connection() -> None:
     Should be called on application shutdown to gracefully close
     all database connections.
     """
-    global engine
+    global engine  # TODO Change to not use global variables
     if engine:
         await engine.dispose()
         logger.info("Database engine disposed successfully")
