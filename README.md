@@ -50,6 +50,70 @@ uv run uvicorn src.main:app --reload
 
 Visit http://localhost:8000/docs for API documentation.
 
+## 🌐 Service Access Points
+
+After starting the application, you can access the following services:
+
+| Service | Port | URL | Purpose | Credentials |
+|---------|------|-----|---------|-------------|
+| **FastAPI API** | 8000 | http://localhost:8000 | REST API endpoints | N/A |
+| **Swagger UI** | 8000 | http://localhost:8000/docs | Interactive API documentation | N/A |
+| **ReDoc** | 8000 | http://localhost:8000/redoc | Alternative API documentation | N/A |
+| **pgAdmin** | 5050 | http://localhost:5050 | PostgreSQL web interface | Email: `admin@example.com`<br>Password: `admin` |
+| **RedisInsight** | 5540 | http://localhost:5540 | Redis web interface | No password required |
+| **PostgreSQL** | 5432 | `localhost:5432` | Database (direct connection) | User: `emerald_user`<br>Password: `emerald_password`<br>Database: `emerald_db` |
+| **Redis** | 6379 | `localhost:6379` | Cache/Rate limiter (direct) | No password |
+
+### 🔧 Setting Up Database Access
+
+#### pgAdmin Setup:
+1. Open http://localhost:5050
+2. Login with credentials above
+3. Right-click "Servers" → "Register" → "Server..."
+4. **General Tab**: Name: `Emerald Database`
+5. **Connection Tab**:
+   - Host: `postgres` (Docker network name)
+   - Port: `5432`
+   - Database: `emerald_db`
+   - Username: `emerald_user`
+   - Password: `emerald_password`
+   - ☑️ Save password
+6. Click "Save"
+
+#### RedisInsight Setup:
+1. Open http://localhost:5540
+2. Click "Add Redis Database"
+3. Connection settings:
+   - Host: `redis` (Docker network name)
+   - Port: `6379`
+   - Name: `Emerald Redis`
+4. Click "Add Redis Database"
+
+### 📊 Useful Redis Commands
+
+```bash
+# Connect to Redis CLI
+docker exec -it emerald-redis redis-cli
+
+# View all keys (rate limiting data)
+KEYS *
+
+# Get value of a key
+GET key_name
+
+# Check time-to-live (TTL) of a key
+TTL key_name
+
+# Monitor Redis commands in real-time
+MONITOR
+
+# Get Redis statistics
+INFO stats
+
+# Count total keys
+DBSIZE
+```
+
 ## Running & Stopping the Application
 
 ### Start the Application
