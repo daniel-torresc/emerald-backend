@@ -6,12 +6,10 @@ All SQLAlchemy models should inherit from Base.
 """
 
 import uuid
-from datetime import UTC, datetime
 
 from sqlalchemy import MetaData
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
-
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Naming convention for constraints
 # This ensures consistent naming across all database objects
