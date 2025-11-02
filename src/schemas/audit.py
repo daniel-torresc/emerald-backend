@@ -8,6 +8,7 @@ This module provides:
 """
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -19,41 +20,58 @@ class AuditLogResponse(BaseModel):
     Attributes:
         id: Audit log entry ID
         user_id: ID of user who performed the action
-        action: Action performed (e.g., "login", "logout", "user.create")
-        resource_type: Type of resource affected (e.g., "user", "account")
-        resource_id: ID of the affected resource
+        action: Action performed (e.g., "LOGIN", "LOGOUT", "CREATE")
+        entity_type: Type of entity affected (e.g., "user", "transaction")
+        entity_id: ID of the affected entity
         ip_address: IP address of the client
         user_agent: User agent string of the client
-        status: Action status ("success" or "failure")
-        before_value: Resource state before action (JSON)
-        after_value: Resource state after action (JSON)
+        status: Action status ("SUCCESS", "FAILURE", "PARTIAL")
+        old_values: Entity state before action (JSON)
+        new_values: Entity state after action (JSON)
+        description: Human-readable description of the action
+        request_id: Correlation ID for tracing requests
+        error_message: Error message if status is FAILURE
+        extra_metadata: Additional context as JSON
         created_at: Timestamp of the action
     """
 
-    id: int = Field(description="Audit log entry ID")
-    user_id: int | None = Field(
+    id: UUID = Field(description="Audit log entry ID")
+    user_id: UUID | None = Field(
         default=None,
         description="ID of user who performed the action",
     )
     action: str = Field(description="Action performed")
-    resource_type: str | None = Field(
+    entity_type: str = Field(description="Type of entity affected")
+    entity_id: UUID | None = Field(
         default=None,
-        description="Type of resource affected",
+        description="ID of the affected entity",
     )
-    resource_id: str | None = Field(
+    old_values: dict | None = Field(
         default=None,
-        description="ID of the affected resource",
+        description="Entity state before action",
+    )
+    new_values: dict | None = Field(
+        default=None,
+        description="Entity state after action",
+    )
+    description: str | None = Field(
+        default=None,
+        description="Human-readable description of the action",
     )
     ip_address: str | None = Field(default=None, description="Client IP address")
     user_agent: str | None = Field(default=None, description="Client user agent")
-    status: str = Field(description="Action status (success/failure)")
-    before_value: dict | None = Field(
+    request_id: str | None = Field(
         default=None,
-        description="Resource state before action",
+        description="Correlation ID for tracing requests",
     )
-    after_value: dict | None = Field(
+    status: str = Field(description="Action status (SUCCESS/FAILURE/PARTIAL)")
+    error_message: str | None = Field(
         default=None,
-        description="Resource state after action",
+        description="Error message if status is FAILURE",
+    )
+    extra_metadata: dict | None = Field(
+        default=None,
+        description="Additional context as JSON",
     )
     created_at: datetime = Field(description="Timestamp of the action")
 
@@ -67,26 +85,26 @@ class AuditLogFilterParams(BaseModel):
     Attributes:
         user_id: Filter by user ID
         action: Filter by action type
-        resource_type: Filter by resource type
-        resource_id: Filter by resource ID
-        status: Filter by status (success/failure)
+        entity_type: Filter by entity type
+        entity_id: Filter by entity ID
+        status: Filter by status (SUCCESS/FAILURE/PARTIAL)
         start_date: Filter logs after this date
         end_date: Filter logs before this date
     """
 
-    user_id: int | None = Field(default=None, description="Filter by user ID")
+    user_id: UUID | None = Field(default=None, description="Filter by user ID")
     action: str | None = Field(default=None, description="Filter by action type")
-    resource_type: str | None = Field(
+    entity_type: str | None = Field(
         default=None,
-        description="Filter by resource type",
+        description="Filter by entity type",
     )
-    resource_id: str | None = Field(
+    entity_id: UUID | None = Field(
         default=None,
-        description="Filter by resource ID",
+        description="Filter by entity ID",
     )
     status: str | None = Field(
         default=None,
-        description="Filter by status (success/failure)",
+        description="Filter by status (SUCCESS/FAILURE/PARTIAL)",
     )
     start_date: datetime | None = Field(
         default=None,

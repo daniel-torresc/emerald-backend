@@ -16,7 +16,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import ActiveUser
+from src.api.dependencies import ActiveUser, get_audit_service, get_auth_service
 from src.core.config import settings
 from src.core.database import get_db
 from src.models.audit_log import AuditAction, AuditStatus
@@ -63,6 +63,8 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 async def register(
     user_data: UserCreate,
     request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+    audit_service: AuditService = Depends(get_audit_service),
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
     """
@@ -71,6 +73,8 @@ async def register(
     Args:
         user_data: User registration data (email, username, password)
         request: FastAPI request object
+        auth_service: Injected AuthService instance
+        audit_service: Injected AuditService instance
         db: Database session
 
     Returns:
@@ -84,10 +88,6 @@ async def register(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("User-Agent")
     request_id = getattr(request.state, "request_id", None)
-
-    # Create services
-    auth_service = AuthService(db)
-    audit_service = AuditService(db)
 
     # Register user
     user, tokens = await auth_service.register(
@@ -141,6 +141,8 @@ async def register(
 async def login(
     credentials: LoginRequest,
     request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+    audit_service: AuditService = Depends(get_audit_service),
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     """
@@ -149,6 +151,8 @@ async def login(
     Args:
         credentials: Login credentials (email, password)
         request: FastAPI request object
+        auth_service: Injected AuthService instance
+        audit_service: Injected AuditService instance
         db: Database session
 
     Returns:
@@ -161,10 +165,6 @@ async def login(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("User-Agent")
     request_id = getattr(request.state, "request_id", None)
-
-    # Create services
-    auth_service = AuthService(db)
-    audit_service = AuditService(db)
 
     # Attempt login
     try:
@@ -234,6 +234,8 @@ async def login(
 async def refresh(
     token_request: RefreshTokenRequest,
     request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+    audit_service: AuditService = Depends(get_audit_service),
     db: AsyncSession = Depends(get_db),
 ) -> AccessTokenResponse:
     """
@@ -242,6 +244,8 @@ async def refresh(
     Args:
         token_request: Refresh token
         request: FastAPI request object
+        auth_service: Injected AuthService instance
+        audit_service: Injected AuditService instance
         db: Database session
 
     Returns:
@@ -254,10 +258,6 @@ async def refresh(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("User-Agent")
     request_id = getattr(request.state, "request_id", None)
-
-    # Create services
-    auth_service = AuthService(db)
-    audit_service = AuditService(db)
 
     # Attempt token refresh
     try:
@@ -327,6 +327,8 @@ async def refresh(
 async def logout(
     logout_request: LogoutRequest,
     request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+    audit_service: AuditService = Depends(get_audit_service),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """
@@ -335,6 +337,8 @@ async def logout(
     Args:
         logout_request: Refresh token to revoke
         request: FastAPI request object
+        auth_service: Injected AuthService instance
+        audit_service: Injected AuditService instance
         db: Database session
 
     Raises:
@@ -344,10 +348,6 @@ async def logout(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("User-Agent")
     request_id = getattr(request.state, "request_id", None)
-
-    # Create services
-    auth_service = AuthService(db)
-    audit_service = AuditService(db)
 
     # Extract user_id before logout
     from src.core.security import decode_token
@@ -394,6 +394,8 @@ async def change_password(
     password_data: UserPasswordChange,
     request: Request,
     current_user: ActiveUser,
+    auth_service: AuthService = Depends(get_auth_service),
+    audit_service: AuditService = Depends(get_audit_service),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """
@@ -403,6 +405,8 @@ async def change_password(
         password_data: Current and new password
         request: FastAPI request object
         current_user: Authenticated user (from dependency)
+        auth_service: Injected AuthService instance
+        audit_service: Injected AuditService instance
         db: Database session
 
     Raises:
@@ -413,10 +417,6 @@ async def change_password(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("User-Agent")
     request_id = getattr(request.state, "request_id", None)
-
-    # Create services
-    auth_service = AuthService(db)
-    audit_service = AuditService(db)
 
     # Attempt password change
     try:

@@ -14,7 +14,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -264,6 +264,83 @@ def require_permission(permission: str):
         return current_user
 
     return _check_permission
+
+
+# ============================================================================
+# Service Dependencies
+# ============================================================================
+
+
+def get_auth_service(db: AsyncSession = Depends(get_db)):
+    """
+    Dependency to get AuthService instance.
+
+    This dependency provides an AuthService with an active database session.
+
+    Args:
+        db: Database session
+
+    Returns:
+        AuthService instance
+
+    Usage:
+        @app.post("/api/v1/auth/login")
+        async def login(
+            auth_service: AuthService = Depends(get_auth_service)
+        ):
+            user, tokens = await auth_service.login(...)
+    """
+    from src.services.auth_service import AuthService
+
+    return AuthService(db)
+
+
+def get_user_service(db: AsyncSession = Depends(get_db)):
+    """
+    Dependency to get UserService instance.
+
+    This dependency provides a UserService with an active database session.
+
+    Args:
+        db: Database session
+
+    Returns:
+        UserService instance
+
+    Usage:
+        @app.get("/api/v1/users/me")
+        async def get_profile(
+            user_service: UserService = Depends(get_user_service)
+        ):
+            return await user_service.get_user_profile(...)
+    """
+    from src.services.user_service import UserService
+
+    return UserService(db)
+
+
+def get_audit_service(db: AsyncSession = Depends(get_db)):
+    """
+    Dependency to get AuditService instance.
+
+    This dependency provides an AuditService with an active database session.
+
+    Args:
+        db: Database session
+
+    Returns:
+        AuditService instance
+
+    Usage:
+        @app.post("/api/v1/actions")
+        async def perform_action(
+            audit_service: AuditService = Depends(get_audit_service)
+        ):
+            await audit_service.log_event(...)
+    """
+    from src.services.audit_service import AuditService
+
+    return AuditService(db)
 
 
 # Convenience type aliases for common dependencies
