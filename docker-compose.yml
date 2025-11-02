@@ -1,5 +1,5 @@
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (Development)
   postgres:
     image: postgres:16-alpine
     container_name: emerald-postgres
@@ -17,6 +17,27 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  # PostgreSQL Test Database (Integration & E2E Tests)
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: emerald-postgres-test
+    environment:
+      POSTGRES_USER: emerald_user
+      POSTGRES_PASSWORD: emerald_password
+      POSTGRES_DB: test_emerald_db
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emerald_user -d test_emerald_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - test  # Only start with --profile test
 
   # Redis Cache
   redis:
@@ -65,6 +86,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  postgres_test_data:
     driver: local
   redis_data:
     driver: local

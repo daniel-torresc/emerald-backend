@@ -120,6 +120,11 @@ def get_logging_config() -> dict[str, Any]:
                 "handlers": ["console"],
                 "propagate": False,
             },
+            "sqlalchemy": {
+                "level": "WARNING",  # Set to INFO to see SQL queries
+                "handlers": ["console"],
+                "propagate": False,
+            },
             "sqlalchemy.engine": {
                 "level": "WARNING",  # Set to INFO to see SQL queries
                 "handlers": ["console"],
