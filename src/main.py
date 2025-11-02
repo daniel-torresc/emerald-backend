@@ -20,7 +20,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from src.api.routes import auth
+from src.api.routes import auth, users
 from src.core import settings, setup_logging
 from src.core.database import check_database_connection, close_database_connection
 from src.exceptions import AppException
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 limiter = Limiter(
     key_func=get_remote_address,
     storage_uri=str(settings.redis_url),
-    default_limits=["100/minute"],  # Global rate limit
+    default_limits=[settings.rate_limit_default],  # Global rate limit
 )
 
 
@@ -247,6 +247,9 @@ app.add_middleware(
 # Include authentication routes
 app.include_router(auth.router, prefix="/api/v1")
 
+# Include user management routes
+app.include_router(users.router, prefix="/api/v1")
+
 
 # ============================================================================
 # Health Check Endpoints
@@ -301,7 +304,7 @@ async def root():
         Welcome message with API information
     """
     return {
-        "message": "Welcome to Emerald Finance Platform API",
+        "message": f"Welcome to {settings.app_name} API",
         "version": settings.version,
         "docs": "/docs" if settings.debug else "disabled in production",
         "health": "/health",
