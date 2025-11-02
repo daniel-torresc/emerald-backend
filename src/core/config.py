@@ -5,9 +5,9 @@ This module defines all application settings loaded from environment variables.
 All configuration must go through this Settings class - NO hardcoded values.
 """
 
-from typing import Literal
+from typing import List, Literal
 
-from pydantic import Field, PostgresDsn, RedisDsn, field_validator
+from pydantic import Field, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -85,22 +85,17 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # CORS Settings
     # -------------------------------------------------------------------------
-    cors_origins: str = Field(
-        default="http://localhost:3000,http://localhost:8000",
+    cors_origins: List[str] = Field(
+        default=["http://localhost:3000", "http://localhost:8000"],
         description="Comma-separated list of allowed CORS origins"
     )
     cors_allow_credentials: bool = Field(default=True)
-
-    @field_validator("cors_origins")
-    @classmethod
-    def parse_cors_origins(cls, v: str) -> list[str]:
-        """Parse comma-separated CORS origins into a list."""
-        return [origin.strip() for origin in v.split(",") if origin.strip()]
 
     # -------------------------------------------------------------------------
     # Rate Limiting
     # -------------------------------------------------------------------------
     rate_limit_enabled: bool = Field(default=True)
+    rate_limit_default: str = Field(default="100/minute")
     rate_limit_login: str = Field(default="5/15minute")
     rate_limit_register: str = Field(default="3/hour")
     rate_limit_password_change: str = Field(default="3/hour")
@@ -150,13 +145,6 @@ class Settings(BaseSettings):
     def is_staging(self) -> bool:
         """Check if running in staging environment."""
         return self.environment == "staging"
-
-    @property
-    def cors_origins_list(self) -> list[str]:
-        """Get parsed CORS origins as list."""
-        if isinstance(self.cors_origins, list):
-            return self.cors_origins
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def database_url_str(self) -> str:

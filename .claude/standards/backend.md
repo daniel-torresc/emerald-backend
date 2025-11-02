@@ -247,6 +247,7 @@ project/
 - Use FastAPI Depends() for authentication dependencies
 - Implement role-based access control (RBAC) when needed
 - Store refresh tokens securely (database, not JWT)
+- If using Bearer token authentication, implement a security scheme configuration (HTTPBearer, OAuth2PasswordBearer)
 
 **MANDATORY: Security best practices**
 - Enable CORS with explicit allowed origins (NO "*" in production)

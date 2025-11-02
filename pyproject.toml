@@ -33,3 +33,11 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.6.0",
 ]
+
+[tool.mypy]
+strict = true
+
+# Ignore missing type hints for specific libraries
+[[tool.mypy.overrides]]
+module = "jose.*"
+ignore_missing_imports = true

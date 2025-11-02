@@ -11,6 +11,7 @@ This module provides:
 import hashlib
 import logging
 import re
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -188,6 +189,7 @@ def create_access_token(
         "exp": expire,
         "iat": datetime.now(UTC),
         "type": TOKEN_TYPE_ACCESS,
+        "jti": str(uuid.uuid4()),  # Unique JWT ID to ensure token uniqueness
     })
 
     encoded_jwt = jwt.encode(
@@ -237,6 +239,7 @@ def create_refresh_token(
         "exp": expire,
         "iat": datetime.now(UTC),
         "type": TOKEN_TYPE_REFRESH,
+        "jti": str(uuid.uuid4()),  # Unique JWT ID to prevent hash collisions
     })
 
     encoded_jwt = jwt.encode(
