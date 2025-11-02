@@ -20,7 +20,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from src.api.routes import auth, users
+from src.api.routes import audit_logs, auth, users
 from src.core import settings, setup_logging
 from src.core.database import check_database_connection, close_database_connection
 from src.exceptions import AppException
@@ -246,6 +246,9 @@ app.add_middleware(
 # ============================================================================
 # Include authentication routes
 app.include_router(auth.router, prefix="/api/v1")
+
+# Include audit log routes
+app.include_router(audit_logs.router, prefix="/api/v1")
 
 # Include user management routes
 app.include_router(users.router, prefix="/api/v1")
