@@ -36,7 +36,7 @@ class UserRepository(BaseRepository[User]):
         """
         super().__init__(User, session)
 
-    async def get_by_email(self, email: str) -> User | None:
+    async def get_by_email(self, email: EmailStr) -> User | None:
         """
         Get user by email address.
 

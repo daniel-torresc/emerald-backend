@@ -13,7 +13,8 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Header, status
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,9 +25,16 @@ from src.repositories.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
 
+# Security scheme for Swagger UI - this adds the padlock icon
+security = HTTPBearer(
+    scheme_name="Bearer",
+    description="Enter your JWT access token",
+    auto_error=False,
+)
+
 
 async def get_current_user(
-    authorization: Annotated[str | None, Header()] = None,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
@@ -40,7 +48,7 @@ async def get_current_user(
     5. Returns User instance
 
     Args:
-        authorization: Authorization header (Bearer <token>)
+        credentials: HTTP Bearer credentials from security scheme
         db: Database session
 
     Returns:
@@ -56,26 +64,16 @@ async def get_current_user(
         ):
             return {"email": current_user.email}
     """
-    # Check if Authorization header is present
-    if not authorization:
-        logger.warning("Authentication failed: missing Authorization header")
+    # Check if credentials are present
+    if not credentials:
+        logger.warning("Authentication failed: missing Bearer token")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Extract Bearer token
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        logger.warning("Authentication failed: invalid Authorization header format")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials format",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = parts[1]
+    token = credentials.credentials
 
     # Decode and validate token
     try:
