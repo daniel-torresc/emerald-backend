@@ -9,6 +9,7 @@ dependency injection for FastAPI routes.
 import logging
 from collections.abc import AsyncGenerator
 
+from fastapi import Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -71,33 +72,23 @@ def create_database_engine(database_url: str | None = None) -> AsyncEngine:
     return engine
 
 
-# Global engine instance
-engine: AsyncEngine = create_database_engine()
-
-
-# -----------------------------------------------------------------------------
-# Session Factory
-# -----------------------------------------------------------------------------
-
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,  # Don't expire objects after commit
-    autocommit=False,
-    autoflush=False,
-)
+# Engine and sessionmaker are now managed via FastAPI app.state
+# No global instances - use get_db() dependency for sessions
 
 
 # -----------------------------------------------------------------------------
 # Dependency Injection for FastAPI
 # -----------------------------------------------------------------------------
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency function to provide database session to FastAPI routes.
 
-    Yields an async database session and ensures it's properly closed
-    after the request completes. Handles rollback on exceptions.
+    Gets the sessionmaker from app state and yields a session.
+    Ensures proper session cleanup with commit/rollback handling.
+
+    Args:
+        request: FastAPI request object (provides access to app.state)
 
     Usage in FastAPI routes:
         @app.get("/users")
@@ -111,7 +102,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     Raises:
         Exception: Re-raises any exception after rolling back transaction
     """
-    async with AsyncSessionLocal() as session:
+    sessionmaker = request.app.state.sessionmaker
+    async with sessionmaker() as session:
         try:
             yield session
             await session.commit()
@@ -126,17 +118,20 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 # Database Health Check
 # -----------------------------------------------------------------------------
 
-async def check_database_connection() -> bool:
+async def check_database_connection(sessionmaker: async_sessionmaker) -> bool:
     """
     Check if database connection is healthy.
 
     Used for health check endpoints to verify database connectivity.
 
+    Args:
+        sessionmaker: AsyncSessionMaker from app.state
+
     Returns:
         True if database is reachable, False otherwise
     """
     try:
-        async with AsyncSessionLocal() as session:
+        async with sessionmaker() as session:
             await session.execute(text("SELECT 1"))
             return True
     except Exception as e:
@@ -148,14 +143,23 @@ async def check_database_connection() -> bool:
 # Lifecycle Management
 # -----------------------------------------------------------------------------
 
-async def close_database_connection() -> None:
+async def close_database_connection(engine: AsyncEngine | None) -> None:
     """
     Close database engine and dispose of connection pool.
 
     Should be called on application shutdown to gracefully close
     all database connections.
+
+    Args:
+        engine: The AsyncEngine to dispose. If None, logs warning and returns.
     """
-    global engine  # TODO Change to not use global variables
-    if engine:
+    if engine is None:
+        logger.warning("close_database_connection called with None engine")
+        return
+
+    try:
         await engine.dispose()
         logger.info("Database engine disposed successfully")
+    except Exception as e:
+        logger.error(f"Error disposing database engine: {e}")
+        # Don't raise - we're shutting down anyway
