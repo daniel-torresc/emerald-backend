@@ -6,10 +6,9 @@ Exports the main configuration, database, security, and logging components.
 
 from src.core.config import settings
 from src.core.database import (
-    AsyncSessionLocal,
     check_database_connection,
     close_database_connection,
-    engine,
+    create_database_engine,
     get_db,
 )
 from src.core.logging import get_logger, setup_logging
@@ -31,8 +30,7 @@ __all__ = [
     # Config
     "settings",
     # Database
-    "engine",
-    "AsyncSessionLocal",
+    "create_database_engine",
     "get_db",
     "check_database_connection",
     "close_database_connection",

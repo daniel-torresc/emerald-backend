@@ -19,10 +19,15 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.api.routes import audit_logs, auth, users
 from src.core import settings, setup_logging
-from src.core.database import check_database_connection, close_database_connection
+from src.core.database import (
+    check_database_connection,
+    close_database_connection,
+    create_database_engine,
+)
 from src.exceptions import AppException
 from src.middleware import (
     RequestIDMiddleware,
@@ -55,17 +60,35 @@ async def lifespan(app: FastAPI):
     Lifespan context manager for startup and shutdown events.
 
     Handles:
-    - Database connection initialization
+    - Database engine creation and storage in app.state
+    - Session factory creation
     - Resource cleanup on shutdown
     """
     logger.info(f"Starting {settings.app_name} v{settings.version}")
     logger.info(f"Environment: {settings.environment}")
 
+    # Create database engine and store in app state
+    logger.info("Initializing database engine...")
+    app.state.engine = create_database_engine()
+
+    # Create sessionmaker and store in app state
+    app.state.sessionmaker = async_sessionmaker(
+        app.state.engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+
+    logger.info("Database engine initialized successfully")
+
     yield
 
     # Cleanup on shutdown
     logger.info("Shutting down application")
-    await close_database_connection()
+    await close_database_connection(app.state.engine)
+    app.state.engine = None
+    app.state.sessionmaker = None
 
 
 # ============================================================================
@@ -274,26 +297,27 @@ async def health_check():
 
 
 @app.get("/health/ready", tags=["Health"])
-async def readiness_check():
+async def readiness_check(request: Request):
     """
     Readiness check endpoint.
 
     Checks if the application is ready to serve requests.
-    This should verify database connectivity and other critical dependencies.
+    This verifies database connectivity and other critical dependencies.
 
     Returns:
         Detailed readiness status
     """
-    # TODO: Add database connectivity check
-    # TODO: Add Redis connectivity check
+    # Check database connection
+    sessionmaker = request.app.state.sessionmaker
+    db_healthy = await check_database_connection(sessionmaker)
 
     return {
-        "status": "ready",
+        "status": "ready" if db_healthy else "degraded",
         "app": settings.app_name,
         "version": settings.version,
         "checks": {
-            "database": "ok" if await check_database_connection() else "ko",  # Placeholder
-            "redis": "ok",  # Placeholder
+            "database": "ok" if db_healthy else "ko",
+            "redis": "ok",  # Placeholder - TODO: Add Redis check
         },
     }
 
