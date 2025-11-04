@@ -100,7 +100,7 @@ class UserService:
 
         if not user:
             logger.warning(f"User {user_id} not found")
-            raise NotFoundError(f"User with ID {user_id} not found")
+            raise NotFoundError(f"User with ID {user_id}")
 
         # Log audit event (profile view by admin)
         if current_user.is_admin and user_id != current_user.id:
@@ -165,7 +165,7 @@ class UserService:
 
         if not user:
             logger.warning(f"User {user_id} not found")
-            raise NotFoundError(f"User with ID {user_id} not found")
+            raise NotFoundError(f"User with ID {user_id}")
 
         # Capture old values for audit log
         old_values: dict[str, Any] = {
@@ -347,7 +347,7 @@ class UserService:
 
         if not user:
             logger.warning(f"User {user_id} not found")
-            raise NotFoundError(f"User with ID {user_id} not found")
+            raise NotFoundError(f"User with ID {user_id}")
 
         # Update user to inactive
         old_values = {"is_active": user.is_active}
@@ -416,7 +416,7 @@ class UserService:
 
         if not user:
             logger.warning(f"User {user_id} not found")
-            raise NotFoundError(f"User with ID {user_id} not found")
+            raise NotFoundError(f"User with ID {user_id}")
 
         # Soft delete user
         old_values = {"deleted_at": None}
