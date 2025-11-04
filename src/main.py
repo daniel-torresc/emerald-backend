@@ -11,6 +11,7 @@ This module sets up:
 
 import logging
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -21,7 +22,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.api.routes import audit_logs, auth, users
+from src.api.routes import accounts, audit_logs, auth, users
 from src.core import settings, setup_logging
 from src.core.database import (
     check_database_connection,
@@ -55,7 +56,7 @@ limiter = Limiter(
 # Lifespan Context Manager
 # ============================================================================
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # type: ignore
     """
     Lifespan context manager for startup and shutdown events.
 
@@ -276,12 +277,15 @@ app.include_router(audit_logs.router, prefix="/api/v1")
 # Include user management routes
 app.include_router(users.router, prefix="/api/v1")
 
+# Include account management routes
+app.include_router(accounts.router, prefix="/api/v1")
+
 
 # ============================================================================
 # Health Check Endpoints
 # ============================================================================
 @app.get("/health", tags=["Health"])
-async def health_check():
+async def health_check() -> dict[str, str]:
     """
     Basic health check endpoint.
 
@@ -297,7 +301,7 @@ async def health_check():
 
 
 @app.get("/health/ready", tags=["Health"])
-async def readiness_check(request: Request):
+async def readiness_check(request: Request) -> dict[str, Any]:
     """
     Readiness check endpoint.
 
@@ -323,7 +327,7 @@ async def readiness_check(request: Request):
 
 
 @app.get("/", tags=["Root"])
-async def root():
+async def root() -> dict[str, str]:
     """
     Root endpoint.
 
