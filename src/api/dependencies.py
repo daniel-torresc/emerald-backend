@@ -343,6 +343,30 @@ def get_audit_service(db: AsyncSession = Depends(get_db)):
     return AuditService(db)
 
 
+def get_account_service(db: AsyncSession = Depends(get_db)):
+    """
+    Dependency to get AccountService instance.
+
+    This dependency provides an AccountService with an active database session.
+
+    Args:
+        db: Database session
+
+    Returns:
+        AccountService instance
+
+    Usage:
+        @app.post("/api/v1/accounts")
+        async def create_account(
+            account_service: AccountService = Depends(get_account_service)
+        ):
+            return await account_service.create_account(...)
+    """
+    from src.services.account_service import AccountService
+
+    return AccountService(db)
+
+
 # Convenience type aliases for common dependencies
 CurrentUser = Annotated[User, Depends(get_current_user)]
 ActiveUser = Annotated[User, Depends(require_active_user)]
