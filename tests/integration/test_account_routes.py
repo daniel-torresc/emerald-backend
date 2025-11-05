@@ -102,8 +102,12 @@ class TestAccountRoutes:
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
-        assert response.status_code == 400
-        assert "already exists" in response.json()["detail"].lower()
+        assert response.status_code == 409  # 409 Conflict is correct for duplicates
+        response_data = response.json()
+        # Check the error message in the standardized error response format
+        assert "error" in response_data
+        error_message = response_data["error"]["message"].lower()
+        assert "already exists" in error_message
 
     async def test_create_account_invalid_currency(
         self, async_client: AsyncClient, user_token: dict
@@ -481,7 +485,7 @@ class TestAccountRoutes:
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 409  # 409 Conflict is correct for duplicates
 
     # ========================================================================
     # DELETE /api/v1/accounts/{id} - Delete Account
