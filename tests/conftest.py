@@ -8,6 +8,15 @@ This module provides:
 - Authentication token fixtures
 """
 
+# Set environment variables BEFORE importing anything from src
+import os
+os.environ["RATE_LIMIT_DEFAULT"] = "10000 per hour"
+os.environ["RATE_LIMIT_LOGIN"] = "10000 per hour"
+os.environ["RATE_LIMIT_REGISTER"] = "10000 per hour"
+os.environ["RATE_LIMIT_PASSWORD_CHANGE"] = "10000 per hour"
+os.environ["RATE_LIMIT_TOKEN_REFRESH"] = "10000 per hour"
+os.environ["RATE_LIMIT_API"] = "10000 per hour"
+
 import asyncio
 from typing import AsyncGenerator
 
@@ -56,7 +65,7 @@ async def test_engine(event_loop):
     """
     # Create test database engine with NullPool to avoid connection issues
     engine = create_async_engine(
-        str(settings.database_url),
+        str(settings.test_database_url),
         echo=False,
         future=True,
         poolclass=NullPool,  # Disable connection pooling for tests
@@ -80,20 +89,26 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
     """
     Create a database session for a test.
 
-    Each test gets a fresh session with automatic cleanup.
+    Each test gets a fresh session with automatic rollback for isolation.
     """
-    # Create session factory
+    # Start a transaction that will be rolled back after the test
+    connection = await test_engine.connect()
+    transaction = await connection.begin()
+
+    # Create session bound to the connection
     async_session_factory = async_sessionmaker(
-        test_engine,
+        bind=connection,
         class_=AsyncSession,
         expire_on_commit=False,
+        join_transaction_mode="create_savepoint",  # Use savepoints for nested transactions
     )
 
     async with async_session_factory() as session:
         yield session
 
-        # Rollback any uncommitted changes
-        await session.rollback()
+    # Rollback the transaction to clean up all changes
+    await transaction.rollback()
+    await connection.close()
 
 
 # ============================================================================
@@ -124,7 +139,7 @@ async def async_client(test_engine) -> AsyncGenerator[AsyncClient, None]:
     """
     Create an async FastAPI test client with database override.
 
-    Use this for async tests.
+    Use this for async tests. Uses TRUNCATE for fast test isolation.
     """
     # Create a session factory
     async_session_factory = async_sessionmaker(
@@ -147,12 +162,13 @@ async def async_client(test_engine) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # Clear Redis (used for rate limiting) before test
+    # Clear Redis (used for caching and other purposes) before test
     redis_client = redis.from_url(str(settings.redis_url))
     try:
-        await redis_client.flushdb()
-    except Exception:
-        pass  # Redis might not be available
+        await redis_client.flushall()  # Clear ALL Redis databases
+        await asyncio.sleep(0.01)  # Give Redis a moment to process
+    except Exception as e:
+        print(f"Warning: Redis flush failed: {e}")
     finally:
         await redis_client.aclose()
 
@@ -166,22 +182,32 @@ async def async_client(test_engine) -> AsyncGenerator[AsyncClient, None]:
     # Clear overrides
     app.dependency_overrides.clear()
 
-    # Clean up database after each test
+    # Clean up database after each test using TRUNCATE (faster than DELETE)
+    # TRUNCATE also resets sequences and is much faster than DELETE
     async with async_session_factory() as session:
         try:
-            await session.execute(text("DELETE FROM audit_logs"))
-            await session.execute(text("DELETE FROM refresh_tokens"))
-            await session.execute(text("DELETE FROM users"))
+            # Disable foreign key checks temporarily
+            await session.execute(text("SET session_replication_role = 'replica'"))
+
+            # Truncate all tables (order doesn't matter with FK checks disabled)
+            await session.execute(text("TRUNCATE TABLE account_shares, accounts, audit_logs, refresh_tokens, users RESTART IDENTITY CASCADE"))
+
+            # Re-enable foreign key checks
+            await session.execute(text("SET session_replication_role = 'origin'"))
+
             await session.commit()
-        except Exception:
+        except Exception as e:
             await session.rollback()
+            # Log error but don't fail the test
+            print(f"Warning: Database cleanup failed: {e}")
 
     # Clear Redis after test
     redis_client = redis.from_url(str(settings.redis_url))
     try:
-        await redis_client.flushdb()
-    except Exception:
-        pass
+        await redis_client.flushall()  # Clear ALL Redis databases
+        await asyncio.sleep(0.01)  # Give Redis a moment to process
+    except Exception as e:
+        print(f"Warning: Redis cleanup flush failed: {e}")
     finally:
         await redis_client.aclose()
 
@@ -193,6 +219,9 @@ async def async_client(test_engine) -> AsyncGenerator[AsyncClient, None]:
 async def test_user(test_engine) -> User:
     """
     Create a test user in the database.
+
+    For unit tests using db_session: user is within the transaction and rolled back.
+    For integration tests: user is cleaned up via TRUNCATE.
 
     Returns:
         User instance with known credentials
@@ -224,6 +253,9 @@ async def admin_user(test_engine) -> User:
     """
     Create an admin user in the database.
 
+    For unit tests using db_session: user is within the transaction and rolled back.
+    For integration tests: user is cleaned up via TRUNCATE.
+
     Returns:
         User instance with admin privileges
     """
@@ -253,6 +285,9 @@ async def admin_user(test_engine) -> User:
 async def inactive_user(test_engine) -> User:
     """
     Create an inactive user in the database.
+
+    For unit tests using db_session: user is within the transaction and rolled back.
+    For integration tests: user is cleaned up via TRUNCATE.
 
     Returns:
         User instance that is deactivated
