@@ -25,13 +25,13 @@ class User:
     username: Username
     password_hash: PasswordHash
     full_name: str
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime | None = None
+    last_login_at: datetime | None = None
     is_active: bool = True
     is_admin: bool = False
     roles: list["Role"] = field(default_factory=list)  # Forward reference
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-    deleted_at: datetime | None = None
-    last_login_at: datetime | None = None
 
     def __post_init__(self) -> None:
         """Validate user after initialization."""
