@@ -22,7 +22,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.api.routes import accounts, audit_logs, auth, users
+from src.api.routes import account_shares, accounts, audit_logs, auth, users
 from src.core import settings, setup_logging
 from src.core.database import (
     check_database_connection,
@@ -279,6 +279,9 @@ app.include_router(users.router, prefix="/api/v1")
 
 # Include account management routes
 app.include_router(accounts.router, prefix="/api/v1")
+
+# Include account sharing routes
+app.include_router(account_shares.router, prefix="/api/v1")
 
 
 # ============================================================================

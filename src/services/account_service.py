@@ -15,13 +15,16 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import AlreadyExistsError, NotFoundError
-from src.models.account import Account
+from src.exceptions import AlreadyExistsError, InsufficientPermissionsError, NotFoundError, ValidationError
+from src.models.account import Account, AccountShare
 from src.models.audit_log import AuditAction
-from src.models.enums import AccountType
+from src.models.enums import AccountType, PermissionLevel
 from src.models.user import User
 from src.repositories.account_repository import AccountRepository
+from src.repositories.account_share_repository import AccountShareRepository
+from src.repositories.user_repository import UserRepository
 from src.services.audit_service import AuditService
+from src.services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +53,9 @@ class AccountService:
         """
         self.db = db
         self.account_repo = AccountRepository(db)
+        self.share_repo = AccountShareRepository(db)
+        self.user_repo = UserRepository(db)
+        self.permission_service = PermissionService(db)
         self.audit_service = AuditService(db)
 
     async def create_account(
@@ -454,3 +460,325 @@ class AccountService:
             raise PermissionError("You can only count your own accounts")
 
         return await self.account_repo.count_user_accounts(user_id, is_active=True)
+
+    # =============================================================================
+    # Account Sharing Methods (Phase 2B)
+    # =============================================================================
+
+    async def share_account(
+        self,
+        account_id: uuid.UUID,
+        target_user_id: uuid.UUID,
+        permission_level: PermissionLevel,
+        current_user: User,
+        request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> AccountShare:
+        """
+        Share account with another user.
+
+        Creates a new AccountShare record granting access to target user.
+        Only the account owner can share accounts.
+
+        Args:
+            account_id: ID of account to share
+            target_user_id: ID of user to share with
+            permission_level: Permission level to grant (editor or viewer, not owner)
+            current_user: Currently authenticated user (must be owner)
+            request_id: Optional request ID for correlation
+            ip_address: Client IP address for audit logging
+            user_agent: Client user agent for audit logging
+
+        Returns:
+            Created AccountShare instance
+
+        Raises:
+            NotFoundError: If account or target user not found
+            InsufficientPermissionsError: If current user is not owner
+            ValidationError: If trying to share with self or grant owner permission
+            AlreadyExistsError: If account already shared with target user
+
+        Example:
+            share = await account_service.share_account(
+                account_id=account.id,
+                target_user_id=partner.id,
+                permission_level=PermissionLevel.EDITOR,
+                current_user=owner
+            )
+        """
+        # Verify account exists
+        account = await self.account_repo.get_by_id(account_id)
+        if not account:
+            raise NotFoundError("Account not found")
+
+        # Check if current user is owner
+        await self.permission_service.require_permission(
+            current_user.id, account_id, PermissionLevel.OWNER
+        )
+
+        # Validate target user exists and is not deleted
+        target_user = await self.user_repo.get_by_id(target_user_id)
+        if not target_user:
+            raise NotFoundError("User to share with not found")
+
+        # Cannot share with self
+        if target_user_id == current_user.id:
+            raise ValidationError("Cannot share account with yourself")
+
+        # Cannot grant owner permission (only one owner per account)
+        if permission_level == PermissionLevel.OWNER:
+            raise ValidationError(
+                "Cannot grant owner permission. Each account has exactly one owner."
+            )
+
+        # Check if share already exists
+        if await self.share_repo.exists_share(target_user_id, account_id):
+            raise AlreadyExistsError(
+                f"Account already shared with user {target_user.username}"
+            )
+
+        # Create share
+        share = AccountShare(
+            account_id=account_id,
+            user_id=target_user_id,
+            permission_level=permission_level,
+            created_by=current_user.id,
+            updated_by=current_user.id,
+        )
+
+        created_share = await self.share_repo.create(share)
+
+        logger.info(
+            f"User {current_user.id} shared account {account_id} with "
+            f"user {target_user_id} ({permission_level.value})"
+        )
+
+        # Log audit event
+        await self.audit_service.log_event(
+            user_id=current_user.id,
+            action=AuditAction.CREATE,
+            entity_type="account_share",
+            entity_id=created_share.id,
+            description=f"Shared account '{account.account_name}' with {target_user.username} ({permission_level.value})",
+            extra_metadata={
+                "account_id": str(account_id),
+                "account_name": account.account_name,
+                "target_user_id": str(target_user_id),
+                "target_username": target_user.username,
+                "permission_level": permission_level.value,
+            },
+            ip_address=ip_address,
+            user_agent=user_agent,
+            request_id=request_id,
+        )
+
+        return created_share
+
+    async def list_shares(
+        self,
+        account_id: uuid.UUID,
+        current_user: User,
+    ) -> list[AccountShare]:
+        """
+        List all shares for an account.
+
+        Owner sees all shares, non-owners see only their own share.
+
+        Args:
+            account_id: ID of the account
+            current_user: Currently authenticated user
+
+        Returns:
+            List of AccountShare instances
+
+        Raises:
+            NotFoundError: If account not found or user has no access
+
+        Example:
+            shares = await account_service.list_shares(account.id, user)
+        """
+        # Verify user has access to account
+        await self.permission_service.require_permission(
+            current_user.id, account_id, PermissionLevel.VIEWER
+        )
+
+        # Get all shares for account
+        shares = await self.share_repo.get_by_account(account_id)
+
+        # If user is not owner, filter to show only their own share
+        is_owner = await self.permission_service.is_owner(
+            current_user.id, account_id
+        )
+
+        if not is_owner:
+            shares = [s for s in shares if s.user_id == current_user.id]
+
+        return shares
+
+    async def update_share(
+        self,
+        account_id: uuid.UUID,
+        share_id: uuid.UUID,
+        permission_level: PermissionLevel,
+        current_user: User,
+        request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> AccountShare:
+        """
+        Update permission level for an account share.
+
+        Only the account owner can update share permissions.
+
+        Args:
+            account_id: ID of the account
+            share_id: ID of the share to update
+            permission_level: New permission level
+            current_user: Currently authenticated user (must be owner)
+            request_id: Optional request ID for correlation
+            ip_address: Client IP address for audit logging
+            user_agent: Client user agent for audit logging
+
+        Returns:
+            Updated AccountShare instance
+
+        Raises:
+            NotFoundError: If account or share not found
+            InsufficientPermissionsError: If current user is not owner
+            ValidationError: If trying to grant owner permission or change own permission
+
+        Example:
+            updated_share = await account_service.update_share(
+                account_id=account.id,
+                share_id=share.id,
+                permission_level=PermissionLevel.EDITOR,
+                current_user=owner
+            )
+        """
+        # Check if current user is owner
+        await self.permission_service.require_permission(
+            current_user.id, account_id, PermissionLevel.OWNER
+        )
+
+        # Get share
+        share = await self.share_repo.get_by_id(share_id)
+        if not share or share.account_id != account_id:
+            raise NotFoundError("Share not found")
+
+        # Cannot grant owner permission
+        if permission_level == PermissionLevel.OWNER:
+            raise ValidationError(
+                "Cannot grant owner permission. Each account has exactly one owner."
+            )
+
+        # Cannot change own owner permission
+        if share.user_id == current_user.id and share.permission_level == PermissionLevel.OWNER:
+            raise ValidationError("Cannot change your own owner permission")
+
+        # Store old permission for audit log
+        old_permission = share.permission_level
+
+        # Update permission
+        share.permission_level = permission_level
+        share.updated_by = current_user.id
+
+        updated_share = await self.share_repo.update(share)
+
+        logger.info(
+            f"User {current_user.id} updated share {share_id} permission "
+            f"from {old_permission.value} to {permission_level.value}"
+        )
+
+        # Log audit event
+        await self.audit_service.log_event(
+            user_id=current_user.id,
+            action=AuditAction.UPDATE,
+            entity_type="account_share",
+            entity_id=share_id,
+            description=f"Updated share permission from {old_permission.value} to {permission_level.value}",
+            extra_metadata={
+                "account_id": str(account_id),
+                "share_user_id": str(share.user_id),
+                "old_permission": old_permission.value,
+                "new_permission": permission_level.value,
+            },
+            ip_address=ip_address,
+            user_agent=user_agent,
+            request_id=request_id,
+        )
+
+        return updated_share
+
+    async def revoke_share(
+        self,
+        account_id: uuid.UUID,
+        share_id: uuid.UUID,
+        current_user: User,
+        request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> None:
+        """
+        Revoke account access from a user.
+
+        Soft deletes the AccountShare record. Only the account owner can revoke access.
+
+        Args:
+            account_id: ID of the account
+            share_id: ID of the share to revoke
+            current_user: Currently authenticated user (must be owner)
+            request_id: Optional request ID for correlation
+            ip_address: Client IP address for audit logging
+            user_agent: Client user agent for audit logging
+
+        Raises:
+            NotFoundError: If account or share not found
+            InsufficientPermissionsError: If current user is not owner
+            ValidationError: If trying to revoke own owner permission
+
+        Example:
+            await account_service.revoke_share(
+                account_id=account.id,
+                share_id=share.id,
+                current_user=owner
+            )
+        """
+        # Check if current user is owner
+        await self.permission_service.require_permission(
+            current_user.id, account_id, PermissionLevel.OWNER
+        )
+
+        # Get share
+        share = await self.share_repo.get_by_id(share_id)
+        if not share or share.account_id != account_id:
+            raise NotFoundError("Share not found")
+
+        # Cannot revoke own owner permission
+        if share.user_id == current_user.id and share.permission_level == PermissionLevel.OWNER:
+            raise ValidationError("Cannot revoke your own owner permission")
+
+        # Soft delete share
+        await self.share_repo.soft_delete(share)
+
+        logger.info(
+            f"User {current_user.id} revoked share {share_id} "
+            f"(user {share.user_id}, {share.permission_level.value})"
+        )
+
+        # Log audit event
+        await self.audit_service.log_event(
+            user_id=current_user.id,
+            action=AuditAction.DELETE,
+            entity_type="account_share",
+            entity_id=share_id,
+            description=f"Revoked {share.permission_level.value} access from user",
+            extra_metadata={
+                "account_id": str(account_id),
+                "revoked_user_id": str(share.user_id),
+                "permission_level": share.permission_level.value,
+            },
+            ip_address=ip_address,
+            user_agent=user_agent,
+            request_id=request_id,
+        )
