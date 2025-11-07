@@ -195,6 +195,21 @@ class InsufficientPermissionsError(AuthorizationError):
         )
 
 
+class ForbiddenError(AuthorizationError):
+    """Raised when an action is forbidden (e.g., violates business rules)."""
+
+    def __init__(
+        self,
+        message: str = "This action is forbidden",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            error_code="FORBIDDEN",
+            details=details,
+        )
+
+
 # =============================================================================
 # Resource Errors
 # =============================================================================

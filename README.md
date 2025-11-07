@@ -41,11 +41,13 @@ cp .env.example .env
 docker-compose up -d
 
 # 5. Run migrations
-uv run alembic revision --autogenerate -m "Initial migration"
 uv run alembic upgrade head
 
-# 6. Run application
+# 6. Start application
 uv run uvicorn src.main:app --reload
+
+# 7. Bootstrap first admin (via API)
+# See "Admin Management" section below for details
 ```
 
 Visit http://localhost:8000/docs for API documentation.
@@ -265,6 +267,112 @@ Then simply right-click `debug.py` → `Debug 'debug'` in PyCharm.
 - **Evaluate expressions** in the Debug Console
 - **Hot reload** works with `--reload` flag - code changes auto-restart the server
 
+## 👨‍💼 Admin Management
+
+The platform includes a comprehensive admin management system for user administration and system operations.
+
+### Initial Admin Setup (Bootstrap)
+
+Create the first admin user via the **bootstrap API endpoint**. This is a one-time operation that requires no authentication (since no admin exists yet).
+
+**⚠️ IMPORTANT: Configure environment variables BEFORE bootstrap**
+
+Admin credentials are read from `.env` file:
+
+```bash
+# Edit .env file (REQUIRED before bootstrap)
+BOOTSTRAP_ADMIN_USERNAME="admin"
+BOOTSTRAP_ADMIN_EMAIL="admin@example.com"
+BOOTSTRAP_ADMIN_PASSWORD="YourSecureP@ss123!"  # CHANGE THIS!
+BOOTSTRAP_ADMIN_FULL_NAME="System Administrator"
+```
+
+**Bootstrap endpoint (no request body needed):**
+
+```bash
+# Simply POST to bootstrap endpoint
+curl -X POST http://localhost:8000/api/v1/admin/bootstrap
+```
+
+**Important:**
+- Bootstrap can only be run **once** - endpoint returns 403 after first admin is created
+- Admin credentials are **predefined in `.env`** - no request body accepted
+- Password is NEVER returned in the response for security
+- After bootstrap, you can change the admin password via PUT `/admin/users/{id}/password`
+- Use the admin API (with authentication) to create additional admins
+
+**Response Example:**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "username": "admin",
+  "email": "admin@example.com",
+  "is_admin": true,
+  "temporary_password": null,
+  "permissions": ["users:read:all", "users:write:all", ...]
+}
+```
+
+### Admin API Endpoints
+
+Once you have an admin account, you can manage admin users via authenticated endpoints:
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/v1/admin/bootstrap` | POST | Create first admin (one-time) | ❌ No |
+| `/api/v1/admin/users` | POST | Create new admin user | ✅ Admin |
+| `/api/v1/admin/users` | GET | List all admin users (paginated) | ✅ Admin |
+| `/api/v1/admin/users/{id}` | GET | Get admin user details | ✅ Admin |
+| `/api/v1/admin/users/{id}` | PUT | Update admin user | ✅ Admin |
+| `/api/v1/admin/users/{id}` | DELETE | Delete admin user (soft delete) | ✅ Admin |
+| `/api/v1/admin/users/{id}/password` | PUT | Reset admin password | ✅ Admin |
+| `/api/v1/admin/users/{id}/permissions` | PUT | Update admin permissions | ✅ Admin |
+
+**Admin Safeguards:**
+- Cannot delete yourself
+- Cannot delete the last admin user
+- Cannot remove your own admin privileges
+- All admin operations are fully audited
+
+### Admin Authentication
+
+Admin endpoints (except `/bootstrap`) require:
+1. Valid JWT access token (from `/api/v1/auth/login`)
+2. Admin role (`is_admin = true`)
+
+**Complete workflow example:**
+```bash
+# Step 1: Configure .env with bootstrap credentials
+# Edit .env file:
+# BOOTSTRAP_ADMIN_USERNAME="admin"
+# BOOTSTRAP_ADMIN_EMAIL="admin@example.com"
+# BOOTSTRAP_ADMIN_PASSWORD="SecureP@ss123"
+
+# Step 2: Bootstrap first admin (no auth required, no body)
+curl -X POST http://localhost:8000/api/v1/admin/bootstrap
+
+# Step 3: Login as admin
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"SecureP@ss123"}'
+
+# Step 4: Use access token for admin operations
+curl http://localhost:8000/api/v1/admin/users \
+  -H "Authorization: Bearer <access_token>"
+
+# Step 5: Create another admin (requires auth)
+curl -X POST http://localhost:8000/api/v1/admin/users \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin2","email":"admin2@example.com"}'
+
+# Step 6: Change admin password if needed (requires auth)
+curl -X PUT http://localhost:8000/api/v1/admin/users/<admin_id>/password \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"new_password":"NewSecureP@ss456"}'
+```
+
 ## Environment Variables
 
 See `.env.example` for all available configuration options.
@@ -273,6 +381,7 @@ See `.env.example` for all available configuration options.
 - `SECRET_KEY`: JWT signing key (generate with `openssl rand -hex 32`)
 - `DATABASE_URL`: PostgreSQL connection string
 - `REDIS_URL`: Redis connection string
+- `INITIAL_ADMIN_*`: Bootstrap environment variables (optional, see Admin Management section)
 
 ## Development
 

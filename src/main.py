@@ -11,9 +11,8 @@ This module sets up:
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any
 
-from fastapi import FastAPI, Request, status
+from fastapi import APIRouter, FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -22,10 +21,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.api.routes import accounts, audit_logs, auth, users
+from src.api.routes import account_shares, accounts, admin, audit_logs, auth, health, root, users
 from src.core import settings, setup_logging
 from src.core.database import (
-    check_database_connection,
     close_database_connection,
     create_database_engine,
 )
@@ -268,75 +266,16 @@ app.add_middleware(
 # ============================================================================
 # API Routes
 # ============================================================================
-# Include authentication routes
-app.include_router(auth.router, prefix="/api/v1")
+# Create API v1 router
+v1_router = APIRouter(prefix="/api/v1")
+v1_router.include_router(auth.router)
+v1_router.include_router(audit_logs.router)
+v1_router.include_router(users.router)
+v1_router.include_router(accounts.router)
+v1_router.include_router(account_shares.router)
+v1_router.include_router(admin.router)
 
-# Include audit log routes
-app.include_router(audit_logs.router, prefix="/api/v1")
-
-# Include user management routes
-app.include_router(users.router, prefix="/api/v1")
-
-# Include account management routes
-app.include_router(accounts.router, prefix="/api/v1")
-
-
-# ============================================================================
-# Health Check Endpoints
-# ============================================================================
-@app.get("/health", tags=["Health"])
-async def health_check() -> dict[str, str]:
-    """
-    Basic health check endpoint.
-
-    Returns:
-        Basic application information and status
-    """
-    return {
-        "status": "healthy",
-        "app": settings.app_name,
-        "version": settings.version,
-        "environment": settings.environment,
-    }
-
-
-@app.get("/health/ready", tags=["Health"])
-async def readiness_check(request: Request) -> dict[str, Any]:
-    """
-    Readiness check endpoint.
-
-    Checks if the application is ready to serve requests.
-    This verifies database connectivity and other critical dependencies.
-
-    Returns:
-        Detailed readiness status
-    """
-    # Check database connection
-    sessionmaker = request.app.state.sessionmaker
-    db_healthy = await check_database_connection(sessionmaker)
-
-    return {
-        "status": "ready" if db_healthy else "degraded",
-        "app": settings.app_name,
-        "version": settings.version,
-        "checks": {
-            "database": "ok" if db_healthy else "ko",
-            "redis": "ok",  # Placeholder - TODO: Add Redis check
-        },
-    }
-
-
-@app.get("/", tags=["Root"])
-async def root() -> dict[str, str]:
-    """
-    Root endpoint.
-
-    Returns:
-        Welcome message with API information
-    """
-    return {
-        "message": f"Welcome to {settings.app_name} API",
-        "version": settings.version,
-        "docs": "/docs" if settings.debug else "disabled in production",
-        "health": "/health",
-    }
+# Include Application Routers
+app.include_router(root.router)
+app.include_router(health.router)
+app.include_router(v1_router)

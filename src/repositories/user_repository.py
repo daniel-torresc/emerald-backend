@@ -321,3 +321,27 @@ class UserRepository(BaseRepository[User]):
 
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None
+
+    async def count_admins(self) -> int:
+        """
+        Count total number of admin users.
+
+        Used for validation (e.g., cannot delete last admin).
+        Automatically filters out soft-deleted users.
+
+        Returns:
+            Total count of active admin users
+
+        Example:
+            admin_count = await user_repo.count_admins()
+            if admin_count <= 1:
+                raise ForbiddenError("Cannot delete last admin user")
+        """
+        from sqlalchemy import func
+
+        query = select(func.count()).select_from(User)
+        query = self._apply_soft_delete_filter(query)
+        query = query.where(User.is_admin == True)  # noqa: E712
+
+        result = await self.session.execute(query)
+        return result.scalar_one()

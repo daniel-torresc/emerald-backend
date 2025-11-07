@@ -9,7 +9,7 @@ This module provides database operations for Account model, including:
 
 import uuid
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.account import Account

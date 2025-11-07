@@ -24,7 +24,7 @@ from src.services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/audit-logs", tags=["audit-logs"])
+router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
 
 @router.get(
