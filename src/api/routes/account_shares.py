@@ -24,7 +24,7 @@ from src.schemas.account_share import (
 )
 from src.services.account_service import AccountService
 
-router = APIRouter(prefix="/accounts", tags=["account-shares"])
+router = APIRouter(prefix="/accounts", tags=["Account Shares"])
 
 
 def get_account_service(db: Annotated[AsyncSession, Depends(get_db)]) -> AccountService:

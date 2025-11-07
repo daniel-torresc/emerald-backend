@@ -20,7 +20,6 @@ from src.models.enums import AccountType
 from src.models.user import User
 from src.schemas.account import (
     AccountCreate,
-    AccountFilterParams,
     AccountListItem,
     AccountResponse,
     AccountUpdate,
@@ -29,7 +28,7 @@ from src.services.account_service import AccountService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/accounts", tags=["accounts"])
+router = APIRouter(prefix="/accounts", tags=["Accounts"])
 
 
 @router.post(

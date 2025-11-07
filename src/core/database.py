@@ -56,7 +56,7 @@ def create_database_engine(database_url: str | None = None) -> AsyncEngine:
         pool_recycle=settings.db_pool_recycle,
         poolclass=AsyncAdaptedQueuePool,
         # Additional performance settings
-        pool_timeout=30,  # Wait up to 30 seconds for a connection
+        pool_timeout=settings.db_pool_timeout,  # Wait up for a connection
         connect_args={
             "server_settings": {
                 "application_name": f"{settings.app_name} - {settings.environment}",

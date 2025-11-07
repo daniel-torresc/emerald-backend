@@ -12,7 +12,6 @@ This module provides:
 
 import logging
 import uuid
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
@@ -22,13 +21,13 @@ from src.api.dependencies import (
     require_admin,
 )
 from src.models.user import User
-from src.schemas.common import PaginatedResponse, PaginationMeta
+from src.schemas.common import PaginatedResponse, PaginationParams
 from src.schemas.user import UserFilterParams, UserListItem, UserResponse, UserUpdate
 from src.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get(

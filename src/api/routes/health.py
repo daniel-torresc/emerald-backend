@@ -12,7 +12,7 @@ from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/health", tags=["health"])
+router = APIRouter(prefix="/health", tags=["Health"])
 
 
 @router.get("/")

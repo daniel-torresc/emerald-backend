@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import AlreadyExistsError, InsufficientPermissionsError, NotFoundError, ValidationError
+from src.exceptions import AlreadyExistsError, NotFoundError, ValidationError
 from src.models.account import Account, AccountShare
 from src.models.audit_log import AuditAction
 from src.models.enums import AccountType, PermissionLevel
