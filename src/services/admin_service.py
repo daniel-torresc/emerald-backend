@@ -18,15 +18,14 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.security import hash_password, validate_password_strength
+from src.core.security import hash_password
 from src.exceptions import (
     AlreadyExistsError,
     ForbiddenError,
     NotFoundError,
-    ValidationError,
 )
 from src.models.audit_log import AuditAction
-from src.models.user import Role, User
+from src.models.user import User
 from src.repositories.role_repository import RoleRepository
 from src.repositories.user_repository import UserRepository
 from src.schemas.admin import (
@@ -192,8 +191,8 @@ class AdminService:
                 permissions=permissions,
             )
 
-        # Create admin user
-        admin_user = User(
+        # Create admin user using kwargs (BaseRepository.create expects **kwargs, not instance)
+        admin_user = await self.user_repo.create(
             username=username,
             email=email,
             password_hash=password_hash,
@@ -202,11 +201,11 @@ class AdminService:
             is_admin=True,
         )
 
-        # Save user
-        admin_user = await self.user_repo.create(admin_user)
-
-        # Assign admin role
-        admin_user.roles.append(admin_role)
+        # Assign admin role using association table directly (avoid lazy-loading issues)
+        from src.models.user import user_roles
+        await self.db.execute(
+            user_roles.insert().values(user_id=admin_user.id, role_id=admin_role.id)
+        )
         await self.db.flush()
 
         # Create audit log
@@ -240,10 +239,20 @@ class AdminService:
         self.db.add(bootstrap)
         await self.db.flush()
 
-        # Build response (no password in response for security)
-        response = AdminUserResponse.model_validate(admin_user)
-        response.permissions = admin_role.permissions
-        response.temporary_password = None  # Never return password
+        # Build response manually (User model doesn't have permissions field)
+        response = AdminUserResponse(
+            id=admin_user.id,
+            username=admin_user.username,
+            email=admin_user.email,
+            full_name=admin_user.full_name,
+            is_active=admin_user.is_active,
+            is_admin=admin_user.is_admin,
+            permissions=admin_role.permissions,
+            created_at=admin_user.created_at,
+            updated_at=admin_user.updated_at,
+            last_login_at=admin_user.last_login_at,
+            temporary_password=None,  # Never return password
+        )
 
         return response
 
@@ -316,8 +325,8 @@ class AdminService:
                 ],
             )
 
-        # Create admin user
-        admin_user = User(
+        # Create admin user using kwargs (BaseRepository.create expects **kwargs, not instance)
+        admin_user = await self.user_repo.create(
             username=request.username,
             email=request.email,
             password_hash=password_hash,
@@ -326,11 +335,11 @@ class AdminService:
             is_admin=True,
         )
 
-        # Save user
-        admin_user = await self.user_repo.create(admin_user)
-
-        # Assign admin role
-        admin_user.roles.append(admin_role)
+        # Assign admin role using association table directly (avoid lazy-loading issues)
+        from src.models.user import user_roles
+        await self.db.execute(
+            user_roles.insert().values(user_id=admin_user.id, role_id=admin_role.id)
+        )
         await self.db.flush()
 
         # Create audit log
@@ -353,10 +362,20 @@ class AdminService:
             request_id=request_id,
         )
 
-        # Build response
-        response = AdminUserResponse.model_validate(admin_user)
-        response.permissions = admin_role.permissions
-        response.temporary_password = generated_password
+        # Build response manually (User model doesn't have permissions field)
+        response = AdminUserResponse(
+            id=admin_user.id,
+            username=admin_user.username,
+            email=admin_user.email,
+            full_name=admin_user.full_name,
+            is_active=admin_user.is_active,
+            is_admin=admin_user.is_admin,
+            permissions=admin_role.permissions,
+            created_at=admin_user.created_at,
+            updated_at=admin_user.updated_at,
+            last_login_at=admin_user.last_login_at,
+            temporary_password=generated_password,
+        )
 
         return response
 
@@ -435,9 +454,20 @@ class AdminService:
         # Get permissions from roles
         permissions = [perm for role in user.roles for perm in role.permissions]
 
-        response = AdminUserResponse.model_validate(user)
-        response.permissions = permissions
-        response.temporary_password = None
+        # Build response manually (User model doesn't have permissions field)
+        response = AdminUserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            is_active=user.is_active,
+            is_admin=user.is_admin,
+            permissions=permissions,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            last_login_at=user.last_login_at,
+            temporary_password=None,
+        )
 
         return response
 
@@ -524,9 +554,20 @@ class AdminService:
         user = await self.user_repo.get_with_roles(user_id)
         permissions = [perm for role in user.roles for perm in role.permissions]
 
-        response = AdminUserResponse.model_validate(user)
-        response.permissions = permissions
-        response.temporary_password = None
+        # Build response manually (User model doesn't have permissions field)
+        response = AdminUserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            is_active=user.is_active,
+            is_admin=user.is_admin,
+            permissions=permissions,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            last_login_at=user.last_login_at,
+            temporary_password=None,
+        )
 
         return response
 
@@ -573,7 +614,7 @@ class AdminService:
             raise ForbiddenError("Cannot delete the last admin user")
 
         # Soft delete user
-        await self.user_repo.delete(user_id)
+        await self.user_repo.delete(user)
 
         # Create audit log
         await self.audit_service.log_event(
@@ -658,9 +699,20 @@ class AdminService:
         # Get permissions
         permissions = [perm for role in user.roles for perm in role.permissions]
 
-        response = AdminUserResponse.model_validate(user)
-        response.permissions = permissions
-        response.temporary_password = generated_password
+        # Build response manually (User model doesn't have permissions field)
+        response = AdminUserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            is_active=user.is_active,
+            is_admin=user.is_admin,
+            permissions=permissions,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            last_login_at=user.last_login_at,
+            temporary_password=generated_password,
+        )
 
         return response
 
@@ -709,16 +761,28 @@ class AdminService:
         if not user.is_admin:
             raise NotFoundError(f"Admin user with ID {user_id}")
 
-        # Get admin role
-        admin_role = await self.role_repo.get_by_name("admin")
-        if not admin_role:
-            raise NotFoundError("Admin role")
+        # Get current permissions from all user's roles
+        old_permissions = [perm for role in user.roles for perm in role.permissions]
 
-        # Store old permissions
-        old_permissions = admin_role.permissions.copy()
+        # Create or get a user-specific admin role
+        user_role_name = f"admin_{user_id}"
+        user_specific_role = await self.role_repo.get_by_name(user_role_name)
 
-        # Update permissions
-        admin_role.permissions = request.permissions
+        if not user_specific_role:
+            # Create new user-specific role with requested permissions
+            user_specific_role = await self.role_repo.create(
+                name=user_role_name,
+                description=f"Custom admin permissions for {user.username}",
+                permissions=request.permissions,
+            )
+            # Add to user's roles
+            from src.models.user import user_roles
+            await self.db.execute(
+                user_roles.insert().values(user_id=user.id, role_id=user_specific_role.id)
+            )
+        else:
+            # Update existing user-specific role
+            user_specific_role.permissions = request.permissions
 
         await self.db.flush()
 
@@ -736,8 +800,19 @@ class AdminService:
             request_id=request_id,
         )
 
-        response = AdminUserResponse.model_validate(user)
-        response.permissions = request.permissions
-        response.temporary_password = None
+        # Build response manually (User model doesn't have permissions field)
+        response = AdminUserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            is_active=user.is_active,
+            is_admin=user.is_admin,
+            permissions=request.permissions,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            last_login_at=user.last_login_at,
+            temporary_password=None,
+        )
 
         return response
