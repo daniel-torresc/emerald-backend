@@ -7,7 +7,7 @@ All configuration must go through this Settings class - NO hardcoded values.
 
 from typing import List, Literal
 
-from pydantic import Field, PostgresDsn, RedisDsn
+from pydantic import EmailStr, Field, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     db_max_overflow: int = Field(default=10, ge=0, le=100)
     db_pool_recycle: int = Field(default=3600, ge=300)  # Seconds
     db_pool_pre_ping: bool = Field(default=True)
+    db_pool_timeout: int = Field(default=30, ge=1, le=60)
 
     # -------------------------------------------------------------------------
     # Redis Configuration
@@ -119,6 +120,44 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     audit_log_enabled: bool = Field(default=True)
     audit_log_retention_days: int = Field(default=2555)  # 7 years
+
+    # -------------------------------------------------------------------------
+    # Bootstrap Admin Configuration
+    # -------------------------------------------------------------------------
+    bootstrap_admin_username: str = Field(
+        ...,
+        min_length=3,
+        max_length=50,
+        description="Bootstrap admin username (required)"
+    )
+    bootstrap_admin_email: EmailStr = Field(
+        ...,
+        description="Bootstrap admin email (required)"
+    )
+    bootstrap_admin_password: str = Field(
+        ...,
+        min_length=8,
+        description="Bootstrap admin password (required, must be strong)"
+    )
+    bootstrap_admin_full_name: str = Field(
+        description="Bootstrap admin full name"
+    )
+    bootstrap_admin_permissions: List[str] = Field(
+        default=[
+            "users:read:all",
+            "users:write:all",
+            "users:delete:all",
+            "accounts:read:all",
+            "accounts:write:all",
+            "accounts:delete:all",
+            "transactions:read:all",
+            "transactions:write:all",
+            "transactions:delete:all",
+            "audit_logs:read:all",
+            "admin:manage:all",
+        ],
+        description="Bootstrap admin permissions (default: full access)"
+    )
 
     # -------------------------------------------------------------------------
     # Testing Configuration
