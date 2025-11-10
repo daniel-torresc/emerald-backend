@@ -44,19 +44,19 @@ class AccountService:
     Audit logging is performed for all mutating operations.
     """
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, session: AsyncSession):
         """
         Initialize AccountService with database session.
 
         Args:
-            db: Async database session
+            session: Async database session
         """
-        self.db = db
-        self.account_repo = AccountRepository(db)
-        self.share_repo = AccountShareRepository(db)
-        self.user_repo = UserRepository(db)
-        self.permission_service = PermissionService(db)
-        self.audit_service = AuditService(db)
+        self.session = session
+        self.account_repo = AccountRepository(session)
+        self.share_repo = AccountShareRepository(session)
+        self.user_repo = UserRepository(session)
+        self.permission_service = PermissionService(session)
+        self.audit_service = AuditService(session)
 
     async def create_account(
         self,
@@ -169,8 +169,7 @@ class AccountService:
         """
         Get account by ID.
 
-        Phase 2A: Only account owner can access.
-        Phase 2B: Will check permission level (owner, editor, viewer).
+        Checks if user has access to the account (owner or shared with them).
 
         Args:
             account_id: ID of the account to retrieve
@@ -192,9 +191,12 @@ class AccountService:
             logger.warning(f"Account {account_id} not found")
             raise NotFoundError(f"Account")
 
-        # Phase 2A: Only owner can access
-        # Phase 2B: Will use PermissionService to check access level
-        if account.user_id != current_user.id:
+        # Check if user has access (owner or shared with them)
+        permission = await self.permission_service.get_user_permission(
+            current_user.id, account_id
+        )
+
+        if permission is None:
             logger.warning(
                 f"User {current_user.id} attempted to access account {account_id} without permission"
             )
@@ -214,8 +216,7 @@ class AccountService:
         """
         List all accounts for a user with pagination and filtering.
 
-        Phase 2A: User can only list their own accounts.
-        Phase 2B: Will also include accounts shared with the user.
+        Includes both owned accounts and accounts shared with the user.
 
         Args:
             user_id: ID of the user whose accounts to list
@@ -226,7 +227,7 @@ class AccountService:
             account_type: Filter by account type (None = all types)
 
         Returns:
-            List of Account instances
+            List of Account instances (owned + shared)
 
         Raises:
             PermissionError: If user attempts to list another user's accounts
@@ -239,8 +240,7 @@ class AccountService:
                 limit=20
             )
         """
-        # Phase 2A: User can only list their own accounts
-        # Phase 2B: Admins can list any user's accounts
+        # User can only list their own accounts (admins can list any user's accounts)
         if user_id != current_user.id and not current_user.is_admin:
             logger.warning(
                 f"User {current_user.id} attempted to list accounts for user {user_id}"
@@ -251,7 +251,8 @@ class AccountService:
         if limit > 100:
             limit = 100
 
-        accounts = await self.account_repo.get_by_user(
+        # Get owned accounts
+        owned_accounts = await self.account_repo.get_by_user(
             user_id=user_id,
             skip=skip,
             limit=limit,
@@ -259,7 +260,26 @@ class AccountService:
             account_type=account_type,
         )
 
-        return accounts
+        # Get shared accounts (accounts where user has a share)
+        shared_accounts = await self.account_repo.get_shared_with_user(
+            user_id=user_id,
+            is_active=is_active,
+            account_type=account_type,
+        )
+
+        # Combine and deduplicate (in case user owns AND has a share on same account)
+        account_ids_seen = {acc.id for acc in owned_accounts}
+        all_accounts = list(owned_accounts)
+
+        for shared_acc in shared_accounts:
+            if shared_acc.id not in account_ids_seen:
+                all_accounts.append(shared_acc)
+                account_ids_seen.add(shared_acc.id)
+
+        # Apply pagination to combined results
+        # Note: This means pagination might not be exact when combining owned+shared
+        # For a production system, we'd want to do pagination at the DB level
+        return all_accounts[skip:skip + limit] if skip > 0 else all_accounts[:limit]
 
     async def update_account(
         self,
@@ -539,15 +559,13 @@ class AccountService:
             )
 
         # Create share
-        share = AccountShare(
+        created_share = await self.share_repo.create(
             account_id=account_id,
             user_id=target_user_id,
             permission_level=permission_level,
             created_by=current_user.id,
             updated_by=current_user.id,
         )
-
-        created_share = await self.share_repo.create(share)
 
         logger.info(
             f"User {current_user.id} shared account {account_id} with "
@@ -782,3 +800,204 @@ class AccountService:
             user_agent=user_agent,
             request_id=request_id,
         )
+
+    async def update_balance(
+        self,
+        account_id: uuid.UUID,
+        delta: Decimal,
+    ) -> Account:
+        """
+        Update account balance by delta amount.
+
+        Used by TransactionService when creating/updating/deleting transactions.
+        Uses SELECT ... FOR UPDATE to prevent race conditions.
+
+        IMPORTANT: This method should be called within an explicit database transaction.
+
+        Args:
+            account_id: Account to update
+            delta: Amount to add to current balance (can be negative)
+
+        Returns:
+            Updated account with new balance
+
+        Raises:
+            NotFoundError: If account not found
+
+        Example:
+            # Called from TransactionService within transaction
+            async with db.begin():
+                account = await account_service.update_balance(
+                    account_id=account.id,
+                    delta=transaction.amount,
+                )
+        """
+        # Lock row for update
+        account = await self.account_repo.get_for_update(account_id)
+
+        if not account:
+            logger.warning(f"Account {account_id} not found for balance update")
+            raise NotFoundError("Account")
+
+        # Update balance
+        old_balance = account.current_balance
+        account.current_balance += delta
+        new_balance = account.current_balance
+
+        logger.debug(
+            f"Updated balance for account {account_id}: {old_balance} + {delta} = {new_balance}"
+        )
+
+        return account
+
+    async def recalculate_balance(
+        self,
+        account_id: uuid.UUID,
+        current_user: User,
+    ) -> tuple[Decimal, Decimal]:
+        """
+        Recalculate account balance from scratch.
+
+        Useful for:
+        - Balance verification (compare cached vs calculated)
+        - Balance repair after data issues
+        - Administrative operations
+
+        Args:
+            account_id: Account to recalculate
+            current_user: Currently authenticated user (for permission check)
+
+        Returns:
+            Tuple of (cached_balance, calculated_balance)
+
+        Raises:
+            NotFoundError: If account not found
+            InsufficientPermissionsError: If user doesn't have access
+
+        Example:
+            cached, calculated = await account_service.recalculate_balance(
+                account_id=account.id,
+                current_user=admin_user,
+            )
+            if cached != calculated:
+                print(f"Balance mismatch: cached={cached}, calculated={calculated}")
+        """
+        # Import here to avoid circular dependency
+        from src.repositories.transaction_repository import TransactionRepository
+
+        # Check permission (VIEWER or higher can view balance)
+        await self.permission_service.require_permission(
+            current_user.id, account_id, PermissionLevel.VIEWER
+        )
+
+        account = await self.account_repo.get_by_id(account_id)
+        if not account:
+            logger.warning(f"Account {account_id} not found")
+            raise NotFoundError("Account")
+
+        cached_balance = account.current_balance
+
+        # Calculate from transactions
+        transaction_repo = TransactionRepository(self.session)
+        calculated_balance = await transaction_repo.calculate_account_balance(
+            account_id
+        )
+        calculated_balance += account.opening_balance
+
+        logger.info(
+            f"Balance comparison for account {account_id}: "
+            f"cached={cached_balance}, calculated={calculated_balance}, "
+            f"match={cached_balance == calculated_balance}"
+        )
+
+        return cached_balance, calculated_balance
+
+    async def verify_and_fix_balance(
+        self,
+        account_id: uuid.UUID,
+        current_user: User,
+        request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> dict:
+        """
+        Verify balance matches calculation. Fix if mismatch.
+
+        Admin-only operation for balance repair.
+
+        Args:
+            account_id: Account to verify and fix
+            current_user: Currently authenticated user (must be admin)
+            request_id: Optional request ID for correlation
+            ip_address: Client IP address for audit logging
+            user_agent: Client user agent for audit logging
+
+        Returns:
+            Dictionary with verification results:
+            {
+                "account_id": str,
+                "cached_balance": str,
+                "calculated_balance": str,
+                "mismatch": bool,
+                "fixed": bool,
+            }
+
+        Raises:
+            NotFoundError: If account not found
+            AuthorizationError: If user is not admin
+
+        Example:
+            result = await account_service.verify_and_fix_balance(
+                account_id=account.id,
+                current_user=admin_user,
+            )
+            if result["fixed"]:
+                print(f"Fixed balance mismatch: {result['cached_balance']} -> {result['calculated_balance']}")
+        """
+        # Admin-only operation
+        if not current_user.is_admin:
+            logger.warning(
+                f"Non-admin user {current_user.id} attempted to verify/fix balance for account {account_id}"
+            )
+            raise AuthorizationError("Admin access required")
+
+        # Recalculate balance
+        cached, calculated = await self.recalculate_balance(account_id, current_user)
+
+        mismatch = cached != calculated
+
+        if mismatch:
+            # Fix balance
+            account = await self.account_repo.get_for_update(account_id)
+            account.current_balance = calculated
+
+            logger.warning(
+                f"Balance mismatch repaired for account {account_id}: "
+                f"{cached} -> {calculated}"
+            )
+
+            # Audit log
+            await self.audit_service.log_event(
+                user_id=current_user.id,
+                action=AuditAction.UPDATE,
+                entity_type="account",
+                entity_id=account_id,
+                description="Balance mismatch repaired",
+                old_values={"current_balance": str(cached)},
+                new_values={"current_balance": str(calculated)},
+                extra_metadata={
+                    "balance_delta": str(calculated - cached),
+                    "reason": "administrative_repair",
+                },
+                ip_address=ip_address,
+                user_agent=user_agent,
+                request_id=request_id,
+            )
+
+        return {
+            "account_id": str(account_id),
+            "cached_balance": str(cached),
+            "calculated_balance": str(calculated),
+            "mismatch": mismatch,
+            "fixed": mismatch,
+        }

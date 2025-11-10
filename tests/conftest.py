@@ -326,7 +326,7 @@ async def user_token(async_client: AsyncClient, test_user: User) -> dict:
         Dictionary with access_token and refresh_token
     """
     response = await async_client.post(
-        "/api/v1/auth/login",
+        "/api/auth/login",
         json={
             "email": "testuser@example.com",
             "password": "TestPass123!",
@@ -346,7 +346,7 @@ async def admin_token(async_client: AsyncClient, admin_user: User) -> dict:
         Dictionary with access_token and refresh_token
     """
     response = await async_client.post(
-        "/api/v1/auth/login",
+        "/api/auth/login",
         json={
             "email": "admin@example.com",
             "password": "AdminPass123!",
@@ -377,3 +377,46 @@ def admin_headers(admin_token: dict) -> dict:
         Dictionary with Authorization header
     """
     return {"Authorization": f"Bearer {admin_token['access_token']}"}
+
+
+# ============================================================================
+# Account & Transaction Fixtures
+# ============================================================================
+@pytest_asyncio.fixture
+async def test_account(test_engine, test_user):
+    """
+    Create a test account in the database.
+
+    Ownership is implicit through account.user_id, no AccountShare needed.
+
+    Returns:
+        Account instance for testing transactions
+    """
+    from decimal import Decimal
+    from src.models.account import Account
+    from src.models.enums import AccountType
+
+    async_session_factory = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_factory() as session:
+        account = Account(
+            user_id=test_user.id,
+            account_name="Test Checking",
+            account_type=AccountType.SAVINGS,
+            currency="USD",
+            opening_balance=Decimal("1000.00"),
+            current_balance=Decimal("1000.00"),
+            is_active=True,
+            created_by=test_user.id,
+            updated_by=test_user.id,
+        )
+
+        session.add(account)
+        await session.commit()
+        await session.refresh(account)
+
+        return account

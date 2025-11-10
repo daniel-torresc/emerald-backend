@@ -83,17 +83,17 @@ class AdminService:
     All operations are fully audited.
     """
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, session: AsyncSession):
         """
         Initialize AdminService with database session.
 
         Args:
-            db: Async database session
+            session: Async database session
         """
-        self.db = db
-        self.user_repo = UserRepository(db)
-        self.role_repo = RoleRepository(db)
-        self.audit_service = AuditService(db)
+        self.session = session
+        self.user_repo = UserRepository(session)
+        self.role_repo = RoleRepository(session)
+        self.audit_service = AuditService(session)
 
     async def has_any_admin(self) -> bool:
         """
@@ -119,7 +119,7 @@ class AdminService:
         from sqlalchemy import select
         from src.models.bootstrap import BootstrapState
 
-        result = await self.db.execute(select(BootstrapState))
+        result = await self.session.execute(select(BootstrapState))
         bootstrap = result.scalar_one_or_none()
         return bootstrap is not None and bootstrap.completed
 
@@ -203,10 +203,10 @@ class AdminService:
 
         # Assign admin role using association table directly (avoid lazy-loading issues)
         from src.models.user import user_roles
-        await self.db.execute(
+        await self.session.execute(
             user_roles.insert().values(user_id=admin_user.id, role_id=admin_role.id)
         )
-        await self.db.flush()
+        await self.session.flush()
 
         # Create audit log
         await self.audit_service.log_event(
@@ -236,8 +236,8 @@ class AdminService:
             completed_at=datetime.now(UTC),
             admin_user_id=admin_user.id,
         )
-        self.db.add(bootstrap)
-        await self.db.flush()
+        self.session.add(bootstrap)
+        await self.session.flush()
 
         # Build response manually (User model doesn't have permissions field)
         response = AdminUserResponse(
@@ -337,10 +337,10 @@ class AdminService:
 
         # Assign admin role using association table directly (avoid lazy-loading issues)
         from src.models.user import user_roles
-        await self.db.execute(
+        await self.session.execute(
             user_roles.insert().values(user_id=admin_user.id, role_id=admin_role.id)
         )
-        await self.db.flush()
+        await self.session.flush()
 
         # Create audit log
         await self.audit_service.log_event(
@@ -531,7 +531,7 @@ class AdminService:
 
         user.updated_at = datetime.now(UTC)
 
-        await self.db.flush()
+        await self.session.flush()
 
         # Create audit log
         await self.audit_service.log_event(
@@ -682,7 +682,7 @@ class AdminService:
         user.password_hash = hash_password(password)
         user.updated_at = datetime.now(UTC)
 
-        await self.db.flush()
+        await self.session.flush()
 
         # Create audit log
         await self.audit_service.log_event(
@@ -777,14 +777,14 @@ class AdminService:
             )
             # Add to user's roles
             from src.models.user import user_roles
-            await self.db.execute(
+            await self.session.execute(
                 user_roles.insert().values(user_id=user.id, role_id=user_specific_role.id)
             )
         else:
             # Update existing user-specific role
             user_specific_role.permissions = request.permissions
 
-        await self.db.flush()
+        await self.session.flush()
 
         # Create audit log
         await self.audit_service.log_event(

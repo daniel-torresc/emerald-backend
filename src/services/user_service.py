@@ -45,17 +45,17 @@ class UserService:
     All methods require an active database session.
     """
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, session: AsyncSession):
         """
         Initialize UserService with database session.
 
         Args:
-            db: Async database session
+            session: Async database session
         """
-        self.db = db
-        self.user_repo = UserRepository(db)
-        self.token_repo = RefreshTokenRepository(db)
-        self.audit_service = AuditService(db)
+        self.session = session
+        self.user_repo = UserRepository(session)
+        self.token_repo = RefreshTokenRepository(session)
+        self.audit_service = AuditService(session)
 
     async def get_user_profile(
         self,
