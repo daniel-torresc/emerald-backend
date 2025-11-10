@@ -391,6 +391,30 @@ def get_admin_service(db: AsyncSession = Depends(get_db)):
     return AdminService(db)
 
 
+def get_transaction_service(db: AsyncSession = Depends(get_db)):
+    """
+    Dependency to get TransactionService instance.
+
+    This dependency provides a TransactionService with an active database session.
+
+    Args:
+        db: Database session
+
+    Returns:
+        TransactionService instance
+
+    Usage:
+        @app.post("/api/v1/accounts/{account_id}/transactions")
+        async def create_transaction(
+            transaction_service: TransactionService = Depends(get_transaction_service)
+        ):
+            return await transaction_service.create_transaction(...)
+    """
+    from src.services.transaction_service import TransactionService
+
+    return TransactionService(db)
+
+
 # Convenience type aliases for common dependencies
 CurrentUser = Annotated[User, Depends(get_current_user)]
 ActiveUser = Annotated[User, Depends(require_active_user)]
