@@ -86,6 +86,55 @@ class AccountRepository(BaseRepository[Account]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
+    async def get_shared_with_user(
+        self,
+        user_id: uuid.UUID,
+        is_active: bool | None = None,
+        account_type: AccountType | None = None,
+    ) -> list[Account]:
+        """
+        Get all accounts shared with a specific user.
+
+        Returns accounts where the user has been granted access via AccountShare.
+
+        Args:
+            user_id: ID of the user who has been granted access
+            is_active: Filter by active status (None = all)
+            account_type: Filter by account type (None = all types)
+
+        Returns:
+            List of Account instances shared with the user
+
+        Example:
+            # Get all active accounts shared with user
+            shared_accounts = await account_repo.get_shared_with_user(
+                user_id=user.id,
+                is_active=True
+            )
+        """
+        from src.models.account import AccountShare
+
+        # Join Account with AccountShare to find accounts shared with this user
+        query = (
+            select(Account)
+            .join(AccountShare, Account.id == AccountShare.account_id)
+            .where(AccountShare.user_id == user_id)
+        )
+        query = self._apply_soft_delete_filter(query)
+
+        # Apply filters
+        if is_active is not None:
+            query = query.where(Account.is_active == is_active)
+
+        if account_type is not None:
+            query = query.where(Account.account_type == account_type)
+
+        # Order by created_at descending (newest first)
+        query = query.order_by(Account.created_at.desc())
+
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
     async def get_by_name(
         self,
         user_id: uuid.UUID,
@@ -193,3 +242,46 @@ class AccountRepository(BaseRepository[Account]):
 
         result = await self.session.execute(query)
         return result.scalar_one()
+
+    async def get_for_update(self, account_id: uuid.UUID) -> Account | None:
+        """
+        Get account with row-level lock (SELECT ... FOR UPDATE).
+
+        Used for atomic balance updates to prevent race conditions.
+        The row lock is held until the transaction commits or rolls back.
+
+        IMPORTANT: This should only be called within an explicit database transaction:
+            async with session.begin():
+                account = await account_repo.get_for_update(account_id)
+                account.current_balance += amount
+                await session.commit()
+
+        Args:
+            account_id: ID of the account
+
+        Returns:
+            Account instance with row lock or None if not found
+
+        Raises:
+            DatabaseError: If called outside a transaction
+
+        Example:
+            # Correct usage - within explicit transaction
+            async with session.begin():
+                account = await account_repo.get_for_update(account_id)
+                if account is None:
+                    raise NotFoundError("Account not found")
+
+                # Update balance (row is locked, no race conditions)
+                account.current_balance += transaction_amount
+                await session.commit()
+
+            # WRONG - will cause issues
+            account = await account_repo.get_for_update(account_id)
+            account.current_balance += amount  # Lock released, race condition possible!
+        """
+        query = select(Account).where(Account.id == account_id).with_for_update()
+        query = self._apply_soft_delete_filter(query)
+
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()

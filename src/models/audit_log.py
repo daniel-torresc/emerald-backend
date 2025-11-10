@@ -42,6 +42,10 @@ class AuditAction(str, enum.Enum):
     UPDATE = "UPDATE"
     DELETE = "DELETE"
 
+    # Transaction-specific actions
+    SPLIT_TRANSACTION = "SPLIT_TRANSACTION"
+    JOIN_TRANSACTION = "JOIN_TRANSACTION"
+
     # Authorization actions
     PERMISSION_GRANT = "PERMISSION_GRANT"
     PERMISSION_REVOKE = "PERMISSION_REVOKE"

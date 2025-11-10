@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions import InsufficientPermissionsError, NotFoundError
 from src.models.enums import PermissionLevel
+from src.repositories.account_repository import AccountRepository
 from src.repositories.account_share_repository import AccountShareRepository
 
 
@@ -56,6 +57,7 @@ class PermissionService:
             session: Async database session
         """
         self.session = session
+        self.account_repo = AccountRepository(session)
         self.share_repo = AccountShareRepository(session)
 
     async def get_user_permission(
@@ -65,6 +67,9 @@ class PermissionService:
     ) -> PermissionLevel | None:
         """
         Get user's permission level for an account.
+
+        Checks implicit ownership first (via Account.user_id), then explicit shares.
+        This means the account owner doesn't need an AccountShare entry.
 
         Args:
             user_id: ID of the user
@@ -80,8 +85,13 @@ class PermissionService:
             if permission == PermissionLevel.OWNER:
                 # User is owner
         """
-        share = await self.share_repo.get_user_permission(user_id, account_id)
+        # First check: Is the user the account owner? (implicit ownership)
+        account = await self.account_repo.get_by_id(account_id)
+        if account and account.user_id == user_id:
+            return PermissionLevel.OWNER
 
+        # Second check: Is there an explicit share?
+        share = await self.share_repo.get_user_permission(user_id, account_id)
         if share is None:
             return None
 

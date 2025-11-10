@@ -21,7 +21,17 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.api.routes import account_shares, accounts, admin, audit_logs, auth, health, root, users
+from src.api.routes import (
+    account_shares,
+    accounts,
+    admin,
+    audit_logs,
+    auth,
+    health,
+    root,
+    transactions,
+    users,
+)
 from src.core import settings, setup_logging
 from src.core.database import (
     close_database_connection,
@@ -266,16 +276,21 @@ app.add_middleware(
 # ============================================================================
 # API Routes
 # ============================================================================
-# Create API v1 router
-v1_router = APIRouter(prefix="/api/v1")
-v1_router.include_router(auth.router)
+# Create V1 Router
+v1_router = APIRouter(prefix="/v1")
 v1_router.include_router(audit_logs.router)
 v1_router.include_router(users.router)
 v1_router.include_router(accounts.router)
 v1_router.include_router(account_shares.router)
+v1_router.include_router(transactions.router)
 v1_router.include_router(admin.router)
+
+# Create API Router
+api_router = APIRouter(prefix="/api")
+api_router.include_router(auth.router)
+api_router.include_router(v1_router)
 
 # Include Application Routers
 app.include_router(root.router)
 app.include_router(health.router)
-app.include_router(v1_router)
+app.include_router(api_router)
