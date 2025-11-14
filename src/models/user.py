@@ -89,8 +89,8 @@ class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
 
     Soft Delete:
         Deleted users have deleted_at set. They cannot login and are
-        excluded from normal queries. Email and username can be reused
-        after soft delete (handled by partial unique index).
+        excluded from normal queries. Email and username remain reserved
+        even after deletion (cannot be reused).
 
     Security:
         - password_hash stores Argon2id hash (never store plain passwords)
@@ -104,14 +104,14 @@ class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     username: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
-        unique=False,  # Unique constraint handled by partial index in migration
+        unique=True,  # Fully unique - no two users can have same username (even if deleted)
         index=True,
     )
 
     email: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
-        unique=False,  # Unique constraint handled by partial index in migration
+        unique=True,  # Fully unique - no two users can have same email (even if deleted)
         index=True,
     )
 
