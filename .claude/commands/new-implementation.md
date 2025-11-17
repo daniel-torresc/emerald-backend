@@ -2,7 +2,7 @@
 
 description: Create a detailed implementation plan for a feature based on its description and, 
 optionally, prior research findings. 
-argument-hint: [feature-description-file] [research-file] [implementation-plan-file] [additional-details]
+argument-hint: [description-file] [research-file] [plan-file] [additional-details]
 
 ---
 

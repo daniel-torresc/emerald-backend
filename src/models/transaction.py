@@ -86,7 +86,7 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     Validation:
         - date: Valid date, configurable if future dates allowed
         - value_date: Valid date if provided
-        - amount: Decimal(15,2), non-zero (checked via CHECK constraint)
+        - amount: Decimal(15,2), can be zero (e.g., fee waivers, promotional credits)
         - currency: Must match account.currency (enforced in service layer)
         - currency: Must match ISO 4217 format (3 uppercase letters)
         - description: 1-500 characters, required
@@ -277,11 +277,7 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
             "currency ~ '^[A-Z]{3}$'",
             name="ck_transactions_currency_format",
         ),
-        # Amount must be non-zero
-        CheckConstraint(
-            "amount != 0",
-            name="ck_transactions_amount_nonzero",
-        ),
+        # Note: Zero-amount transactions are allowed (e.g., fee waivers, promotional credits, adjustments)
     )
 
     @property

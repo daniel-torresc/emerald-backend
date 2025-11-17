@@ -373,6 +373,219 @@ curl -X PUT http://localhost:8000/api/v1/admin/users/<admin_id>/password \
   -d '{"new_password":"NewSecureP@ss456"}'
 ```
 
+## Database Migrations
+
+The project uses Alembic for database schema migrations. Migrations are version-controlled SQL scripts that modify your database schema over time.
+
+### Quick Start
+
+```bash
+# Apply all pending migrations (most common)
+uv run alembic upgrade head
+
+# Check current migration status
+uv run alembic current
+
+# View migration history
+uv run alembic history
+```
+
+### Common Migration Commands
+
+#### Upgrading Database
+
+```bash
+# Upgrade to latest migration
+uv run alembic upgrade head
+
+# Upgrade to specific revision
+uv run alembic upgrade <revision_id>
+# Example: uv run alembic upgrade 4aabd1426c98
+
+# Upgrade by relative steps (e.g., upgrade 2 versions)
+uv run alembic upgrade +2
+```
+
+#### Downgrading Database
+
+```bash
+# Downgrade one migration
+uv run alembic downgrade -1
+
+# Downgrade to specific revision
+uv run alembic downgrade <revision_id>
+
+# Downgrade to base (removes everything - USE WITH CAUTION)
+uv run alembic downgrade base
+```
+
+**⚠️ WARNING**: Downgrading deletes data. Always backup before downgrading in production!
+
+#### Checking Status
+
+```bash
+# Show current database revision
+uv run alembic current
+
+# Show migration history
+uv run alembic history
+
+# Show detailed migration info
+uv run alembic show <revision_id>
+
+# Preview SQL without executing (dry run)
+uv run alembic upgrade head --sql
+```
+
+#### Creating New Migrations
+
+```bash
+# Auto-generate migration from model changes
+uv run alembic revision --autogenerate -m "description of changes"
+
+# Create empty migration template (for manual SQL)
+uv run alembic revision -m "description"
+```
+
+**Best Practices for Creating Migrations:**
+1. Always review auto-generated migrations before applying
+2. Test migrations on development database first
+3. Never edit applied migrations (create new ones instead)
+4. Use descriptive migration messages
+
+### Reset Database (Development Only)
+
+To completely reset your database schema from scratch:
+
+```bash
+# Step 1: Downgrade to base (removes all tables/data)
+uv run alembic downgrade base
+
+# Step 2: Upgrade to latest
+uv run alembic upgrade head
+
+# Step 3: Bootstrap admin (if needed)
+curl -X POST http://localhost:8000/api/v1/admin/bootstrap
+```
+
+**Alternative: Nuclear option** (deletes Docker volumes):
+```bash
+docker-compose down -v  # WARNING: Deletes ALL data including volumes
+docker-compose up -d
+uv run alembic upgrade head
+```
+
+### Verifying Migrations
+
+After running migrations, verify the database structure:
+
+```bash
+# Check all tables exist (should show 10 tables)
+docker exec -it emerald-postgres psql -U emerald_user -d emerald_db -c "\dt"
+
+# Check enums exist
+docker exec -it emerald-postgres psql -U emerald_user -d emerald_db -c "\dT+"
+
+# Check pg_trgm extension
+docker exec -it emerald-postgres psql -U emerald_user -d emerald_db -c "SELECT * FROM pg_extension WHERE extname = 'pg_trgm';"
+```
+
+**Expected Tables:**
+- `users` - User accounts
+- `roles` - User roles
+- `user_roles` - User-role associations
+- `refresh_tokens` - JWT refresh tokens
+- `audit_logs` - Audit trail
+- `bootstrap_state` - Bootstrap tracking
+- `accounts` - Financial accounts
+- `account_shares` - Account sharing
+- `transactions` - Financial transactions
+- `transaction_tags` - Transaction tags
+
+### Migration Troubleshooting
+
+#### Problem: "Target database is not up to date"
+```bash
+# Check what revision the database thinks it's at
+uv run alembic current
+
+# Force stamp database to specific version (fixes mismatch)
+uv run alembic stamp head
+```
+
+#### Problem: "Can't locate revision identified by '...'"
+```bash
+# Clear version table and re-stamp
+docker exec -it emerald-postgres psql -U emerald_user -d emerald_db -c "DROP TABLE IF EXISTS alembic_version;"
+uv run alembic upgrade head
+```
+
+#### Problem: Migration fails midway
+```bash
+# Alembic tracks partial migrations - check current state
+uv run alembic current
+
+# If stuck, manually fix the issue and resume
+uv run alembic upgrade head
+
+# Or rollback and retry
+uv run alembic downgrade -1
+uv run alembic upgrade head
+```
+
+#### Problem: Schema out of sync with models
+```bash
+# Generate migration to sync schema with models
+uv run alembic revision --autogenerate -m "sync schema with models"
+
+# Review the generated migration carefully!
+# Then apply it
+uv run alembic upgrade head
+```
+
+### Migration File Structure
+
+```
+alembic/
+├── env.py                 # Alembic environment configuration
+├── script.py.mako        # Migration template
+└── versions/             # Migration files
+    └── 4aabd1426c98_initial_schema.py  # Current migration
+```
+
+### Production Migration Workflow
+
+For production deployments:
+
+1. **Test migrations locally first**
+   ```bash
+   uv run alembic upgrade head
+   ```
+
+2. **Backup production database**
+   ```bash
+   pg_dump -U user -d dbname > backup_$(date +%Y%m%d_%H%M%S).sql
+   ```
+
+3. **Apply migrations with zero downtime**
+   ```bash
+   # Use blue-green deployment or rolling updates
+   # Apply backward-compatible migrations first
+   uv run alembic upgrade head
+   ```
+
+4. **Verify migration success**
+   ```bash
+   uv run alembic current
+   # Check application logs for errors
+   ```
+
+5. **Rollback plan** (if issues occur)
+   ```bash
+   uv run alembic downgrade -1
+   # Restore from backup if needed
+   ```
+
 ## Environment Variables
 
 See `.env.example` for all available configuration options.
