@@ -464,34 +464,34 @@ class AccountShare(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
 
 ```python
 async def check_permission(
-    user_id: UUID,
-    account_id: UUID,
-    required_permission: PermissionLevel
+        user_id: UUID,
+        account_id: UUID,
+        required_permission: PermissionLevel
 ) -> bool:
-    """
-    Check if user has required permission for account.
+   """
+   Check if user has required permission for account.
 
-    Hierarchy: owner > editor > viewer
-    """
-    # Get user's share (if any)
-    share = await account_share_repo.get_by_user_and_account(
-        user_id=user_id,
-        account_id=account_id,
-        include_deleted=False  # Revoked shares excluded
-    )
+   Hierarchy: owner > editor > viewer
+   """
+   # Get user's share (if any)
+   share = await account_share_repo.get_by_user_and_account(
+      user_id=user_id,
+      account_id=account_id,
+      include_deleted=False  # Revoked shares excluded
+   )
 
-    if not share:
-        return False
+   if not share:
+      return False
 
-    # Permission hierarchy check
-    permission_hierarchy = {
-        PermissionLevel.VIEWER: 1,
-        PermissionLevel.EDITOR: 2,
-        PermissionLevel.OWNER: 3,
-    }
+   # Permission hierarchy check
+   permission_hierarchy = {
+      PermissionLevel.viewer: 1,
+      PermissionLevel.editor: 2,
+      PermissionLevel.owner: 3,
+   }
 
-    return permission_hierarchy[share.permission_level] >= \
-           permission_hierarchy[required_permission]
+   return permission_hierarchy[share.permission_level] >=
+   permission_hierarchy[required_permission]
 ```
 
 **Performance Optimization:**
@@ -687,19 +687,20 @@ async def get_account_with_permission(
 ```
 
 2. **Service-Layer Authorization:**
+
 ```python
 class AccountService:
     async def update_account(
-        self,
-        account_id: UUID,
-        updates: dict,
-        current_user: User
+            self,
+            account_id: UUID,
+            updates: dict,
+            current_user: User
     ) -> Account:
         # Check permission first
         await self._require_permission(
             user_id=current_user.id,
             account_id=account_id,
-            required=PermissionLevel.OWNER
+            required=PermissionLevel.owner
         )
         # Then perform operation
         return await self.account_repo.update(account_id, **updates)
@@ -717,21 +718,22 @@ class AccountService:
 **Mitigations:**
 
 1. **Field-Level Access Control:**
+
 ```python
 class AccountResponse(BaseModel):
-    id: UUID
-    account_name: str
-    current_balance: Decimal  # Only if user has read permission
+   id: UUID
+   account_name: str
+   current_balance: Decimal  # Only if user has read permission
 
-    @classmethod
-    def from_account(cls, account: Account, permission: PermissionLevel):
-        data = {
-            "id": account.id,
-            "account_name": account.account_name,
-        }
-        if permission in [PermissionLevel.OWNER, PermissionLevel.EDITOR, PermissionLevel.VIEWER]:
-            data["current_balance"] = account.current_balance
-        return cls(**data)
+   @classmethod
+   def from_account(cls, account: Account, permission: PermissionLevel):
+      data = {
+         "id": account.id,
+         "account_name": account.account_name,
+      }
+      if permission in [PermissionLevel.owner, PermissionLevel.editor, PermissionLevel.viewer]:
+         data["current_balance"] = account.current_balance
+      return cls(**data)
 ```
 
 2. **Share List Filtering:**

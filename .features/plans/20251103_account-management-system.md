@@ -676,9 +676,9 @@ tests/
 2. **Permission Hierarchy Logic**
    ```python
    PERMISSION_HIERARCHY = {
-       PermissionLevel.VIEWER: 1,
-       PermissionLevel.EDITOR: 2,
-       PermissionLevel.OWNER: 3,
+       PermissionLevel.viewer: 1,
+       PermissionLevel.editor: 2,
+       PermissionLevel.owner: 3,
    }
 
    def has_permission(
@@ -1343,7 +1343,7 @@ tests/
        user_id: UUID = Field(description="User ID to share with")
        permission_level: PermissionLevel = Field(
            description="Permission level to grant",
-           examples=[PermissionLevel.VIEWER]
+           examples=[PermissionLevel.viewer]
        )
    ```
 
