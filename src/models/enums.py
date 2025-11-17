@@ -25,11 +25,11 @@ class AccountType(str, enum.Enum):
 
     Attributes:
         SAVINGS: Savings or checking accounts with positive balances
-        CREDIT_CARD: Credit card accounts (typically negative balance = debt)
-        DEBIT_CARD: Prepaid or debit card accounts
-        LOAN: Loan accounts (mortgage, personal, auto) - negative balance = debt
-        INVESTMENT: Investment or brokerage accounts (stocks, bonds, mutual funds)
-        OTHER: User-defined account types not covered by standard types
+        credit_card: Credit card accounts (typically negative balance = debt)
+        debit_card: Prepaid or debit card accounts
+        loan: Loan accounts (mortgage, personal, auto) - negative balance = debt
+        investment: Investment or brokerage accounts (stocks, bonds, mutual funds)
+        other: User-defined account types not covered by standard types
 
     Usage:
         account = Account(
@@ -39,12 +39,12 @@ class AccountType(str, enum.Enum):
         )
     """
 
-    SAVINGS = "savings"
-    CREDIT_CARD = "credit_card"
-    DEBIT_CARD = "debit_card"
-    LOAN = "loan"
-    INVESTMENT = "investment"
-    OTHER = "other"
+    savings = "savings"
+    credit_card = "credit_card"
+    debit_card = "debit_card"
+    loan = "loan"
+    investment = "investment"
+    other = "other"
 
 
 class PermissionLevel(str, enum.Enum):
@@ -58,7 +58,7 @@ class PermissionLevel(str, enum.Enum):
         OWNER > EDITOR > VIEWER
 
     Attributes:
-        OWNER: Full access - read, write, delete, manage sharing
+        owner: Full access - read, write, delete, manage sharing
             - Can view account details and balance
             - Can update account name and status
             - Can delete account (soft delete)
@@ -67,14 +67,14 @@ class PermissionLevel(str, enum.Enum):
             - Can revoke access from shared users
             - Only one owner per account (the creator)
 
-        EDITOR: Read and write access - cannot delete or manage sharing
+        editor: Read and write access - cannot delete or manage sharing
             - Can view account details and balance
             - Can update account name (but not is_active status)
             - Cannot delete account
             - Cannot share account or change permissions
             - Suitable for partners managing shared finances
 
-        VIEWER: Read-only access
+        viewer: Read-only access
             - Can view account details and balance
             - Cannot modify anything
             - Cannot delete account
@@ -106,9 +106,9 @@ class PermissionLevel(str, enum.Enum):
         All service methods must check permissions before performing operations.
     """
 
-    OWNER = "owner"
-    EDITOR = "editor"
-    VIEWER = "viewer"
+    owner = "owner"
+    editor = "editor"
+    viewer = "viewer"
 
 
 class TransactionType(str, enum.Enum):
@@ -119,32 +119,32 @@ class TransactionType(str, enum.Enum):
     in the system. Each transaction must have exactly one type.
 
     Attributes:
-        DEBIT: Money out - expenses, withdrawals, payments
+        debit: Money out - expenses, withdrawals, payments
             - Decreases account balance
             - Examples: grocery purchases, bill payments, cash withdrawals
             - Amount is typically negative or recorded as expense
 
-        CREDIT: Money in - income, deposits, refunds
+        credit: Money in - income, deposits, refunds
             - Increases account balance
             - Examples: salary deposits, refunds, transfers in
             - Amount is typically positive or recorded as income
 
-        TRANSFER: Movement of money between accounts
+        transfer: Movement of money between accounts
             - For internal transfers between user's own accounts
             - One account debited, another credited
             - Future: Phase 4 will link paired transfer transactions
 
-        FEE: Bank fees, service charges, transaction costs
+        fee: Bank fees, service charges, transaction costs
             - Decreases account balance
             - Examples: monthly account fees, overdraft fees, ATM fees
             - Typically small amounts but important for expense tracking
 
-        INTEREST: Interest earned or paid
+        interest: Interest earned or paid
             - Can be positive (interest earned) or negative (interest paid)
             - Examples: savings interest, credit card interest charges
             - Useful for investment and loan tracking
 
-        OTHER: Miscellaneous transactions not covered by other types
+        other: Miscellaneous transactions not covered by other types
             - Catch-all for unusual or uncategorized transactions
             - Examples: adjustments, corrections, one-off transactions
             - Users should categorize most transactions with specific types
@@ -162,9 +162,9 @@ class TransactionType(str, enum.Enum):
         in reports and budgets. Choose the most specific type that applies.
     """
 
-    DEBIT = "debit"
-    CREDIT = "credit"
-    TRANSFER = "transfer"
-    FEE = "fee"
-    INTEREST = "interest"
-    OTHER = "other"
+    debit = "debit"
+    credit = "credit"
+    transfer = "transfer"
+    fee = "fee"
+    interest = "interest"
+    other = "other"
