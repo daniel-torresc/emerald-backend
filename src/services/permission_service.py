@@ -44,9 +44,9 @@ class PermissionService:
 
     # Permission hierarchy mapping (higher number = more permissions)
     PERMISSION_HIERARCHY = {
-        PermissionLevel.VIEWER: 1,
-        PermissionLevel.EDITOR: 2,
-        PermissionLevel.OWNER: 3,
+        PermissionLevel.viewer: 1,
+        PermissionLevel.editor: 2,
+        PermissionLevel.owner: 3,
     }
 
     def __init__(self, session: AsyncSession):
@@ -88,7 +88,7 @@ class PermissionService:
         # First check: Is the user the account owner? (implicit ownership)
         account = await self.account_repo.get_by_id(account_id)
         if account and account.user_id == user_id:
-            return PermissionLevel.OWNER
+            return PermissionLevel.owner
 
         # Second check: Is there an explicit share?
         share = await self.share_repo.get_user_permission(user_id, account_id)
@@ -216,7 +216,7 @@ class PermissionService:
                 # User is owner, can delete account
         """
         return await self.check_permission(
-            user_id, account_id, PermissionLevel.OWNER
+            user_id, account_id, PermissionLevel.owner
         )
 
     async def can_read(
@@ -241,7 +241,7 @@ class PermissionService:
                 # Show account details
         """
         return await self.check_permission(
-            user_id, account_id, PermissionLevel.VIEWER
+            user_id, account_id, PermissionLevel.viewer
         )
 
     async def can_write(
@@ -266,5 +266,5 @@ class PermissionService:
                 # Allow account updates
         """
         return await self.check_permission(
-            user_id, account_id, PermissionLevel.EDITOR
+            user_id, account_id, PermissionLevel.editor
         )

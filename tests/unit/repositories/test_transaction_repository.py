@@ -39,7 +39,7 @@ class TestTransactionRepository:
             currency="USD",
             description="Grocery shopping",
             merchant="Whole Foods",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -52,7 +52,7 @@ class TestTransactionRepository:
         assert created.currency == "USD"
         assert created.description == "Grocery shopping"
         assert created.merchant == "Whole Foods"
-        assert created.transaction_type == TransactionType.DEBIT
+        assert created.transaction_type == TransactionType.debit
         assert created.deleted_at is None
 
     async def test_get_by_id(self, db_session, test_user, test_account):
@@ -66,7 +66,7 @@ class TestTransactionRepository:
             amount=Decimal("100.00"),
             currency="USD",
             description="Salary",
-            transaction_type=TransactionType.CREDIT,
+            transaction_type=TransactionType.credit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -91,7 +91,7 @@ class TestTransactionRepository:
                 amount=Decimal(f"-{10 + i}.00"),
                 currency="USD",
                 description=f"Transaction {i}",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -116,7 +116,7 @@ class TestTransactionRepository:
                 amount=Decimal(f"-{10 + i}.00"),
                 currency="USD",
                 description=f"Transaction {i}",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -138,7 +138,7 @@ class TestTransactionRepository:
                 amount=Decimal("-10.00"),
                 currency="USD",
                 description=f"Transaction {i}",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -167,7 +167,7 @@ class TestTransactionRepository:
                 amount=amount,
                 currency="USD",
                 description="Transaction",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -187,12 +187,12 @@ class TestTransactionRepository:
         repo = TransactionRepository(db_session)
 
         # Create transactions of different types
-        types = [TransactionType.DEBIT, TransactionType.CREDIT, TransactionType.DEBIT]
+        types = [TransactionType.debit, TransactionType.credit, TransactionType.debit]
         for txn_type in types:
             transaction = Transaction(
                 account_id=test_account.id,
                 transaction_date=date.today(),
-                amount=Decimal("-10.00") if txn_type == TransactionType.DEBIT else Decimal("10.00"),
+                amount=Decimal("-10.00") if txn_type == TransactionType.debit else Decimal("10.00"),
                 currency="USD",
                 description="Transaction",
                 transaction_type=txn_type,
@@ -204,7 +204,7 @@ class TestTransactionRepository:
         # Search for debit transactions
         transactions, total = await repo.search_transactions(
             account_id=test_account.id,
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
         )
 
         assert total == 2
@@ -220,7 +220,7 @@ class TestTransactionRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -235,7 +235,7 @@ class TestTransactionRepository:
                 amount=Decimal(f"-{25}.00"),
                 currency="USD",
                 description=f"Child {i}",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -257,7 +257,7 @@ class TestTransactionRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -274,7 +274,7 @@ class TestTransactionRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Child",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -296,7 +296,7 @@ class TestTransactionRepository:
                 amount=amount,
                 currency="USD",
                 description="Transaction",
-                transaction_type=TransactionType.DEBIT if amount < 0 else TransactionType.CREDIT,
+                transaction_type=TransactionType.debit if amount < 0 else TransactionType.credit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -327,7 +327,7 @@ class TestTransactionRepository:
                 amount=amount,
                 currency="USD",
                 description="Transaction",
-                transaction_type=TransactionType.CREDIT if amount > 0 else TransactionType.DEBIT,
+                transaction_type=TransactionType.credit if amount > 0 else TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -352,7 +352,7 @@ class TestTransactionRepository:
             amount=Decimal("-10.00"),
             currency="USD",
             description="To be deleted",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -381,7 +381,7 @@ class TestTransactionRepository:
                 amount=Decimal(f"-{i + 1}.00"),
                 currency="USD",
                 description=f"Transaction {i}",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )

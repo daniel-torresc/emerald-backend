@@ -101,7 +101,7 @@ class TestAccountService:
         account = await service.create_account(
             user_id=test_user.id,
             account_name="Credit Card",
-            account_type=AccountType.CREDIT_CARD,
+            account_type=AccountType.credit_card,
             currency="USD",
             opening_balance=Decimal("-500.50"),
             current_user=test_user,
@@ -208,7 +208,7 @@ class TestAccountService:
         await service.create_account(
             user_id=test_user.id,
             account_name="Active Credit",
-            account_type=AccountType.CREDIT_CARD,
+            account_type=AccountType.credit_card,
             currency="USD",
             opening_balance=Decimal("-500.00"),
             current_user=test_user,
@@ -234,7 +234,7 @@ class TestAccountService:
         credit_accounts = await service.list_accounts(
             user_id=test_user.id,
             current_user=test_user,
-            account_type=AccountType.CREDIT_CARD,
+            account_type=AccountType.credit_card,
         )
         assert len(credit_accounts) == 1
         assert credit_accounts[0].account_name == "Active Credit"

@@ -679,7 +679,7 @@ Implement business logic for transaction operations. Orchestrates repositories, 
        await self.permission_service.check_account_access(
            user_id=current_user.id,
            account_id=account_id,
-           required_permission=PermissionLevel.EDITOR,  # Editors can create
+           required_permission=PermissionLevel.editor,  # Editors can create
        )
 
        # Validate currency matches account
@@ -749,7 +749,7 @@ Implement business logic for transaction operations. Orchestrates repositories, 
            existing.created_by == current_user.id or  # Creator
            current_user.is_admin or                   # Admin
            await self.permission_service.has_permission(
-               current_user.id, existing.account_id, PermissionLevel.OWNER
+               current_user.id, existing.account_id, PermissionLevel.owner
            )
        )
        if not has_permission:
@@ -804,7 +804,7 @@ Implement business logic for transaction operations. Orchestrates repositories, 
        await self.permission_service.check_account_access(
            user_id=current_user.id,
            account_id=existing.account_id,
-           required_permission=PermissionLevel.OWNER,
+           required_permission=PermissionLevel.owner,
        )
 
        async with self.db.begin():
@@ -875,7 +875,7 @@ Implement business logic for transaction operations. Orchestrates repositories, 
        await self.permission_service.check_account_access(
            user_id=current_user.id,
            account_id=parent.account_id,
-           required_permission=PermissionLevel.EDITOR,
+           required_permission=PermissionLevel.editor,
        )
 
        async with self.db.begin():
@@ -1825,6 +1825,7 @@ Add balance calculation and update methods to AccountService to support transact
    - [ ] Tag add/remove logged
 
 **Test Fixtures (conftest.py):**
+
 ```python
 @pytest.fixture
 async def sample_transaction(db_session, sample_account, sample_user):
@@ -1836,7 +1837,7 @@ async def sample_transaction(db_session, sample_account, sample_user):
         currency="USD",
         description="Test Transaction",
         merchant="Test Merchant",
-        transaction_type=TransactionType.DEBIT,
+        transaction_type=TransactionType.debit,
         created_by=sample_user.id,
         updated_by=sample_user.id,
     )
@@ -1844,6 +1845,7 @@ async def sample_transaction(db_session, sample_account, sample_user):
     await db_session.commit()
     await db_session.refresh(transaction)
     return transaction
+
 
 @pytest.fixture
 async def sample_split_transaction(db_session, sample_account, sample_user):

@@ -94,7 +94,7 @@ class TestAccountRepository:
         await repo.create(
             user_id=test_user.id,
             account_name="Credit Card",
-            account_type=AccountType.CREDIT_CARD,
+            account_type=AccountType.credit_card,
             currency="USD",
             opening_balance=Decimal("-500.00"),
             current_balance=Decimal("-500.00"),
@@ -141,7 +141,7 @@ class TestAccountRepository:
         await repo.create(
             user_id=test_user.id,
             account_name="Active Credit Card",
-            account_type=AccountType.CREDIT_CARD,
+            account_type=AccountType.credit_card,
             currency="USD",
             opening_balance=Decimal("-200.00"),
             current_balance=Decimal("-200.00"),

@@ -141,7 +141,7 @@ async def shared_account_viewer(
         share = AccountShare(
             account_id=test_account.id,
             user_id=second_user.id,
-            permission_level=PermissionLevel.VIEWER,
+            permission_level=PermissionLevel.viewer,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -168,7 +168,7 @@ async def shared_account_editor(
         share = AccountShare(
             account_id=test_account.id,
             user_id=second_user.id,
-            permission_level=PermissionLevel.EDITOR,
+            permission_level=PermissionLevel.editor,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -581,7 +581,7 @@ async def test_update_share_non_owner_cannot_update(
         third_share = AccountShare(
             account_id=test_account.id,
             user_id=third_user.id,
-            permission_level=PermissionLevel.VIEWER,
+            permission_level=PermissionLevel.viewer,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -703,7 +703,7 @@ async def test_revoke_share_non_owner_cannot_revoke(
         third_share = AccountShare(
             account_id=test_account.id,
             user_id=third_user.id,
-            permission_level=PermissionLevel.VIEWER,
+            permission_level=PermissionLevel.viewer,
             created_by=test_user.id,
             updated_by=test_user.id,
         )

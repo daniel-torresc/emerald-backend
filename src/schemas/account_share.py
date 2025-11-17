@@ -31,7 +31,7 @@ class AccountShareCreate(BaseModel):
 
     permission_level: PermissionLevel = Field(
         description="Permission level to grant (owner, editor, viewer)",
-        examples=[PermissionLevel.VIEWER, PermissionLevel.EDITOR],
+        examples=[PermissionLevel.viewer, PermissionLevel.editor],
     )
 
 
@@ -47,7 +47,7 @@ class AccountShareUpdate(BaseModel):
 
     permission_level: PermissionLevel = Field(
         description="New permission level (owner, editor, viewer)",
-        examples=[PermissionLevel.EDITOR, PermissionLevel.VIEWER],
+        examples=[PermissionLevel.editor, PermissionLevel.viewer],
     )
 
 

@@ -43,7 +43,7 @@ class TestTransactionServiceCreate:
             amount=Decimal("-50.25"),
             currency="USD",
             description="Grocery shopping",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             merchant="Whole Foods",
             tags=["groceries", "food"],
             current_user=test_user,
@@ -73,7 +73,7 @@ class TestTransactionServiceCreate:
             amount=Decimal("-100.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -94,7 +94,7 @@ class TestTransactionServiceCreate:
                 amount=Decimal("-50.00"),
                 currency="EUR",  # Account is USD
                 description="Test",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 current_user=test_user,
             )
 
@@ -111,7 +111,7 @@ class TestTransactionServiceCreate:
                 amount=Decimal("0.00"),
                 currency="USD",
                 description="Test",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 current_user=test_user,
             )
 
@@ -131,7 +131,7 @@ class TestTransactionServiceCreate:
                 amount=Decimal("-50.00"),
                 currency="USD",
                 description="Test",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 current_user=admin_user,  # Different user
             )
 
@@ -151,7 +151,7 @@ class TestTransactionServiceRead:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -183,7 +183,7 @@ class TestTransactionServiceRead:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -210,7 +210,7 @@ class TestTransactionServiceRead:
                 currency="USD",
                 description="Test",
                 transaction_type=(
-                    TransactionType.CREDIT if amount > 0 else TransactionType.DEBIT
+                    TransactionType.credit if amount > 0 else TransactionType.debit
                 ),
                 current_user=test_user,
             )
@@ -219,7 +219,7 @@ class TestTransactionServiceRead:
         results, total = await service.search_transactions(
             account_id=test_account.id,
             current_user=test_user,
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
         )
 
         assert total == 3  # Three debit transactions
@@ -240,7 +240,7 @@ class TestTransactionServiceUpdate:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Original",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -272,7 +272,7 @@ class TestTransactionServiceUpdate:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -304,7 +304,7 @@ class TestTransactionServiceUpdate:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -354,7 +354,7 @@ class TestTransactionServiceUpdate:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -382,7 +382,7 @@ class TestTransactionServiceDelete:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -412,7 +412,7 @@ class TestTransactionServiceDelete:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -436,7 +436,7 @@ class TestTransactionServiceDelete:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -473,7 +473,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -504,7 +504,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -534,7 +534,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -563,7 +563,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -600,7 +600,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -635,7 +635,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="No splits",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -661,7 +661,7 @@ class TestTransactionServiceTags:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 
@@ -681,7 +681,7 @@ class TestTransactionServiceTags:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             tags=["groceries"],
             current_user=test_user,
         )
@@ -704,7 +704,7 @@ class TestTransactionServiceTags:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             current_user=test_user,
         )
 

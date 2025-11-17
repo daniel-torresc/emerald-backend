@@ -271,46 +271,42 @@ Then simply right-click `debug.py` → `Debug 'debug'` in PyCharm.
 
 The platform includes a comprehensive admin management system for user administration and system operations.
 
-### Initial Admin Setup (Bootstrap)
+### Initial Superuser Setup
 
-Create the first admin user via the **bootstrap API endpoint**. This is a one-time operation that requires no authentication (since no admin exists yet).
+The initial superuser is created **automatically during database migration**. No manual API calls or bootstrap steps are needed.
 
-**⚠️ IMPORTANT: Configure environment variables BEFORE bootstrap**
+**⚠️ IMPORTANT: Configure environment variables BEFORE running migrations**
 
-Admin credentials are read from `.env` file:
+Superuser credentials are read from `.env` file:
 
 ```bash
-# Edit .env file (REQUIRED before bootstrap)
-BOOTSTRAP_ADMIN_USERNAME="admin"
-BOOTSTRAP_ADMIN_EMAIL="admin@example.com"
-BOOTSTRAP_ADMIN_PASSWORD="YourSecureP@ss123!"  # CHANGE THIS!
-BOOTSTRAP_ADMIN_FULL_NAME="System Administrator"
+# Edit .env file (REQUIRED before running migrations)
+SUPERADMIN_USERNAME="admin"
+SUPERADMIN_EMAIL="admin@example.com"
+SUPERADMIN_PASSWORD="YourSecureP@ss123!"  # CHANGE THIS!
+SUPERADMIN_FULL_NAME="System Administrator"
 ```
 
-**Bootstrap endpoint (no request body needed):**
+**Migration creates the superuser:**
 
 ```bash
-# Simply POST to bootstrap endpoint
-curl -X POST http://localhost:8000/api/v1/admin/bootstrap
+# Run database migrations (creates schema AND superuser)
+uv run alembic upgrade head
 ```
 
 **Important:**
-- Bootstrap can only be run **once** - endpoint returns 403 after first admin is created
-- Admin credentials are **predefined in `.env`** - no request body accepted
-- Password is NEVER returned in the response for security
-- After bootstrap, you can change the admin password via PUT `/admin/users/{id}/password`
+- Superuser is created automatically when running `alembic upgrade head`
+- Migration is **idempotent** - if an admin already exists, creation is skipped
+- Password is NEVER stored in plain text - hashed with Argon2id
+- After creation, you can change the password via PUT `/admin/users/{id}/password`
 - Use the admin API (with authentication) to create additional admins
 
-**Response Example:**
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "username": "admin",
-  "email": "admin@example.com",
-  "is_admin": true,
-  "temporary_password": null,
-  "permissions": ["users:read:all", "users:write:all", ...]
-}
+**Verify superuser was created:**
+```bash
+# Login as superuser
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"YourSecureP@ss123!"}'
 ```
 
 ### Admin API Endpoints
@@ -319,7 +315,6 @@ Once you have an admin account, you can manage admin users via authenticated end
 
 | Endpoint | Method | Description | Auth Required |
 |----------|--------|-------------|---------------|
-| `/api/v1/admin/bootstrap` | POST | Create first admin (one-time) | ❌ No |
 | `/api/v1/admin/users` | POST | Create new admin user | ✅ Admin |
 | `/api/v1/admin/users` | GET | List all admin users (paginated) | ✅ Admin |
 | `/api/v1/admin/users/{id}` | GET | Get admin user details | ✅ Admin |
@@ -336,25 +331,25 @@ Once you have an admin account, you can manage admin users via authenticated end
 
 ### Admin Authentication
 
-Admin endpoints (except `/bootstrap`) require:
+All admin endpoints require:
 1. Valid JWT access token (from `/api/v1/auth/login`)
 2. Admin role (`is_admin = true`)
 
 **Complete workflow example:**
 ```bash
-# Step 1: Configure .env with bootstrap credentials
+# Step 1: Configure .env with superuser credentials (before migrations)
 # Edit .env file:
-# BOOTSTRAP_ADMIN_USERNAME="admin"
-# BOOTSTRAP_ADMIN_EMAIL="admin@example.com"
-# BOOTSTRAP_ADMIN_PASSWORD="SecureP@ss123"
+# SUPERADMIN_USERNAME="admin"
+# SUPERADMIN_EMAIL="admin@example.com"
+# SUPERADMIN_PASSWORD="SecureP@ss123"
 
-# Step 2: Bootstrap first admin (no auth required, no body)
-curl -X POST http://localhost:8000/api/v1/admin/bootstrap
+# Step 2: Run migrations (creates database AND superuser automatically)
+uv run alembic upgrade head
 
-# Step 3: Login as admin
+# Step 3: Login as superuser
 curl -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"SecureP@ss123"}'
+  -d '{"email":"admin@example.com","password":"SecureP@ss123"}'
 
 # Step 4: Use access token for admin operations
 curl http://localhost:8000/api/v1/admin/users \
@@ -364,7 +359,7 @@ curl http://localhost:8000/api/v1/admin/users \
 curl -X POST http://localhost:8000/api/v1/admin/users \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin2","email":"admin2@example.com"}'
+  -d '{"username":"admin2","email":"admin2@example.com","password":"Admin2Pass123!"}'
 
 # Step 6: Change admin password if needed (requires auth)
 curl -X PUT http://localhost:8000/api/v1/admin/users/<admin_id>/password \
