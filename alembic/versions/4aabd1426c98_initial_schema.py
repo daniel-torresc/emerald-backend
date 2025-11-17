@@ -449,7 +449,7 @@ def upgrade() -> None:
 
             bind.execute(sa.text(
                 "INSERT INTO roles (id, name, description, permissions, created_at, updated_at) "
-                "VALUES (:id, :name, :description, :permissions::jsonb, :created_at, :updated_at)"
+                "VALUES (:id, :name, :description, CAST(:permissions AS jsonb), :created_at, :updated_at)"
             ), {
                 "id": str(role_id),
                 "name": "admin",
@@ -482,7 +482,7 @@ def upgrade() -> None:
             "INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, "
             "description, new_values, ip_address, user_agent, request_id, status, created_at) "
             "VALUES (:id, :user_id, :action, :entity_type, :entity_id, "
-            ":description, :new_values::jsonb, :ip_address, :user_agent, :request_id, :status, :created_at)"
+            ":description, CAST(:new_values AS jsonb), :ip_address, :user_agent, :request_id, :status, :created_at)"
         ), {
             "id": str(uuid.uuid4()),
             "user_id": None,  # System operation
