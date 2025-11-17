@@ -138,7 +138,7 @@ class TransactionService:
         has_permission = await self.permission_service.check_permission(
             user_id=current_user.id,
             account_id=account_id,
-            required_permission=PermissionLevel.EDITOR,
+            required_permission=PermissionLevel.editor,
         )
 
         if not has_permission:
@@ -270,7 +270,7 @@ class TransactionService:
         has_permission = await self.permission_service.check_permission(
             user_id=current_user.id,
             account_id=transaction.account_id,
-            required_permission=PermissionLevel.VIEWER,
+            required_permission=PermissionLevel.viewer,
         )
 
         if not has_permission:
@@ -341,7 +341,7 @@ class TransactionService:
         has_permission = await self.permission_service.check_permission(
             user_id=current_user.id,
             account_id=account_id,
-            required_permission=PermissionLevel.VIEWER,
+            required_permission=PermissionLevel.viewer,
         )
 
         if not has_permission:
@@ -437,7 +437,7 @@ class TransactionService:
         is_owner = await self.permission_service.check_permission(
             user_id=current_user.id,
             account_id=existing.account_id,
-            required_permission=PermissionLevel.OWNER,
+            required_permission=PermissionLevel.owner,
         )
 
         if not (is_creator or is_admin or is_owner):
@@ -578,7 +578,7 @@ class TransactionService:
         has_permission = await self.permission_service.check_permission(
             user_id=current_user.id,
             account_id=existing.account_id,
-            required_permission=PermissionLevel.OWNER,
+            required_permission=PermissionLevel.owner,
         )
 
         if not has_permission:
@@ -720,7 +720,7 @@ class TransactionService:
         has_permission = await self.permission_service.check_permission(
             user_id=current_user.id,
             account_id=parent.account_id,
-            required_permission=PermissionLevel.EDITOR,
+            required_permission=PermissionLevel.editor,
         )
 
         if not has_permission:
@@ -833,7 +833,7 @@ class TransactionService:
         has_permission = await self.permission_service.check_permission(
             user_id=current_user.id,
             account_id=parent.account_id,
-            required_permission=PermissionLevel.EDITOR,
+            required_permission=PermissionLevel.editor,
         )
 
         if not has_permission:
@@ -918,7 +918,7 @@ class TransactionService:
         has_permission = await self.permission_service.check_permission(
             user_id=current_user.id,
             account_id=transaction.account_id,
-            required_permission=PermissionLevel.EDITOR,
+            required_permission=PermissionLevel.editor,
         )
 
         if not has_permission:
@@ -977,7 +977,7 @@ class TransactionService:
         has_permission = await self.permission_service.check_permission(
             user_id=current_user.id,
             account_id=transaction.account_id,
-            required_permission=PermissionLevel.EDITOR,
+            required_permission=PermissionLevel.editor,
         )
 
         if not has_permission:

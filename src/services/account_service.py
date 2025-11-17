@@ -534,7 +534,7 @@ class AccountService:
 
         # Check if current user is owner
         await self.permission_service.require_permission(
-            current_user.id, account_id, PermissionLevel.OWNER
+            current_user.id, account_id, PermissionLevel.owner
         )
 
         # Validate target user exists and is not deleted
@@ -547,7 +547,7 @@ class AccountService:
             raise ValidationError("Cannot share account with yourself")
 
         # Cannot grant owner permission (only one owner per account)
-        if permission_level == PermissionLevel.OWNER:
+        if permission_level == PermissionLevel.owner:
             raise ValidationError(
                 "Cannot grant owner permission. Each account has exactly one owner."
             )
@@ -618,7 +618,7 @@ class AccountService:
         """
         # Verify user has access to account
         await self.permission_service.require_permission(
-            current_user.id, account_id, PermissionLevel.VIEWER
+            current_user.id, account_id, PermissionLevel.viewer
         )
 
         # Get all shares for account
@@ -676,7 +676,7 @@ class AccountService:
         """
         # Check if current user is owner
         await self.permission_service.require_permission(
-            current_user.id, account_id, PermissionLevel.OWNER
+            current_user.id, account_id, PermissionLevel.owner
         )
 
         # Get share
@@ -685,13 +685,13 @@ class AccountService:
             raise NotFoundError("Share not found")
 
         # Cannot grant owner permission
-        if permission_level == PermissionLevel.OWNER:
+        if permission_level == PermissionLevel.owner:
             raise ValidationError(
                 "Cannot grant owner permission. Each account has exactly one owner."
             )
 
         # Cannot change own owner permission
-        if share.user_id == current_user.id and share.permission_level == PermissionLevel.OWNER:
+        if share.user_id == current_user.id and share.permission_level == PermissionLevel.owner:
             raise ValidationError("Cannot change your own owner permission")
 
         # Store old permission for audit log
@@ -764,7 +764,7 @@ class AccountService:
         """
         # Check if current user is owner
         await self.permission_service.require_permission(
-            current_user.id, account_id, PermissionLevel.OWNER
+            current_user.id, account_id, PermissionLevel.owner
         )
 
         # Get share
@@ -773,7 +773,7 @@ class AccountService:
             raise NotFoundError("Share not found")
 
         # Cannot revoke own owner permission
-        if share.user_id == current_user.id and share.permission_level == PermissionLevel.OWNER:
+        if share.user_id == current_user.id and share.permission_level == PermissionLevel.owner:
             raise ValidationError("Cannot revoke your own owner permission")
 
         # Soft delete share
@@ -887,7 +887,7 @@ class AccountService:
 
         # Check permission (VIEWER or higher can view balance)
         await self.permission_service.require_permission(
-            current_user.id, account_id, PermissionLevel.VIEWER
+            current_user.id, account_id, PermissionLevel.viewer
         )
 
         account = await self.account_repo.get_by_id(account_id)

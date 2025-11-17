@@ -217,7 +217,7 @@ class AccountShareRepository(BaseRepository[AccountShare]):
         """
         query = select(AccountShare).where(
             AccountShare.account_id == account_id,
-            AccountShare.permission_level == PermissionLevel.OWNER,
+            AccountShare.permission_level == PermissionLevel.owner,
         )
         query = self._apply_soft_delete_filter(query)
 

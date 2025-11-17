@@ -56,7 +56,7 @@ class TransactionBase(BaseModel):
 
     transaction_type: TransactionType = Field(
         description="Type of transaction",
-        examples=[TransactionType.DEBIT, TransactionType.CREDIT],
+        examples=[TransactionType.debit, TransactionType.credit],
     )
 
     @field_validator("currency")
