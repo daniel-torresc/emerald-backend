@@ -354,6 +354,7 @@ def upgrade() -> None:
         sa.Column('transaction_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('tag', sa.String(length=50), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
         sa.UniqueConstraint('transaction_id', 'tag', name='uq_transaction_tags_transaction_tag'),
         sa.ForeignKeyConstraint(['transaction_id'], ['transactions.id'], name=op.f('fk_transaction_tags_transaction_id_transactions'), ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id', name=op.f('pk_transaction_tags'))
