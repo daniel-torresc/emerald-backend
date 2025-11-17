@@ -9,6 +9,9 @@ This module provides HTTP endpoints for admin operations:
 - DELETE /api/v1/admin/users/{user_id} - Delete admin user
 - PUT /api/v1/admin/users/{user_id}/password - Reset admin password
 - PUT /api/v1/admin/users/{user_id}/permissions - Update admin permissions
+
+Note: Initial superuser is created automatically during database migration
+via 'alembic upgrade head'. See SUPERADMIN_* environment variables in .env
 """
 
 import logging
@@ -35,59 +38,6 @@ from src.services.admin_service import AdminService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
-
-
-@router.post(
-    "/bootstrap",
-    response_model=AdminUserResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Bootstrap first admin user",
-    description="Create the first admin user using predefined environment variables. "
-                "This endpoint can ONLY be used once, when no admin users exist. "
-                "No authentication or request body required. "
-                "Admin credentials are read from BOOTSTRAP_ADMIN_* environment variables. "
-                "After bootstrap, use POST /users to create additional admins.",
-)
-async def bootstrap_first_admin(
-    request: Request,
-    admin_service: AdminService = Depends(get_admin_service),
-) -> AdminUserResponse:
-    """
-    Bootstrap the first admin user.
-
-    This is a special one-time operation that creates the initial admin
-    when the system is first set up. No authentication or request body required.
-
-    Admin credentials are read from environment variables:
-    - BOOTSTRAP_ADMIN_USERNAME (default: "admin")
-    - BOOTSTRAP_ADMIN_EMAIL (default: "admin@example.com")
-    - BOOTSTRAP_ADMIN_PASSWORD (REQUIRED - must be set in .env)
-    - BOOTSTRAP_ADMIN_FULL_NAME (default: "System Administrator")
-    - BOOTSTRAP_ADMIN_PERMISSIONS (optional - defaults to full access)
-
-    After bootstrap is complete, this endpoint will return 403 Forbidden.
-    Use POST /users to create additional admins (requires admin auth).
-
-    Args:
-        request: FastAPI request object (for IP, user-agent)
-        admin_service: Admin service instance
-
-    Returns:
-        Created admin user details (no password in response)
-
-    Raises:
-        403: If bootstrap already completed or admins exist
-        500: If BOOTSTRAP_ADMIN_PASSWORD not set in environment
-
-    Example:
-        POST /api/v1/admin/bootstrap
-        (no body required)
-    """
-    return await admin_service.bootstrap_first_admin(
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-    )
 
 
 @router.post(

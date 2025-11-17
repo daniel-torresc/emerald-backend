@@ -122,27 +122,27 @@ class Settings(BaseSettings):
     audit_log_retention_days: int = Field(default=2555)  # 7 years
 
     # -------------------------------------------------------------------------
-    # Bootstrap Admin Configuration
+    # Superuser Configuration (for Database Migration)
     # -------------------------------------------------------------------------
-    bootstrap_admin_username: str = Field(
+    superadmin_username: str = Field(
         ...,
         min_length=3,
         max_length=50,
-        description="Bootstrap admin username (required)"
+        description="Initial superuser username (used during database migration)"
     )
-    bootstrap_admin_email: EmailStr = Field(
+    superadmin_email: EmailStr = Field(
         ...,
-        description="Bootstrap admin email (required)"
+        description="Initial superuser email (used during database migration)"
     )
-    bootstrap_admin_password: str = Field(
+    superadmin_password: str = Field(
         ...,
         min_length=8,
-        description="Bootstrap admin password (required, must be strong)"
+        description="Initial superuser password (used during database migration)"
     )
-    bootstrap_admin_full_name: str = Field(
-        description="Bootstrap admin full name"
+    superadmin_full_name: str = Field(
+        description="Initial superuser full name (used during database migration)"
     )
-    bootstrap_admin_permissions: List[str] = Field(
+    superadmin_permissions: List[str] = Field(
         default=[
             "users:read:all",
             "users:write:all",
@@ -156,7 +156,7 @@ class Settings(BaseSettings):
             "audit_logs:read:all",
             "admin:manage:all",
         ],
-        description="Bootstrap admin permissions (default: full access)"
+        description="Initial superuser permissions (default: full access)"
     )
 
     # -------------------------------------------------------------------------

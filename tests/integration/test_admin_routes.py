@@ -29,78 +29,15 @@ from src.models.user import User
 
 
 # ============================================================================
-# Bootstrap Tests (POST /admin/bootstrap)
+# Bootstrap Endpoint Removal Tests
 # ============================================================================
 @pytest.mark.asyncio
-async def test_bootstrap_first_admin_success(
+async def test_bootstrap_endpoint_removed(
     async_client: AsyncClient,
-    test_engine,
 ):
-    """Test: Successfully bootstrap first admin user."""
-    # Ensure no admins exist (clean database for this test)
-    async_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-
-    async with async_session_factory() as session:
-        from sqlalchemy import delete
-        await session.execute(delete(User).where(User.is_admin == True))
-        await session.commit()
-
+    """Test: Bootstrap endpoint no longer exists (returns 404)."""
     response = await async_client.post("/api/v1/admin/bootstrap")
-
-    assert response.status_code == 201
-    data = response.json()
-
-    # Verify admin was created with expected fields (env vars are loaded at startup)
-    assert "username" in data
-    assert "email" in data
-    assert data["is_admin"] is True
-    assert data["is_active"] is True
-    assert "password_hash" not in data  # Password should not be in response
-    assert "id" in data
-
-
-@pytest.mark.asyncio
-async def test_bootstrap_cannot_bootstrap_twice(
-    async_client: AsyncClient,
-    admin_user: User,
-):
-    """Test: Cannot bootstrap when admin already exists."""
-    os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "AnotherPassword123!"
-
-    response = await async_client.post("/api/v1/admin/bootstrap")
-
-    assert response.status_code in [403, 409]  # Forbidden or Conflict
-
-
-@pytest.mark.asyncio
-async def test_bootstrap_requires_password_in_env(
-    async_client: AsyncClient,
-    test_engine,
-):
-    """Test: Bootstrap works with password in environment (already configured)."""
-    # This test verifies that bootstrap endpoint is functional
-    # Password is expected to be set in environment at startup
-    # If no admins exist, bootstrap should work
-
-    async_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-
-    async with async_session_factory() as session:
-        from sqlalchemy import delete
-        await session.execute(delete(User).where(User.is_admin == True))
-        await session.commit()
-
-    response = await async_client.post("/api/v1/admin/bootstrap")
-
-    # Should succeed if password is configured
-    assert response.status_code in [201, 400, 500]  # Success, or error if no password
+    assert response.status_code == 404
 
 
 # ============================================================================

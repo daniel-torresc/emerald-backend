@@ -38,36 +38,21 @@ async def test_complete_admin_workflow(async_client: AsyncClient, test_engine):
     7. Admin views audit logs for operations
     """
 
-    # Step 1: Clear all admins and bootstrap first admin
-    async_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
+    # Step 1: Login as superuser (created by migration)
+    from src.core.config import settings
 
-    async with async_session_factory() as session:
-        await session.execute(delete(User).where(User.is_admin == True))
-        await session.commit()
-
-    # Bootstrap uses default credentials from config
-    bootstrap_response = await async_client.post("/api/v1/admin/bootstrap")
-    assert bootstrap_response.status_code == 201
-    bootstrap_data = bootstrap_response.json()
-    print("✓ Step 1: Bootstrapped first admin")
-
-    # Step 2: Login as admin using the credentials from bootstrap response
     admin_login = await async_client.post(
         "/api/auth/login",
         json={
-            "email": bootstrap_data["email"],
-            "password": os.environ.get("BOOTSTRAP_ADMIN_PASSWORD", "ChangeMe123!"),
+            "email": settings.superadmin_email,
+            "password": settings.superadmin_password,
         },
     )
     assert admin_login.status_code == 200
     admin_headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
-    print("✓ Step 2: Admin logged in successfully")
+    print("✓ Step 1: Admin logged in successfully")
 
-    # Step 3: Admin creates second admin user
+    # Step 2: Admin creates second admin user
     second_admin_response = await async_client.post(
         "/api/v1/admin/users",
         headers=admin_headers,
@@ -192,28 +177,14 @@ async def test_admin_permission_management(async_client: AsyncClient, test_engin
     Test: Admin manages permissions for other admins.
     """
 
-    # Bootstrap admin
-    os.environ["BOOTSTRAP_ADMIN_USERNAME"] = "permadmin"
-    os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "permadmin@example.com"
-    os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "PermAdmin123!@#"
-
-    async_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-
-    async with async_session_factory() as session:
-        await session.execute(delete(User).where(User.is_admin == True))
-        await session.commit()
-
-    await async_client.post("/api/v1/admin/bootstrap")
+    # Login as superuser (created by migration)
+    from src.core.config import settings
 
     admin_login = await async_client.post(
         "/api/auth/login",
         json={
-            "email": "permadmin@example.com",
-            "password": "PermAdmin123!@#",
+            "email": settings.superadmin_email,
+            "password": settings.superadmin_password,
         },
     )
     admin_headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
@@ -253,28 +224,14 @@ async def test_admin_password_reset_workflow(async_client: AsyncClient, test_eng
     Test: Admin resets password for another admin.
     """
 
-    # Bootstrap
-    os.environ["BOOTSTRAP_ADMIN_USERNAME"] = "resetadmin"
-    os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "resetadmin@example.com"
-    os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "ResetAdmin123!@#"
-
-    async_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-
-    async with async_session_factory() as session:
-        await session.execute(delete(User).where(User.is_admin == True))
-        await session.commit()
-
-    await async_client.post("/api/v1/admin/bootstrap")
+    # Login as superuser (created by migration)
+    from src.core.config import settings
 
     admin_login = await async_client.post(
         "/api/auth/login",
         json={
-            "email": "resetadmin@example.com",
-            "password": "ResetAdmin123!@#",
+            "email": settings.superadmin_email,
+            "password": settings.superadmin_password,
         },
     )
     admin_headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
@@ -329,26 +286,15 @@ async def test_multi_admin_collaboration(async_client: AsyncClient, test_engine)
     Test: Multiple admins work together managing users.
     """
 
-    # Bootstrap first admin
-    os.environ["BOOTSTRAP_ADMIN_USERNAME"] = "collab1"
-    os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "collab1@example.com"
-    os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "Collab1Admin123!@#"
-
-    async_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-
-    async with async_session_factory() as session:
-        await session.execute(delete(User).where(User.is_admin == True))
-        await session.commit()
-
-    await async_client.post("/api/v1/admin/bootstrap")
+    # Login as superuser (created by migration)
+    from src.core.config import settings
 
     admin1_login = await async_client.post(
         "/api/auth/login",
-        json={"email": "collab1@example.com", "password": "Collab1Admin123!@#"},
+        json={
+            "email": settings.superadmin_email,
+            "password": settings.superadmin_password,
+        },
     )
     admin1_headers = {"Authorization": f"Bearer {admin1_login.json()['access_token']}"}
 
@@ -403,29 +349,22 @@ async def test_last_admin_protection(async_client: AsyncClient, test_engine):
     Test: System prevents deletion or deactivation of the last admin.
     """
 
-    # Bootstrap single admin
-    os.environ["BOOTSTRAP_ADMIN_USERNAME"] = "lastone"
-    os.environ["BOOTSTRAP_ADMIN_EMAIL"] = "lastone@example.com"
-    os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "LastOne123!@#"
+    # Get superuser ID (created by migration)
+    from src.core.config import settings
 
-    async_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-
-    async with async_session_factory() as session:
-        await session.execute(delete(User).where(User.is_admin == True))
-        await session.commit()
-
-    bootstrap_response = await async_client.post("/api/v1/admin/bootstrap")
-    admin_id = bootstrap_response.json()["id"]
-
+    # Login to get admin ID
     admin_login = await async_client.post(
         "/api/auth/login",
-        json={"email": "lastone@example.com", "password": "LastOne123!@#"},
+        json={
+            "email": settings.superadmin_email,
+            "password": settings.superadmin_password,
+        },
     )
     admin_headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
+
+    # Get superuser ID by listing admins
+    admins_response = await async_client.get("/api/v1/admin/users", headers=admin_headers)
+    admin_id = admins_response.json()["items"][0]["id"]
 
     # Try to delete self (last admin)
     delete_response = await async_client.delete(
@@ -457,29 +396,27 @@ async def test_last_admin_protection(async_client: AsyncClient, test_engine):
 
 
 @pytest.mark.asyncio
-async def test_bootstrap_security(async_client: AsyncClient, test_engine):
+async def test_superuser_created_by_migration(async_client: AsyncClient):
     """
-    Test: Bootstrap can only be used once, providing security.
+    Test: Superuser is created automatically by migration and can login.
     """
+    from src.core.config import settings
 
-    # Clear admins
-    async_session_factory = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
+    # Verify superuser can login
+    login_response = await async_client.post(
+        "/api/auth/login",
+        json={
+            "email": settings.superadmin_email,
+            "password": settings.superadmin_password,
+        },
     )
+    assert login_response.status_code == 200
+    assert "access_token" in login_response.json()
 
-    async with async_session_factory() as session:
-        await session.execute(delete(User).where(User.is_admin == True))
-        await session.commit()
+    # Verify superuser has admin privileges
+    admin_headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+    admins_response = await async_client.get("/api/v1/admin/users", headers=admin_headers)
+    assert admins_response.status_code == 200
+    assert len(admins_response.json()["items"]) > 0
 
-    # First bootstrap succeeds
-    os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "Bootstrap123!@#"
-    response1 = await async_client.post("/api/v1/admin/bootstrap")
-    assert response1.status_code == 201
-
-    # Second bootstrap fails
-    response2 = await async_client.post("/api/v1/admin/bootstrap")
-    assert response2.status_code in [403, 409]
-
-    print("✓ Bootstrap security verified (one-time only)")
+    print("✓ Migration-created superuser verified")

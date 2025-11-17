@@ -20,7 +20,6 @@ Tables Created:
 - user_roles: User-role associations
 - accounts: Financial accounts
 - account_shares: Shared account permissions
-- bootstrap_state: Initial setup tracking
 - transactions: Financial transactions
 - transaction_tags: Transaction categorization
 
@@ -31,10 +30,14 @@ This consolidates migrations from:
 - 1d78ffc27a9c_create_transactions (transactions, tags)
 """
 from typing import Sequence, Union
+from datetime import datetime, UTC
+import uuid
+import json
 
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from argon2 import PasswordHasher
 
 # revision identifiers, used by Alembic.
 revision: str = '4aabd1426c98'
@@ -200,21 +203,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('user_id', 'role_id', name=op.f('pk_user_roles'))
     )
 
-    # bootstrap_state table (from 7cd3ac786069_add_admin_support)
-    # NOTE: This table only stores completed bootstrap states (enforced by check constraint).
-    # If you need to track incomplete bootstrap attempts, remove the check constraint.
-    op.create_table(
-        'bootstrap_state',
-        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, server_default=sa.text('gen_random_uuid()')),
-        sa.Column('completed', sa.Boolean(), nullable=False, server_default=sa.text('TRUE')),
-        sa.Column('completed_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column('admin_user_id', postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.CheckConstraint('completed = TRUE', name='ck_bootstrap_state_completed'),
-        sa.ForeignKeyConstraint(['admin_user_id'], ['users.id'], name=op.f('fk_bootstrap_state_admin_user_id_users'), ondelete='SET NULL'),
-        sa.PrimaryKeyConstraint('id', name=op.f('pk_bootstrap_state'))
-    )
-
     # =========================================================================
     # STEP 3: Create Account Tables
     # From: 5ed7d2606ef9_create_accounts
@@ -376,6 +364,142 @@ def upgrade() -> None:
     op.create_index(op.f('ix_transaction_tags_tag'), 'transaction_tags', ['tag'], unique=False)
     op.create_index(op.f('ix_transaction_tags_created_at'), 'transaction_tags', ['created_at'], unique=False)
 
+    # =========================================================================
+    # STEP 5: Seed Initial Superuser (idempotent)
+    # =========================================================================
+
+    # Get database connection
+    bind = op.get_bind()
+
+    # Check if any admin user exists (idempotency)
+    result = bind.execute(sa.text(
+        "SELECT id FROM users WHERE is_admin = TRUE AND deleted_at IS NULL LIMIT 1"
+    ))
+    existing_admin = result.first()
+
+    if existing_admin:
+        print("⏭️  Skipping superuser creation: Admin user(s) already exist")
+    else:
+        # Read and validate environment variables
+        from src.core.config import settings
+
+        username = settings.superadmin_username
+        email = settings.superadmin_email
+        password = settings.superadmin_password
+        full_name = settings.superadmin_full_name
+        permissions = settings.superadmin_permissions
+
+        # Validate uniqueness (username and email)
+        result = bind.execute(sa.text(
+            "SELECT id FROM users WHERE (username = :username OR email = :email) "
+            "AND deleted_at IS NULL"
+        ), {"username": username, "email": email})
+        existing_user = result.first()
+
+        if existing_user:
+            raise ValueError(
+                f"Cannot create superuser: Username '{username}' or email '{email}' already exists. "
+                f"Check your SUPERADMIN_USERNAME and SUPERADMIN_EMAIL environment variables."
+            )
+
+        # Hash password using Argon2id (match application config)
+        pwd_hasher = PasswordHasher(
+            time_cost=settings.argon2_time_cost,
+            memory_cost=settings.argon2_memory_cost,
+            parallelism=settings.argon2_parallelism,
+            hash_len=32,
+            salt_len=16,
+        )
+        password_hash = pwd_hasher.hash(password)
+
+        # Create user record
+        user_id = uuid.uuid4()
+        now = datetime.now(UTC)
+
+        bind.execute(sa.text(
+            "INSERT INTO users (id, username, email, password_hash, full_name, "
+            "is_active, is_admin, created_at, updated_at, deleted_at) "
+            "VALUES (:id, :username, :email, :password_hash, :full_name, "
+            ":is_active, :is_admin, :created_at, :updated_at, :deleted_at)"
+        ), {
+            "id": str(user_id),
+            "username": username,
+            "email": email,
+            "password_hash": password_hash,
+            "full_name": full_name,
+            "is_active": True,
+            "is_admin": True,
+            "created_at": now,
+            "updated_at": now,
+            "deleted_at": None,
+        })
+
+        # Create or get admin role
+        result = bind.execute(sa.text(
+            "SELECT id FROM roles WHERE name = 'admin'"
+        ))
+        admin_role = result.first()
+
+        if admin_role:
+            role_id = admin_role[0]
+        else:
+            role_id = uuid.uuid4()
+            # Convert permissions list to JSON string for PostgreSQL JSONB
+            permissions_json = json.dumps(permissions)
+
+            bind.execute(sa.text(
+                "INSERT INTO roles (id, name, description, permissions, created_at, updated_at) "
+                "VALUES (:id, :name, :description, :permissions::jsonb, :created_at, :updated_at)"
+            ), {
+                "id": str(role_id),
+                "name": "admin",
+                "description": "System Administrator with full access",
+                "permissions": permissions_json,
+                "created_at": now,
+                "updated_at": now,
+            })
+
+        # Link user to admin role
+        bind.execute(sa.text(
+            "INSERT INTO user_roles (user_id, role_id, assigned_at) "
+            "VALUES (:user_id, :role_id, :assigned_at)"
+        ), {
+            "user_id": str(user_id),
+            "role_id": str(role_id),
+            "assigned_at": now,
+        })
+
+        # Create audit log entry
+        new_values_json = json.dumps({
+            'username': username,
+            'email': email,
+            'full_name': full_name,
+            'is_admin': True,
+            'is_active': True,
+        })
+
+        bind.execute(sa.text(
+            "INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, "
+            "description, new_values, ip_address, user_agent, request_id, status, created_at) "
+            "VALUES (:id, :user_id, :action, :entity_type, :entity_id, "
+            ":description, :new_values::jsonb, :ip_address, :user_agent, :request_id, :status, :created_at)"
+        ), {
+            "id": str(uuid.uuid4()),
+            "user_id": None,  # System operation
+            "action": "CREATE",
+            "entity_type": "user",
+            "entity_id": str(user_id),
+            "description": f"Migration: Initial superuser '{username}' created from environment config",
+            "new_values": new_values_json,
+            "ip_address": None,
+            "user_agent": "alembic-migration",
+            "request_id": None,
+            "status": "SUCCESS",
+            "created_at": now,
+        })
+
+        print(f"✅ Successfully created superuser: {username} ({email})")
+
 
 def downgrade() -> None:
     """
@@ -386,6 +510,25 @@ def downgrade() -> None:
     Note: This migration depends on 9cfdc3051d85_create_enums_and_extensions
     which will drop the enum types and PostgreSQL extensions when downgraded.
     """
+    # =========================================================================
+    # STEP 0: Soft-delete superuser before dropping tables
+    # =========================================================================
+    bind = op.get_bind()
+
+    try:
+        from src.core.config import settings
+        username = settings.superadmin_username
+        now = datetime.now(UTC)
+
+        bind.execute(sa.text(
+            "UPDATE users SET deleted_at = :deleted_at "
+            "WHERE username = :username AND is_admin = TRUE"
+        ), {"deleted_at": now, "username": username})
+
+        print(f"✅ Soft-deleted superuser: {username}")
+    except Exception as e:
+        print(f"⚠️  Could not soft-delete superuser: {e}")
+
     # =========================================================================
     # STEP 1: Drop manually created indexes (not managed by drop_table)
     # =========================================================================
@@ -406,7 +549,6 @@ def downgrade() -> None:
     op.drop_table('transactions')
     op.drop_table('account_shares')
     op.drop_table('accounts')
-    op.drop_table('bootstrap_state')
     op.drop_table('user_roles')
     op.drop_table('refresh_tokens')
     op.drop_table('audit_logs')
