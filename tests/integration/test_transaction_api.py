@@ -383,7 +383,7 @@ async def test_viewer_cannot_create_transaction(
         share = AccountShare(
             account_id=test_account.id,
             user_id=viewer_user.id,
-            permission_level=PermissionLevel.VIEWER,
+            permission_level=PermissionLevel.viewer,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -463,7 +463,7 @@ async def test_viewer_cannot_update_transaction(
         share = AccountShare(
             account_id=test_account.id,
             user_id=viewer_user.id,
-            permission_level=PermissionLevel.VIEWER,
+            permission_level=PermissionLevel.viewer,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -537,7 +537,7 @@ async def test_viewer_cannot_delete_transaction(
         share = AccountShare(
             account_id=test_account.id,
             user_id=viewer_user.id,
-            permission_level=PermissionLevel.VIEWER,
+            permission_level=PermissionLevel.viewer,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -595,7 +595,7 @@ async def test_editor_can_create_transaction(
         share = AccountShare(
             account_id=test_account.id,
             user_id=editor_user.id,
-            permission_level=PermissionLevel.EDITOR,
+            permission_level=PermissionLevel.editor,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -856,7 +856,7 @@ async def test_cannot_create_transaction_in_non_member_account(
         share = AccountShare(
             account_id=other_account.id,
             user_id=other_user.id,
-            permission_level=PermissionLevel.OWNER,
+            permission_level=PermissionLevel.owner,
             created_by=other_user.id,
             updated_by=other_user.id,
         )

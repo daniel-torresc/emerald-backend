@@ -36,7 +36,7 @@ class TestTransactionTagRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Grocery shopping",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -60,7 +60,7 @@ class TestTransactionTagRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Transaction",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -82,7 +82,7 @@ class TestTransactionTagRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Transaction",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -105,7 +105,7 @@ class TestTransactionTagRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Transaction",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -127,7 +127,7 @@ class TestTransactionTagRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Transaction",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -168,7 +168,7 @@ class TestTransactionTagRepository:
                 amount=Decimal("-50.00"),
                 currency="USD",
                 description="Transaction",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -212,7 +212,7 @@ class TestTransactionTagRepository:
                 amount=Decimal("-50.00"),
                 currency="USD",
                 description="Transaction",
-                transaction_type=TransactionType.DEBIT,
+                transaction_type=TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -241,7 +241,7 @@ class TestTransactionTagRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Transaction",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -265,7 +265,7 @@ class TestTransactionTagRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Transaction",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -292,7 +292,7 @@ class TestTransactionTagRepository:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Transaction",
-            transaction_type=TransactionType.DEBIT,
+            transaction_type=TransactionType.debit,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
