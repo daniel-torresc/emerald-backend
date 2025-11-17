@@ -1,14 +1,18 @@
 """Initial schema for Emerald Finance Platform
 
 Revision ID: 4aabd1426c98
-Revises:
+Revises: 9cfdc3051d85
 Create Date: 2025-11-14
 
 This migration consolidates all previous migrations into a single initial schema.
-It creates the complete database structure for the Emerald Finance Platform,
-including:
+It creates the complete database structure for the Emerald Finance Platform.
 
-Tables:
+Prerequisites:
+- Depends on migration 9cfdc3051d85_create_enums_and_extensions which creates:
+  * All PostgreSQL enum types (audit_action_enum, audit_status_enum, accounttype, permissionlevel, transactiontype)
+  * PostgreSQL pg_trgm extension for fuzzy text search
+
+Tables Created:
 - roles: User roles and permissions
 - users: User accounts and authentication
 - audit_logs: Complete audit trail
@@ -20,81 +24,11 @@ Tables:
 - transactions: Financial transactions
 - transaction_tags: Transaction categorization
 
-Enums:
-- audit_action_enum: Audit action types
-- audit_status_enum: Audit status values
-- accounttype: Account classification
-- permissionlevel: Permission levels for sharing
-- transactiontype: Transaction types
-
-Extensions:
-- pg_trgm: Trigram fuzzy search support
-
-===============================================================================
-ENUM EVOLUTION GUIDE
-===============================================================================
-
-PostgreSQL ENUMs cannot be modified directly within a transaction, which makes
-them tricky to evolve. Here are the recommended approaches:
-
-1. ADDING A NEW VALUE (Recommended for most cases)
-   ------------------------------------------------
-   Use ALTER TYPE ... ADD VALUE outside of a transaction:
-
-   ```python
-   def upgrade():
-       # Use op.execute() with explicit connection
-       with op.get_context().autocommit_block():
-           op.execute("ALTER TYPE transactiontype ADD VALUE 'REFUND'")
-   ```
-
-   Note: New values are always added at the end. You cannot specify position
-   within a transaction.
-
-2. REMOVING A VALUE (Complex - requires recreation)
-   --------------------------------------------------
-   PostgreSQL doesn't support removing enum values. You must:
-
-   a) Create a new enum with desired values:
-   ```python
-   def upgrade():
-       # Create new enum
-       op.execute("CREATE TYPE transactiontype_new AS ENUM ('DEBIT', 'CREDIT', 'TRANSFER')")
-
-       # Update all columns to use new enum (with casting)
-       op.execute('''
-           ALTER TABLE transactions
-           ALTER COLUMN transaction_type TYPE transactiontype_new
-           USING transaction_type::text::transactiontype_new
-       ''')
-
-       # Drop old enum and rename new one
-       op.execute('DROP TYPE transactiontype')
-       op.execute('ALTER TYPE transactiontype_new RENAME TO transactiontype')
-   ```
-
-   b) In downgrade, reverse the process
-
-3. RENAMING A VALUE (Complex - requires column updates)
-   -----------------------------------------------------
-   ```python
-   def upgrade():
-       # Update all existing values first
-       op.execute("UPDATE transactions SET transaction_type = 'NEW_NAME' WHERE transaction_type = 'OLD_NAME'")
-
-       # Then recreate the enum (see approach #2)
-   ```
-
-4. BEST PRACTICES
-   ----------------
-   - Always create enums explicitly BEFORE tables (as done in this migration)
-   - Use checkfirst=True to avoid duplicate creation errors
-   - Use create_type=False when referencing existing enums in columns
-   - Document enum values in docstrings
-   - Consider using VARCHAR with CHECK constraints for frequently-changing types
-   - For complex enum evolution, test thoroughly on a copy of production data
-
-===============================================================================
+This consolidates migrations from:
+- f13dbedae659_initial_migration (users, roles, audit, tokens)
+- 7cd3ac786069_add_admin_support (admin flags, bootstrap)
+- 5ed7d2606ef9_create_accounts (accounts, shares)
+- 1d78ffc27a9c_create_transactions (transactions, tags)
 """
 from typing import Sequence, Union
 
@@ -104,7 +38,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '4aabd1426c98'
-down_revision: Union[str, Sequence[str], None] = None
+down_revision: Union[str, Sequence[str], None] = '9cfdc3051d85'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -120,40 +54,12 @@ def upgrade() -> None:
     - 7cd3ac786069_add_admin_support (admin flags, bootstrap)
     - 5ed7d2606ef9_create_accounts (accounts, shares)
     - 1d78ffc27a9c_create_transactions (transactions, tags)
+
+    Note: This migration depends on 9cfdc3051d85_create_enums_and_extensions
+    which creates all required enum types and PostgreSQL extensions.
     """
     # =========================================================================
-    # STEP 1: Install PostgreSQL Extensions
-    # =========================================================================
-    op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
-
-    # =========================================================================
-    # STEP 2: Create Enums (explicitly, before tables)
-    # =========================================================================
-    # Create all enum types first to ensure they exist before table creation
-    # Using checkfirst=True to avoid duplicate creation errors
-    audit_action_enum = postgresql.ENUM(
-        'LOGIN', 'LOGOUT', 'LOGIN_FAILED', 'PASSWORD_CHANGE', 'TOKEN_REFRESH',
-        'CREATE', 'READ', 'UPDATE', 'DELETE',
-        'PERMISSION_GRANT', 'PERMISSION_REVOKE', 'ROLE_ASSIGN', 'ROLE_REMOVE',
-        'ACCOUNT_ACTIVATE', 'ACCOUNT_DEACTIVATE', 'ACCOUNT_LOCK', 'ACCOUNT_UNLOCK',
-        'RATE_LIMIT_EXCEEDED', 'INVALID_TOKEN', 'PERMISSION_DENIED',
-        'SPLIT_TRANSACTION', 'JOIN_TRANSACTION',
-        name='audit_action_enum'
-    )
-    audit_status_enum = postgresql.ENUM('SUCCESS', 'FAILURE', 'PARTIAL', name='audit_status_enum')
-    # FIXED: Changed to lowercase to match Python enum definitions in src/models/enums.py
-    accounttype_enum = postgresql.ENUM('savings', 'credit_card', 'debit_card', 'loan', 'investment', 'other', name='accounttype')
-    permissionlevel_enum = postgresql.ENUM('owner', 'editor', 'viewer', name='permissionlevel')
-    transactiontype_enum = postgresql.ENUM('debit', 'credit', 'transfer', 'fee', 'interest', 'other', name='transactiontype')
-
-    audit_action_enum.create(op.get_bind(), checkfirst=True)
-    audit_status_enum.create(op.get_bind(), checkfirst=True)
-    accounttype_enum.create(op.get_bind(), checkfirst=True)
-    permissionlevel_enum.create(op.get_bind(), checkfirst=True)
-    transactiontype_enum.create(op.get_bind(), checkfirst=True)
-
-    # =========================================================================
-    # STEP 3: Create Base Tables (no dependencies)
+    # STEP 1: Create Base Tables (no dependencies)
     # =========================================================================
 
     # roles table
@@ -216,7 +122,7 @@ def upgrade() -> None:
     )
 
     # =========================================================================
-    # STEP 4: Create Dependent Tables (depend on users/roles)
+    # STEP 2: Create Dependent Tables (depend on users/roles)
     # =========================================================================
 
     # audit_logs table
@@ -310,7 +216,7 @@ def upgrade() -> None:
     )
 
     # =========================================================================
-    # STEP 5: Create Account Tables
+    # STEP 3: Create Account Tables
     # From: 5ed7d2606ef9_create_accounts
     # =========================================================================
 
@@ -392,7 +298,7 @@ def upgrade() -> None:
     """)
 
     # =========================================================================
-    # STEP 6: Create Transaction Tables
+    # STEP 4: Create Transaction Tables
     # From: 1d78ffc27a9c_create_transactions
     # =========================================================================
 
@@ -476,6 +382,9 @@ def downgrade() -> None:
     Downgrade schema.
 
     Removes all schema elements in reverse order.
+
+    Note: This migration depends on 9cfdc3051d85_create_enums_and_extensions
+    which will drop the enum types and PostgreSQL extensions when downgraded.
     """
     # =========================================================================
     # STEP 1: Drop manually created indexes (not managed by drop_table)
@@ -503,23 +412,3 @@ def downgrade() -> None:
     op.drop_table('audit_logs')
     op.drop_table('users')
     op.drop_table('roles')
-
-    # =========================================================================
-    # STEP 3: Drop enum types explicitly
-    # =========================================================================
-    transactiontype_enum = postgresql.ENUM(name='transactiontype')
-    permissionlevel_enum = postgresql.ENUM(name='permissionlevel')
-    accounttype_enum = postgresql.ENUM(name='accounttype')
-    audit_status_enum = postgresql.ENUM(name='audit_status_enum')
-    audit_action_enum = postgresql.ENUM(name='audit_action_enum')
-
-    transactiontype_enum.drop(op.get_bind(), checkfirst=True)
-    permissionlevel_enum.drop(op.get_bind(), checkfirst=True)
-    accounttype_enum.drop(op.get_bind(), checkfirst=True)
-    audit_status_enum.drop(op.get_bind(), checkfirst=True)
-    audit_action_enum.drop(op.get_bind(), checkfirst=True)
-
-    # =========================================================================
-    # STEP 4: Drop PostgreSQL extension
-    # =========================================================================
-    op.execute('DROP EXTENSION IF EXISTS pg_trgm')
