@@ -28,6 +28,7 @@ from src.api.routes import (
     audit_logs,
     auth,
     health,
+    metadata,
     root,
     transactions,
     users,
@@ -288,6 +289,7 @@ v1_router.include_router(admin.router)
 # Create API Router
 api_router = APIRouter(prefix="/api")
 api_router.include_router(auth.router)
+api_router.include_router(metadata.router)
 api_router.include_router(v1_router)
 
 # Include Application Routers
