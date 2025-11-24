@@ -17,34 +17,48 @@ class AccountType(str, enum.Enum):
     """
     Financial account types.
 
-    Standard account types supported by the platform. Each account must have
-    exactly one type. The type is informational and used for:
-    - UI categorization and icons
-    - Reporting and analytics
-    - Future business logic (e.g., different balance calculations for credit cards)
+    Supported account types for the platform. Updated to match
+    business requirements: checking, savings, investment, other.
 
     Attributes:
-        SAVINGS: Savings or checking accounts with positive balances
-        credit_card: Credit card accounts (typically negative balance = debt)
-        debit_card: Prepaid or debit card accounts
-        loan: Loan accounts (mortgage, personal, auto) - negative balance = debt
+        checking: Current/checking accounts for daily transactions
+        savings: Savings accounts with positive balances
         investment: Investment or brokerage accounts (stocks, bonds, mutual funds)
         other: User-defined account types not covered by standard types
 
     Usage:
         account = Account(
-            account_name="My Savings",
-            account_type=AccountType.SAVINGS,
+            account_name="My Checking",
+            account_type=AccountType.checking,
             ...
         )
     """
 
+    checking = "checking"
     savings = "savings"
-    credit_card = "credit_card"
-    debit_card = "debit_card"
-    loan = "loan"
     investment = "investment"
     other = "other"
+
+    @classmethod
+    def to_dict_list(cls) -> list[dict[str, str]]:
+        """
+        Return list of dicts with 'key' and 'label' for API responses.
+
+        Returns:
+            List of dictionaries with 'key' (enum value) and 'label' (display name)
+
+        Example:
+            [
+                {"key": "checking", "label": "Checking"},
+                {"key": "savings", "label": "Savings"},
+                {"key": "investment", "label": "Investment"},
+                {"key": "other", "label": "Other"}
+            ]
+        """
+        return [
+            {"key": item.value, "label": item.value.replace("_", " ").title()}
+            for item in cls
+        ]
 
 
 class PermissionLevel(str, enum.Enum):
@@ -115,56 +129,58 @@ class TransactionType(str, enum.Enum):
     """
     Financial transaction types.
 
-    Defines the different types of financial transactions that can be recorded
-    in the system. Each transaction must have exactly one type.
+    Supported transaction types: income (money in), expense (money out),
+    and transfer (between own accounts).
 
     Attributes:
-        debit: Money out - expenses, withdrawals, payments
+        income: Money in - salary, deposits, refunds, transfers in
+            - Increases account balance
+            - Examples: salary deposits, refunds, incoming transfers
+            - Amount is typically positive
+
+        expense: Money out - purchases, bills, withdrawals, payments
             - Decreases account balance
             - Examples: grocery purchases, bill payments, cash withdrawals
-            - Amount is typically negative or recorded as expense
+            - Amount is typically negative
 
-        credit: Money in - income, deposits, refunds
-            - Increases account balance
-            - Examples: salary deposits, refunds, transfers in
-            - Amount is typically positive or recorded as income
-
-        transfer: Movement of money between accounts
-            - For internal transfers between user's own accounts
+        transfer: Movement of money between user's own accounts
+            - For internal transfers between accounts
             - One account debited, another credited
-            - Future: Phase 4 will link paired transfer transactions
-
-        fee: Bank fees, service charges, transaction costs
-            - Decreases account balance
-            - Examples: monthly account fees, overdraft fees, ATM fees
-            - Typically small amounts but important for expense tracking
-
-        interest: Interest earned or paid
-            - Can be positive (interest earned) or negative (interest paid)
-            - Examples: savings interest, credit card interest charges
-            - Useful for investment and loan tracking
-
-        other: Miscellaneous transactions not covered by other types
-            - Catch-all for unusual or uncategorized transactions
-            - Examples: adjustments, corrections, one-off transactions
-            - Users should categorize most transactions with specific types
+            - Neutral impact on total net worth
 
     Usage:
         transaction = Transaction(
-            description="Grocery Shopping",
-            transaction_type=TransactionType.DEBIT,
-            amount=-50.25,
+            description="Salary Deposit",
+            transaction_type=TransactionType.income,
+            amount=5000.00,
             ...
         )
 
     Note:
         Transaction type affects how transactions are displayed and analyzed
-        in reports and budgets. Choose the most specific type that applies.
+        in reports and budgets. Choose the most appropriate type.
     """
 
-    debit = "debit"
-    credit = "credit"
+    income = "income"
+    expense = "expense"
     transfer = "transfer"
-    fee = "fee"
-    interest = "interest"
-    other = "other"
+
+    @classmethod
+    def to_dict_list(cls) -> list[dict[str, str]]:
+        """
+        Return list of dicts with 'key' and 'label' for API responses.
+
+        Returns:
+            List of dictionaries with 'key' (enum value) and 'label' (display name)
+
+        Example:
+            [
+                {"key": "income", "label": "Income"},
+                {"key": "expense", "label": "Expense"},
+                {"key": "transfer", "label": "Transfer"}
+            ]
+        """
+        return [
+            {"key": item.value, "label": item.value.replace("_", " ").title()}
+            for item in cls
+        ]
