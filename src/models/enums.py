@@ -1,0 +1,186 @@
+"""
+Enums for account management and transaction models.
+
+This module defines:
+- AccountType: Types of financial accounts (savings, credit_card, etc.)
+- PermissionLevel: Permission levels for account sharing (owner, editor, viewer)
+- TransactionType: Types of financial transactions (debit, credit, transfer, etc.)
+
+These enums are used by the Account, AccountShare, and Transaction models and are also
+created as PostgreSQL ENUM types in the database for type safety.
+"""
+
+import enum
+
+
+class AccountType(str, enum.Enum):
+    """
+    Financial account types.
+
+    Supported account types for the platform. Updated to match
+    business requirements: checking, savings, investment, other.
+
+    Attributes:
+        checking: Current/checking accounts for daily transactions
+        savings: Savings accounts with positive balances
+        investment: Investment or brokerage accounts (stocks, bonds, mutual funds)
+        other: User-defined account types not covered by standard types
+
+    Usage:
+        account = Account(
+            account_name="My Checking",
+            account_type=AccountType.checking,
+            ...
+        )
+    """
+
+    checking = "checking"
+    savings = "savings"
+    investment = "investment"
+    other = "other"
+
+    @classmethod
+    def to_dict_list(cls) -> list[dict[str, str]]:
+        """
+        Return list of dicts with 'key' and 'label' for API responses.
+
+        Returns:
+            List of dictionaries with 'key' (enum value) and 'label' (display name)
+
+        Example:
+            [
+                {"key": "checking", "label": "Checking"},
+                {"key": "savings", "label": "Savings"},
+                {"key": "investment", "label": "Investment"},
+                {"key": "other", "label": "Other"}
+            ]
+        """
+        return [
+            {"key": item.value, "label": item.value.replace("_", " ").title()}
+            for item in cls
+        ]
+
+
+class PermissionLevel(str, enum.Enum):
+    """
+    Permission levels for account sharing.
+
+    Defines the hierarchy of access permissions for shared accounts.
+    Each user has exactly one permission level per account.
+
+    Hierarchy (highest to lowest):
+        OWNER > EDITOR > VIEWER
+
+    Attributes:
+        owner: Full access - read, write, delete, manage sharing
+            - Can view account details and balance
+            - Can update account name and status
+            - Can delete account (soft delete)
+            - Can share account with other users
+            - Can update permissions for shared users
+            - Can revoke access from shared users
+            - Only one owner per account (the creator)
+
+        editor: Read and write access - cannot delete or manage sharing
+            - Can view account details and balance
+            - Can update account name (but not is_active status)
+            - Cannot delete account
+            - Cannot share account or change permissions
+            - Suitable for partners managing shared finances
+
+        viewer: Read-only access
+            - Can view account details and balance
+            - Cannot modify anything
+            - Cannot delete account
+            - Cannot share account or change permissions
+            - Suitable for financial advisors or read-only access
+
+    Permission Matrix:
+        | Operation              | Owner | Editor | Viewer |
+        |------------------------|-------|--------|--------|
+        | View account details   |   ✓   |   ✓    |   ✓    |
+        | View balance           |   ✓   |   ✓    |   ✓    |
+        | Update account name    |   ✓   |   ✓    |   ✗    |
+        | Update is_active       |   ✓   |   ✗    |   ✗    |
+        | Delete account         |   ✓   |   ✗    |   ✗    |
+        | Share account          |   ✓   |   ✗    |   ✗    |
+        | Update permissions     |   ✓   |   ✗    |   ✗    |
+        | Revoke access          |   ✓   |   ✗    |   ✗    |
+
+    Usage:
+        share = AccountShare(
+            account_id=account.id,
+            user_id=partner.id,
+            permission_level=PermissionLevel.EDITOR,
+            ...
+        )
+
+    Note:
+        Permission levels are enforced in the service layer (PermissionService).
+        All service methods must check permissions before performing operations.
+    """
+
+    owner = "owner"
+    editor = "editor"
+    viewer = "viewer"
+
+
+class TransactionType(str, enum.Enum):
+    """
+    Financial transaction types.
+
+    Supported transaction types: income (money in), expense (money out),
+    and transfer (between own accounts).
+
+    Attributes:
+        income: Money in - salary, deposits, refunds, transfers in
+            - Increases account balance
+            - Examples: salary deposits, refunds, incoming transfers
+            - Amount is typically positive
+
+        expense: Money out - purchases, bills, withdrawals, payments
+            - Decreases account balance
+            - Examples: grocery purchases, bill payments, cash withdrawals
+            - Amount is typically negative
+
+        transfer: Movement of money between user's own accounts
+            - For internal transfers between accounts
+            - One account debited, another credited
+            - Neutral impact on total net worth
+
+    Usage:
+        transaction = Transaction(
+            description="Salary Deposit",
+            transaction_type=TransactionType.income,
+            amount=5000.00,
+            ...
+        )
+
+    Note:
+        Transaction type affects how transactions are displayed and analyzed
+        in reports and budgets. Choose the most appropriate type.
+    """
+
+    income = "income"
+    expense = "expense"
+    transfer = "transfer"
+
+    @classmethod
+    def to_dict_list(cls) -> list[dict[str, str]]:
+        """
+        Return list of dicts with 'key' and 'label' for API responses.
+
+        Returns:
+            List of dictionaries with 'key' (enum value) and 'label' (display name)
+
+        Example:
+            [
+                {"key": "income", "label": "Income"},
+                {"key": "expense", "label": "Expense"},
+                {"key": "transfer", "label": "Transfer"}
+            ]
+        """
+        return [
+            {"key": item.value, "label": item.value.replace("_", " ").title()}
+            for item in cls
+        ]
