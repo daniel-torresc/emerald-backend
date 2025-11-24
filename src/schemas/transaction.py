@@ -13,7 +13,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator, field_serializer
+from pydantic import BaseModel, Field, field_validator
 
 from src.models.enums import TransactionType
 
@@ -56,7 +56,7 @@ class TransactionBase(BaseModel):
 
     transaction_type: TransactionType = Field(
         description="Type of transaction",
-        examples=[TransactionType.debit, TransactionType.credit],
+        examples=[TransactionType.income, TransactionType.expense],
     )
 
     @field_validator("currency")

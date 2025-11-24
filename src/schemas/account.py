@@ -35,7 +35,7 @@ class AccountBase(BaseModel):
 
     account_type: AccountType = Field(
         description="Type of financial account",
-        examples=[AccountType.savings, AccountType.credit_card],
+        examples=[AccountType.savings, AccountType.checking],
     )
 
     currency: str = Field(
