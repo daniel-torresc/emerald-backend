@@ -124,10 +124,12 @@ def upgrade() -> None:
         name='audit_action_enum'
     )
     audit_status_enum = postgresql.ENUM('SUCCESS', 'FAILURE', 'PARTIAL', name='audit_status_enum')
-    # FIXED: Changed to lowercase to match Python enum definitions in src/models/enums.py
-    accounttype_enum = postgresql.ENUM('savings', 'credit_card', 'debit_card', 'loan', 'investment', 'other', name='accounttype')
+    # UPDATED: Changed to match new business requirements for metadata endpoints
+    # AccountType: checking, savings, investment, other (removed credit_card, debit_card, loan)
+    # TransactionType: income, expense, transfer (removed debit, credit, fee, interest, other)
+    accounttype_enum = postgresql.ENUM('checking', 'savings', 'investment', 'other', name='accounttype')
     permissionlevel_enum = postgresql.ENUM('owner', 'editor', 'viewer', name='permissionlevel')
-    transactiontype_enum = postgresql.ENUM('debit', 'credit', 'transfer', 'fee', 'interest', 'other', name='transactiontype')
+    transactiontype_enum = postgresql.ENUM('income', 'expense', 'transfer', name='transactiontype')
 
     audit_action_enum.create(op.get_bind(), checkfirst=True)
     audit_status_enum.create(op.get_bind(), checkfirst=True)
