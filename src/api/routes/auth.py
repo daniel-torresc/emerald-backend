@@ -269,11 +269,13 @@ async def refresh(
 
         # Extract user_id from the new access token for logging
         from src.core.security import decode_token
+
         token_data = decode_token(tokens.access_token)
         user_id_str = token_data.get("sub")
 
         if user_id_str:
             import uuid
+
             user_id = uuid.UUID(user_id_str)
 
             # Log successful token refresh
@@ -351,6 +353,7 @@ async def logout(
 
     # Extract user_id before logout
     from src.core.security import decode_token
+
     try:
         token_data = decode_token(logout_request.refresh_token)
         user_id_str = token_data.get("sub")
@@ -363,6 +366,7 @@ async def logout(
     # Log logout
     if user_id_str:
         import uuid
+
         user_id = uuid.UUID(user_id_str)
         await audit_service.log_logout(
             user_id=user_id,

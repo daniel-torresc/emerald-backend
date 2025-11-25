@@ -89,7 +89,9 @@ async def create_share(
         current_user=current_user,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        request_id=request.state.request_id if hasattr(request.state, "request_id") else None,
+        request_id=request.state.request_id
+        if hasattr(request.state, "request_id")
+        else None,
     )
 
     return AccountShareResponse.model_validate(share)
@@ -197,7 +199,9 @@ async def update_share(
         current_user=current_user,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        request_id=request.state.request_id if hasattr(request.state, "request_id") else None,
+        request_id=request.state.request_id
+        if hasattr(request.state, "request_id")
+        else None,
     )
 
     return AccountShareResponse.model_validate(updated_share)
@@ -254,5 +258,7 @@ async def revoke_share(
         current_user=current_user,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
-        request_id=request.state.request_id if hasattr(request.state, "request_id") else None,
+        request_id=request.state.request_id
+        if hasattr(request.state, "request_id")
+        else None,
     )

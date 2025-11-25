@@ -363,7 +363,7 @@ class TransactionResponse(TransactionBase):
         if not tags:
             return []
         # Handle SQLAlchemy relationship returning TransactionTag objects
-        return [tag.tag if hasattr(tag, 'tag') else tag for tag in tags]
+        return [tag.tag if hasattr(tag, "tag") else tag for tag in tags]
 
     model_config = {"from_attributes": True}
 

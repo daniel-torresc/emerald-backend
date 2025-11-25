@@ -46,8 +46,8 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
     status_code=status.HTTP_201_CREATED,
     summary="Create admin user",
     description="Create a new admin user. Only accessible by existing admins. "
-                "Password is optional - if not provided, a strong password will be generated. "
-                "Returns the created admin user with temporary password if generated.",
+    "Password is optional - if not provided, a strong password will be generated. "
+    "Returns the created admin user with temporary password if generated.",
 )
 async def create_admin_user(
     request_data: CreateAdminUserRequest,
@@ -90,7 +90,7 @@ async def create_admin_user(
     response_model=PaginatedResponse[AdminUserListItem],
     summary="List admin users",
     description="Get paginated list of admin users with optional filtering and search. "
-                "Only accessible by admins. Supports searching by username, email, or full name.",
+    "Only accessible by admins. Supports searching by username, email, or full name.",
 )
 async def list_admin_users(
     current_user: AdminUser,
@@ -126,7 +126,7 @@ async def list_admin_users(
     response_model=AdminUserResponse,
     summary="Get admin user details",
     description="Get detailed information about a specific admin user. "
-                "Only accessible by admins.",
+    "Only accessible by admins.",
 )
 async def get_admin_user(
     user_id: uuid.UUID,
@@ -160,8 +160,8 @@ async def get_admin_user(
     response_model=AdminUserResponse,
     summary="Update admin user",
     description="Update admin user information (full_name, is_active). "
-                "Cannot update username or email via this endpoint. "
-                "Cannot deactivate the last admin user.",
+    "Cannot update username or email via this endpoint. "
+    "Cannot deactivate the last admin user.",
 )
 async def update_admin_user(
     user_id: uuid.UUID,
@@ -206,8 +206,8 @@ async def update_admin_user(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete admin user",
     description="Soft delete an admin user. "
-                "Cannot delete yourself or the last admin user. "
-                "Deleted users are not permanently removed from the database.",
+    "Cannot delete yourself or the last admin user. "
+    "Deleted users are not permanently removed from the database.",
 )
 async def delete_admin_user(
     user_id: uuid.UUID,
@@ -246,8 +246,8 @@ async def delete_admin_user(
     response_model=AdminUserResponse,
     summary="Reset admin password",
     description="Reset admin user password. "
-                "Password is optional - if not provided, a strong password will be generated. "
-                "Returns the admin user with temporary password if generated.",
+    "Password is optional - if not provided, a strong password will be generated. "
+    "Returns the admin user with temporary password if generated.",
 )
 async def reset_admin_password(
     user_id: uuid.UUID,
@@ -292,8 +292,8 @@ async def reset_admin_password(
     response_model=AdminUserResponse,
     summary="Update admin permissions",
     description="Update admin user permissions. "
-                "Cannot remove own admin privilege. "
-                "Permissions follow format: resource:action[:scope]",
+    "Cannot remove own admin privilege. "
+    "Permissions follow format: resource:action[:scope]",
 )
 async def update_admin_permissions(
     user_id: uuid.UUID,

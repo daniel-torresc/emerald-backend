@@ -55,9 +55,7 @@ class UserRepository(BaseRepository[User]):
                 raise InvalidCredentialsError()
         """
         query = (
-            select(User)
-            .where(User.email == email)
-            .options(selectinload(User.roles))
+            select(User).where(User.email == email).options(selectinload(User.roles))
         )
         query = self._apply_soft_delete_filter(query)
 
@@ -111,11 +109,7 @@ class UserRepository(BaseRepository[User]):
             # Roles are already loaded, no additional query
             permissions = [perm for role in user.roles for perm in role.permissions]
         """
-        query = (
-            select(User)
-            .where(User.id == user_id)
-            .options(selectinload(User.roles))
-        )
+        query = select(User).where(User.id == user_id).options(selectinload(User.roles))
         query = self._apply_soft_delete_filter(query)
 
         result = await self.session.execute(query)
@@ -258,7 +252,9 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(query)
         return result.scalar_one()
 
-    async def email_exists(self, email: EmailStr, exclude_user_id: uuid.UUID | None = None) -> bool:
+    async def email_exists(
+        self, email: EmailStr, exclude_user_id: uuid.UUID | None = None
+    ) -> bool:
         """
         Check if email is already in use by another user.
 
@@ -290,7 +286,9 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None
 
-    async def username_exists(self, username: str, exclude_user_id: uuid.UUID | None = None) -> bool:
+    async def username_exists(
+        self, username: str, exclude_user_id: uuid.UUID | None = None
+    ) -> bool:
         """
         Check if username is already in use by another user.
 

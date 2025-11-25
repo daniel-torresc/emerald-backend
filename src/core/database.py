@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Database Engine Configuration
 # -----------------------------------------------------------------------------
 
+
 def create_database_engine(database_url: str | None = None) -> AsyncEngine:
     """
     Create async database engine with connection pooling.
@@ -80,6 +81,7 @@ def create_database_engine(database_url: str | None = None) -> AsyncEngine:
 # Dependency Injection for FastAPI
 # -----------------------------------------------------------------------------
 
+
 async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency function to provide database session to FastAPI routes.
@@ -118,6 +120,7 @@ async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
 # Database Health Check
 # -----------------------------------------------------------------------------
 
+
 async def check_database_connection(sessionmaker: async_sessionmaker) -> bool:
     """
     Check if database connection is healthy.
@@ -142,6 +145,7 @@ async def check_database_connection(sessionmaker: async_sessionmaker) -> bool:
 # -----------------------------------------------------------------------------
 # Lifecycle Management
 # -----------------------------------------------------------------------------
+
 
 async def close_database_connection(engine: AsyncEngine | None) -> None:
     """

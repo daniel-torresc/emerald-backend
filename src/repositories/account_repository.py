@@ -232,8 +232,8 @@ class AccountRepository(BaseRepository[Account]):
                 user.id, is_active=True
             )
         """
-        query = select(func.count()).select_from(Account).where(
-            Account.user_id == user_id
+        query = (
+            select(func.count()).select_from(Account).where(Account.user_id == user_id)
         )
         query = self._apply_soft_delete_filter(query)
 

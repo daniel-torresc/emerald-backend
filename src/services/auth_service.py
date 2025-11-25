@@ -18,9 +18,16 @@ from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
-from src.core.security import (TOKEN_TYPE_REFRESH, create_access_token, create_refresh_token,
-                               decode_token, hash_password, hash_refresh_token, verify_password,
-                               verify_token_type)
+from src.core.security import (
+    TOKEN_TYPE_REFRESH,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    hash_refresh_token,
+    verify_password,
+    verify_token_type,
+)
 from src.exceptions import (
     AlreadyExistsError,
     AuthenticationError,
@@ -100,12 +107,16 @@ class AuthService:
         """
         # Check if email already exists
         if await self.user_repo.email_exists(user_data.email):
-            logger.warning(f"Registration attempted with existing email: {user_data.email}")
+            logger.warning(
+                f"Registration attempted with existing email: {user_data.email}"
+            )
             raise AlreadyExistsError("User with this email")
 
         # Check if username already exists
         if await self.user_repo.username_exists(user_data.username):
-            logger.warning(f"Registration attempted with existing username: {user_data.username}")
+            logger.warning(
+                f"Registration attempted with existing username: {user_data.username}"
+            )
             raise AlreadyExistsError("User with this username")
 
         # Hash the password
@@ -269,7 +280,9 @@ class AuthService:
 
         # Check if token is expired
         if db_token.expires_at < datetime.now(UTC):
-            logger.warning(f"Token refresh failed: token expired for user {db_token.user_id}")
+            logger.warning(
+                f"Token refresh failed: token expired for user {db_token.user_id}"
+            )
             raise InvalidTokenError("Refresh token has expired")
 
         # Get user
@@ -396,7 +409,9 @@ class AuthService:
 
         # Verify current password
         if not verify_password(current_password, user.password_hash):
-            logger.warning(f"Password change failed: invalid current password for user {user_id}")
+            logger.warning(
+                f"Password change failed: invalid current password for user {user_id}"
+            )
             raise InvalidCredentialsError("Current password is incorrect")
 
         # Hash new password
@@ -458,7 +473,9 @@ class AuthService:
 
         # Store refresh token hash in database
         refresh_token_hash = hash_refresh_token(refresh_token)
-        expires_at = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
+        expires_at = datetime.now(UTC) + timedelta(
+            days=settings.refresh_token_expire_days
+        )
 
         await self.token_repo.create(
             user_id=user.id,

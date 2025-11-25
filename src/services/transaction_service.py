@@ -21,7 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions import (
     AuthorizationError,
-    ConflictError,
     NotFoundError,
     ValidationError,
 )
@@ -444,7 +443,9 @@ class TransactionService:
             logger.warning(
                 f"User {current_user.id} attempted to update transaction {transaction_id} without permission"
             )
-            raise AuthorizationError("You don't have permission to edit this transaction")
+            raise AuthorizationError(
+                "You don't have permission to edit this transaction"
+            )
 
         # Validate amount if provided
         if amount is not None and amount == 0:
@@ -493,7 +494,9 @@ class TransactionService:
             existing.user_notes = user_notes
 
         if value_date is not None:
-            old_values["value_date"] = str(existing.value_date) if existing.value_date else None
+            old_values["value_date"] = (
+                str(existing.value_date) if existing.value_date else None
+            )
             new_values["value_date"] = str(value_date)
             existing.value_date = value_date
 
@@ -752,9 +755,7 @@ class TransactionService:
             created_child = await self.transaction_repo.create(child)
             children.append(created_child)
 
-        logger.info(
-            f"Split transaction {transaction_id} into {len(children)} children"
-        )
+        logger.info(f"Split transaction {transaction_id} into {len(children)} children")
 
         # No balance update needed (parent still exists, children don't add new amounts)
 

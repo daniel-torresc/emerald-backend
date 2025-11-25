@@ -13,7 +13,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Select, and_, func, or_, select, text
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -191,7 +191,9 @@ class TransactionRepository(BaseRepository[Transaction]):
                 selectinload(Transaction.tags),
                 selectinload(Transaction.child_transactions),
             )
-            .order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+            .order_by(
+                Transaction.transaction_date.desc(), Transaction.created_at.desc()
+            )
             .offset(skip)
             .limit(limit)
         )
@@ -310,9 +312,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         # Fuzzy text search on description (pg_trgm similarity)
         if description:
             # Use trigram similarity with threshold 0.3 (~70% match)
-            filters.append(
-                func.similarity(Transaction.description, description) > 0.3
-            )
+            filters.append(func.similarity(Transaction.description, description) > 0.3)
 
         # Fuzzy text search on merchant (pg_trgm similarity)
         if merchant:

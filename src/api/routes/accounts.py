@@ -156,7 +156,9 @@ async def list_accounts(
     ] = 20,
     is_active: Annotated[
         bool | None,
-        Query(description="Filter by active status (true=active, false=inactive, null=all)"),
+        Query(
+            description="Filter by active status (true=active, false=inactive, null=all)"
+        ),
     ] = None,
     account_type: Annotated[
         AccountType | None, Query(description="Filter by account type")

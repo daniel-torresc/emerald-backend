@@ -67,6 +67,7 @@ user_roles = Table(
 # User Model
 # =============================================================================
 
+
 class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     """
     User model for authentication and profile management.
@@ -168,6 +169,7 @@ class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
 # =============================================================================
 # Role Model
 # =============================================================================
+
 
 class Role(Base, TimestampMixin):
     """

@@ -295,7 +295,11 @@ class AuditLogRepository:
             total = await audit_repo.count_user_logs(user_id=user.id)
             total_pages = (total + limit - 1) // limit
         """
-        query = select(func.count()).select_from(AuditLog).where(AuditLog.user_id == user_id)
+        query = (
+            select(func.count())
+            .select_from(AuditLog)
+            .where(AuditLog.user_id == user_id)
+        )
 
         # Apply filters
         if action:
