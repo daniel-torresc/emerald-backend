@@ -17,6 +17,7 @@ import pytest
 from src.exceptions import AlreadyExistsError, NotFoundError
 from src.models.enums import AccountType
 from src.services.account_service import AccountService
+from src.services.encryption_service import EncryptionService
 
 
 @pytest.mark.asyncio
@@ -25,7 +26,7 @@ class TestAccountService:
 
     async def test_create_account_success(self, db_session, test_user):
         """Test successful account creation."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         account = await service.create_account(
             user_id=test_user.id,
@@ -49,7 +50,7 @@ class TestAccountService:
 
     async def test_create_account_duplicate_name(self, db_session, test_user):
         """Test that creating account with duplicate name fails."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create first account
         await service.create_account(
@@ -76,7 +77,7 @@ class TestAccountService:
 
     async def test_create_account_invalid_currency(self, db_session, test_user):
         """Test that invalid currency format raises error."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Test invalid currencies
         invalid_currencies = ["US", "USDD", "usd", "123", "US$", ""]
@@ -96,7 +97,7 @@ class TestAccountService:
 
     async def test_create_account_negative_balance(self, db_session, test_user):
         """Test creating account with negative balance (for loans/credit cards)."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         account = await service.create_account(
             user_id=test_user.id,
@@ -112,7 +113,7 @@ class TestAccountService:
 
     async def test_get_account_success(self, db_session, test_user):
         """Test getting account by ID."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create account
         created = await service.create_account(
@@ -135,7 +136,7 @@ class TestAccountService:
 
     async def test_get_account_not_owner(self, db_session, test_user, admin_user):
         """Test that non-owner cannot access account."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create account for test_user
         created = await service.create_account(
@@ -156,7 +157,7 @@ class TestAccountService:
 
     async def test_get_account_not_found(self, db_session, test_user):
         """Test getting non-existent account."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         import uuid
 
@@ -170,7 +171,7 @@ class TestAccountService:
 
     async def test_list_accounts(self, db_session, test_user):
         """Test listing user's accounts."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create multiple accounts
         for i in range(3):
@@ -193,7 +194,7 @@ class TestAccountService:
 
     async def test_list_accounts_with_filters(self, db_session, test_user):
         """Test listing accounts with filters."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create accounts with different types and statuses
         account1 = await service.create_account(
@@ -241,7 +242,7 @@ class TestAccountService:
 
     async def test_list_accounts_pagination(self, db_session, test_user):
         """Test pagination for list_accounts."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create 5 accounts
         for i in range(5):
@@ -274,7 +275,7 @@ class TestAccountService:
 
     async def test_list_accounts_limit_enforced(self, db_session, test_user):
         """Test that limit is capped at 100."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create 1 account
         await service.create_account(
@@ -298,7 +299,7 @@ class TestAccountService:
 
     async def test_update_account_name(self, db_session, test_user):
         """Test updating account name."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create account
         account = await service.create_account(
@@ -322,7 +323,7 @@ class TestAccountService:
 
     async def test_update_account_is_active(self, db_session, test_user):
         """Test updating account is_active status."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create account
         account = await service.create_account(
@@ -347,7 +348,7 @@ class TestAccountService:
 
     async def test_update_account_duplicate_name(self, db_session, test_user):
         """Test that updating to duplicate name fails."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create two accounts
         account1 = await service.create_account(
@@ -378,7 +379,7 @@ class TestAccountService:
 
     async def test_update_account_no_changes(self, db_session, test_user):
         """Test updating account with no changes."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create account
         account = await service.create_account(
@@ -404,7 +405,7 @@ class TestAccountService:
 
     async def test_delete_account(self, db_session, test_user):
         """Test soft deleting account."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create account
         account = await service.create_account(
@@ -438,7 +439,7 @@ class TestAccountService:
 
     async def test_delete_account_not_owner(self, db_session, test_user, admin_user):
         """Test that non-owner cannot delete account."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Create account for test_user
         account = await service.create_account(
@@ -459,7 +460,7 @@ class TestAccountService:
 
     async def test_count_user_accounts(self, db_session, test_user):
         """Test counting user's accounts."""
-        service = AccountService(db_session)
+        service = AccountService(db_session, EncryptionService())
 
         # Initially 0
         count = await service.count_user_accounts(
