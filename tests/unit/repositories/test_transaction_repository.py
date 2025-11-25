@@ -17,10 +17,8 @@ from decimal import Decimal
 
 import pytest
 
-from src.models.account import Account
-from src.models.enums import AccountType, TransactionType
+from src.models.enums import TransactionType
 from src.models.transaction import Transaction
-from src.repositories.account_repository import AccountRepository
 from src.repositories.transaction_repository import TransactionRepository
 
 
@@ -159,7 +157,12 @@ class TestTransactionRepository:
         repo = TransactionRepository(db_session)
 
         # Create transactions with different amounts
-        amounts = [Decimal("-10.00"), Decimal("-25.00"), Decimal("-50.00"), Decimal("-100.00")]
+        amounts = [
+            Decimal("-10.00"),
+            Decimal("-25.00"),
+            Decimal("-50.00"),
+            Decimal("-100.00"),
+        ]
         for amount in amounts:
             transaction = Transaction(
                 account_id=test_account.id,
@@ -192,7 +195,9 @@ class TestTransactionRepository:
             transaction = Transaction(
                 account_id=test_account.id,
                 transaction_date=date.today(),
-                amount=Decimal("-10.00") if txn_type == TransactionType.debit else Decimal("10.00"),
+                amount=Decimal("-10.00")
+                if txn_type == TransactionType.debit
+                else Decimal("10.00"),
                 currency="USD",
                 description="Transaction",
                 transaction_type=txn_type,
@@ -296,7 +301,9 @@ class TestTransactionRepository:
                 amount=amount,
                 currency="USD",
                 description="Transaction",
-                transaction_type=TransactionType.debit if amount < 0 else TransactionType.credit,
+                transaction_type=TransactionType.debit
+                if amount < 0
+                else TransactionType.credit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -327,7 +334,9 @@ class TestTransactionRepository:
                 amount=amount,
                 currency="USD",
                 description="Transaction",
-                transaction_type=TransactionType.credit if amount > 0 else TransactionType.debit,
+                transaction_type=TransactionType.credit
+                if amount > 0
+                else TransactionType.debit,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -335,8 +344,7 @@ class TestTransactionRepository:
 
         # Get balance as of 2 days ago
         balance = await repo.get_balance_at_date(
-            test_account.id,
-            today - timedelta(days=2)
+            test_account.id, today - timedelta(days=2)
         )
 
         assert balance == Decimal("80.00")  # 100 - 20

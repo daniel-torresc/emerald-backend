@@ -18,7 +18,6 @@ Test scenarios:
 - Edge cases (last admin protection, bootstrap once)
 """
 
-import os
 import uuid
 
 import pytest
@@ -542,13 +541,10 @@ async def test_delete_admin_cannot_delete_last_admin(
     )
 
     async with async_session_factory() as session:
-        from sqlalchemy import delete, select
+        from sqlalchemy import delete
 
         # Delete all admins except the current one
-        stmt = delete(User).where(
-            User.is_admin == True,
-            User.id != admin_user.id
-        )
+        stmt = delete(User).where(User.is_admin == True, User.id != admin_user.id)
         await session.execute(stmt)
         await session.commit()
 

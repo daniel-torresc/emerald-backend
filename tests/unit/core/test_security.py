@@ -4,12 +4,10 @@ Unit tests for security utilities (password hashing, JWT tokens).
 All tests are fully mocked - no database or external dependencies.
 """
 
-import uuid
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
-from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from jose import JWTError
 
 from src.core import security
@@ -151,7 +149,9 @@ class TestJWTAccessToken:
         # Check expiration is approximately 15 minutes from now
         # JWT timestamps are in seconds, so we add 1 second tolerance
         exp_time = datetime.fromtimestamp(payload["exp"], tz=UTC)
-        expected_exp_min = before_creation + timedelta(minutes=15) - timedelta(seconds=1)
+        expected_exp_min = (
+            before_creation + timedelta(minutes=15) - timedelta(seconds=1)
+        )
         expected_exp_max = after_creation + timedelta(minutes=15) + timedelta(seconds=1)
 
         assert expected_exp_min <= exp_time <= expected_exp_max
@@ -162,8 +162,7 @@ class TestJWTAccessToken:
         custom_delta = timedelta(hours=2)
         before_creation = datetime.now(UTC)
         token = security.create_access_token(
-            {"sub": "user_123"},
-            expires_delta=custom_delta
+            {"sub": "user_123"}, expires_delta=custom_delta
         )
         after_creation = datetime.now(UTC)
 
@@ -193,11 +192,9 @@ class TestJWTAccessToken:
 
     def test_create_access_token_preserves_custom_claims(self):
         """Test that custom claims are preserved in token."""
-        token = security.create_access_token({
-            "sub": "user_123",
-            "role": "admin",
-            "permissions": ["read", "write"]
-        })
+        token = security.create_access_token(
+            {"sub": "user_123", "role": "admin", "permissions": ["read", "write"]}
+        )
 
         payload = security.decode_token(token)
 
@@ -362,10 +359,7 @@ class TestTokenUniqueness:
     def test_access_tokens_created_simultaneously_are_unique(self):
         """Test that access tokens created at the same time have unique hashes."""
         # Create multiple tokens for the same user at the same time
-        tokens = [
-            security.create_access_token({"sub": "user_123"})
-            for _ in range(10)
-        ]
+        tokens = [security.create_access_token({"sub": "user_123"}) for _ in range(10)]
 
         # Hash each token
         hashes = [security.hash_refresh_token(token) for token in tokens]
@@ -376,10 +370,7 @@ class TestTokenUniqueness:
     def test_refresh_tokens_created_simultaneously_are_unique(self):
         """Test that refresh tokens created at the same time have unique hashes."""
         # Create multiple tokens for the same user at the same time
-        tokens = [
-            security.create_refresh_token({"sub": "user_123"})
-            for _ in range(10)
-        ]
+        tokens = [security.create_refresh_token({"sub": "user_123"}) for _ in range(10)]
 
         # Hash each token
         hashes = [security.hash_refresh_token(token) for token in tokens]

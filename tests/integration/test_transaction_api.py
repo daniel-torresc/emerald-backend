@@ -312,12 +312,14 @@ class TestTransactionAPI:
         assert len(data["tags"]) == 0
 
     async def test_permission_denied(
-        self, async_client: AsyncClient, test_user: User, admin_user: User, user_token: dict, test_account
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        admin_user: User,
+        user_token: dict,
+        test_account,
     ):
         """Test that users without permission cannot access transactions."""
-        from src.models.user import User
-        from src.core.security import hash_password
-        from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
         # Create transaction as test_user
         create_response = await async_client.post(
@@ -814,7 +816,6 @@ async def test_cannot_create_transaction_in_non_member_account(
     test_engine,
 ):
     """Test: Cannot create transaction in account where user is not a member."""
-    from decimal import Decimal
     from src.models.account import Account, AccountShare
     from src.models.enums import AccountType, PermissionLevel
     from src.core.security import hash_password
@@ -898,9 +899,6 @@ async def test_cannot_access_another_users_transaction(
     test_engine,
 ):
     """Test: Cannot access transaction from account where user has no access."""
-    from decimal import Decimal
-    from src.models.account import Account, AccountShare
-    from src.models.enums import AccountType, PermissionLevel
     from src.core.security import hash_password
     from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 

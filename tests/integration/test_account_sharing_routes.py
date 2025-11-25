@@ -15,7 +15,6 @@ Test scenarios:
 """
 
 import uuid
-from decimal import Decimal
 
 import pytest
 import pytest_asyncio
@@ -23,7 +22,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.models.account import Account, AccountShare
-from src.models.enums import AccountType, PermissionLevel
+from src.models.enums import PermissionLevel
 from src.models.user import User
 
 

@@ -15,9 +15,7 @@ from decimal import Decimal
 
 import pytest
 
-from src.models.account import Account
 from src.models.enums import AccountType
-from src.models.user import User
 from src.repositories.account_repository import AccountRepository
 
 
@@ -217,17 +215,23 @@ class TestAccountRepository:
         )
 
         # Get by exact name
-        account = await repo.get_by_name(user_id=test_user.id, account_name="My Savings")
+        account = await repo.get_by_name(
+            user_id=test_user.id, account_name="My Savings"
+        )
         assert account is not None
         assert account.account_name == "My Savings"
 
         # Get by case-insensitive name
-        account = await repo.get_by_name(user_id=test_user.id, account_name="my savings")
+        account = await repo.get_by_name(
+            user_id=test_user.id, account_name="my savings"
+        )
         assert account is not None
         assert account.account_name == "My Savings"
 
         # Get non-existent
-        account = await repo.get_by_name(user_id=test_user.id, account_name="Non Existent")
+        account = await repo.get_by_name(
+            user_id=test_user.id, account_name="Non Existent"
+        )
         assert account is None
 
     async def test_exists_by_name(self, db_session, test_user):
@@ -248,15 +252,21 @@ class TestAccountRepository:
         )
 
         # Check exists
-        exists = await repo.exists_by_name(user_id=test_user.id, account_name="Existing Account")
+        exists = await repo.exists_by_name(
+            user_id=test_user.id, account_name="Existing Account"
+        )
         assert exists is True
 
         # Check case-insensitive
-        exists = await repo.exists_by_name(user_id=test_user.id, account_name="EXISTING ACCOUNT")
+        exists = await repo.exists_by_name(
+            user_id=test_user.id, account_name="EXISTING ACCOUNT"
+        )
         assert exists is True
 
         # Check non-existent
-        exists = await repo.exists_by_name(user_id=test_user.id, account_name="Non Existent")
+        exists = await repo.exists_by_name(
+            user_id=test_user.id, account_name="Non Existent"
+        )
         assert exists is False
 
     async def test_exists_by_name_with_exclude(self, db_session, test_user):

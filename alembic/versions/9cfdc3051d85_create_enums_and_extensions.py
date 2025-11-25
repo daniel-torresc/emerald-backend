@@ -82,15 +82,15 @@ them tricky to evolve. Here are the recommended approaches:
 
 ===============================================================================
 """
+
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = '9cfdc3051d85'
+revision: str = "9cfdc3051d85"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -115,21 +115,45 @@ def upgrade() -> None:
     # Create all enum types first to ensure they exist before table creation
     # Using checkfirst=True to avoid duplicate creation errors
     audit_action_enum = postgresql.ENUM(
-        'LOGIN', 'LOGOUT', 'LOGIN_FAILED', 'PASSWORD_CHANGE', 'TOKEN_REFRESH',
-        'CREATE', 'READ', 'UPDATE', 'DELETE',
-        'PERMISSION_GRANT', 'PERMISSION_REVOKE', 'ROLE_ASSIGN', 'ROLE_REMOVE',
-        'ACCOUNT_ACTIVATE', 'ACCOUNT_DEACTIVATE', 'ACCOUNT_LOCK', 'ACCOUNT_UNLOCK',
-        'RATE_LIMIT_EXCEEDED', 'INVALID_TOKEN', 'PERMISSION_DENIED',
-        'SPLIT_TRANSACTION', 'JOIN_TRANSACTION',
-        name='audit_action_enum'
+        "LOGIN",
+        "LOGOUT",
+        "LOGIN_FAILED",
+        "PASSWORD_CHANGE",
+        "TOKEN_REFRESH",
+        "CREATE",
+        "READ",
+        "UPDATE",
+        "DELETE",
+        "PERMISSION_GRANT",
+        "PERMISSION_REVOKE",
+        "ROLE_ASSIGN",
+        "ROLE_REMOVE",
+        "ACCOUNT_ACTIVATE",
+        "ACCOUNT_DEACTIVATE",
+        "ACCOUNT_LOCK",
+        "ACCOUNT_UNLOCK",
+        "RATE_LIMIT_EXCEEDED",
+        "INVALID_TOKEN",
+        "PERMISSION_DENIED",
+        "SPLIT_TRANSACTION",
+        "JOIN_TRANSACTION",
+        name="audit_action_enum",
     )
-    audit_status_enum = postgresql.ENUM('SUCCESS', 'FAILURE', 'PARTIAL', name='audit_status_enum')
+    audit_status_enum = postgresql.ENUM(
+        "SUCCESS", "FAILURE", "PARTIAL", name="audit_status_enum"
+    )
     # UPDATED: Changed to match new business requirements for metadata endpoints
     # AccountType: checking, savings, investment, other (removed credit_card, debit_card, loan)
     # TransactionType: income, expense, transfer (removed debit, credit, fee, interest, other)
-    accounttype_enum = postgresql.ENUM('checking', 'savings', 'investment', 'other', name='accounttype')
-    permissionlevel_enum = postgresql.ENUM('owner', 'editor', 'viewer', name='permissionlevel')
-    transactiontype_enum = postgresql.ENUM('income', 'expense', 'transfer', name='transactiontype')
+    accounttype_enum = postgresql.ENUM(
+        "checking", "savings", "investment", "other", name="accounttype"
+    )
+    permissionlevel_enum = postgresql.ENUM(
+        "owner", "editor", "viewer", name="permissionlevel"
+    )
+    transactiontype_enum = postgresql.ENUM(
+        "income", "expense", "transfer", name="transactiontype"
+    )
 
     audit_action_enum.create(op.get_bind(), checkfirst=True)
     audit_status_enum.create(op.get_bind(), checkfirst=True)
@@ -145,11 +169,11 @@ def downgrade() -> None:
     # =========================================================================
     # STEP 1: Drop enum types explicitly
     # =========================================================================
-    transactiontype_enum = postgresql.ENUM(name='transactiontype')
-    permissionlevel_enum = postgresql.ENUM(name='permissionlevel')
-    accounttype_enum = postgresql.ENUM(name='accounttype')
-    audit_status_enum = postgresql.ENUM(name='audit_status_enum')
-    audit_action_enum = postgresql.ENUM(name='audit_action_enum')
+    transactiontype_enum = postgresql.ENUM(name="transactiontype")
+    permissionlevel_enum = postgresql.ENUM(name="permissionlevel")
+    accounttype_enum = postgresql.ENUM(name="accounttype")
+    audit_status_enum = postgresql.ENUM(name="audit_status_enum")
+    audit_action_enum = postgresql.ENUM(name="audit_action_enum")
 
     transactiontype_enum.drop(op.get_bind(), checkfirst=True)
     permissionlevel_enum.drop(op.get_bind(), checkfirst=True)
@@ -160,4 +184,4 @@ def downgrade() -> None:
     # =========================================================================
     # STEP 2: Drop PostgreSQL extension
     # =========================================================================
-    op.execute('DROP EXTENSION IF EXISTS pg_trgm')
+    op.execute("DROP EXTENSION IF EXISTS pg_trgm")

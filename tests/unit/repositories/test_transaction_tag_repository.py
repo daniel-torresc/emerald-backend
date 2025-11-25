@@ -278,11 +278,14 @@ class TestTransactionTagRepository:
 
         # Try to add same tag again (should raise integrity error)
         from sqlalchemy.exc import IntegrityError
+
         with pytest.raises(IntegrityError):
             await tag_repo.add_tag(created_trans.id, "groceries")
             await db_session.commit()  # Need to commit to trigger constraint
 
-    async def test_tags_sorted_alphabetically(self, db_session, test_user, test_account):
+    async def test_tags_sorted_alphabetically(
+        self, db_session, test_user, test_account
+    ):
         """Test that tags are returned sorted alphabetically."""
         # Create transaction
         trans_repo = TransactionRepository(db_session)

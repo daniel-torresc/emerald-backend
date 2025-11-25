@@ -111,7 +111,7 @@ async def test_complete_user_journey(async_client: AsyncClient):
     )
     assert income_response.status_code == 201
     income = income_response.json()
-    print(f"✓ Step 5: Added income transaction (+$2500.00)")
+    print("✓ Step 5: Added income transaction (+$2500.00)")
 
     # Step 6: Add expense transaction
     expense_response = await async_client.post(
@@ -130,7 +130,7 @@ async def test_complete_user_journey(async_client: AsyncClient):
     assert expense_response.status_code == 201
     expense = expense_response.json()
     expense_id = expense["id"]
-    print(f"✓ Step 6: Added expense transaction (-$150.00)")
+    print("✓ Step 6: Added expense transaction (-$150.00)")
 
     # Step 7: Split expense transaction
     split_response = await async_client.post(
@@ -149,7 +149,7 @@ async def test_complete_user_journey(async_client: AsyncClient):
     assert "parent" in split_data
     assert "children" in split_data
     assert len(split_data["children"]) == 2
-    print(f"✓ Step 7: Split expense into 2 transactions ($100 + $50)")
+    print("✓ Step 7: Split expense into 2 transactions ($100 + $50)")
 
     # Step 8: Add tags to transaction
     tag_response = await async_client.post(
@@ -158,7 +158,7 @@ async def test_complete_user_journey(async_client: AsyncClient):
         json={"tag": "recurring"},
     )
     assert tag_response.status_code == 200
-    print(f"✓ Step 8: Added 'recurring' tag to income transaction")
+    print("✓ Step 8: Added 'recurring' tag to income transaction")
 
     # Step 9: Search transactions by tag
     search_response = await async_client.get(
@@ -168,7 +168,9 @@ async def test_complete_user_journey(async_client: AsyncClient):
     assert search_response.status_code == 200
     search_results = search_response.json()
     assert search_results["total"] >= 1
-    print(f"✓ Step 9: Searched transactions by tag (found {search_results['total']} results)")
+    print(
+        f"✓ Step 9: Searched transactions by tag (found {search_results['total']} results)"
+    )
 
     # Step 10: Update profile
     update_profile_response = await async_client.patch(
@@ -195,7 +197,9 @@ async def test_complete_user_journey(async_client: AsyncClient):
     assert change_password_response.status_code == 204
     print("✓ Step 11: Changed password successfully")
 
-    print("\n🎉 Complete user journey test passed! All 11 steps completed successfully.")
+    print(
+        "\n🎉 Complete user journey test passed! All 11 steps completed successfully."
+    )
 
 
 @pytest.mark.asyncio
@@ -257,7 +261,7 @@ async def test_new_user_creates_multiple_accounts_and_transactions(
                 "transaction_date": str(date.today() - timedelta(days=i)),
                 "amount": f"-{10 + i * 5}.00",
                 "currency": "USD",
-                "description": f"Checking Expense {i+1}",
+                "description": f"Checking Expense {i + 1}",
                 "transaction_type": "debit",
             },
         )
