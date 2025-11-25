@@ -28,7 +28,7 @@ Soft Delete:
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -164,6 +164,44 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         index=True,
     )
 
+    # Account Metadata (Visual Customization & Bank Information)
+    color_hex: Mapped[str] = mapped_column(
+        String(7),
+        nullable=False,
+        default="#818E8F",
+        comment="Hex color code for UI display (e.g., #FF5733)",
+    )
+
+    icon_url: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="URL or path to account icon",
+    )
+
+    bank_name: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="Name of the financial institution",
+    )
+
+    iban: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Encrypted IBAN (full account number, encrypted at rest)",
+    )
+
+    iban_last_four: Mapped[str | None] = mapped_column(
+        String(4),
+        nullable=True,
+        comment="Last 4 digits of IBAN for display purposes (plaintext)",
+    )
+
+    notes: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="User's personal notes about the account",
+    )
+
     # Relationships
     owner: Mapped["User"] = relationship(  # type: ignore
         "User",
@@ -190,9 +228,10 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
 
     def __repr__(self) -> str:
         """String representation of Account."""
+        bank_info = f", bank={self.bank_name}" if self.bank_name else ""
         return (
             f"Account(id={self.id}, name={self.account_name}, "
-            f"type={self.account_type.value}, balance={self.current_balance} {self.currency})"
+            f"type={self.account_type.value}, balance={self.current_balance} {self.currency}{bank_info})"
         )
 
 
