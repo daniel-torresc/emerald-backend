@@ -13,9 +13,15 @@ import logging
 import uuid
 from decimal import Decimal
 
+from pydantic import HttpUrl
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import AlreadyExistsError, NotFoundError, ValidationError
+from src.exceptions import (
+    AlreadyExistsError,
+    EncryptionError,
+    NotFoundError,
+    ValidationError,
+)
 from src.models.account import Account, AccountShare
 from src.models.audit_log import AuditAction
 from src.models.enums import AccountType, PermissionLevel
@@ -24,6 +30,7 @@ from src.repositories.account_repository import AccountRepository
 from src.repositories.account_share_repository import AccountShareRepository
 from src.repositories.user_repository import UserRepository
 from src.services.audit_service import AuditService
+from src.services.encryption_service import EncryptionService
 from src.services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
@@ -44,12 +51,13 @@ class AccountService:
     Audit logging is performed for all mutating operations.
     """
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, encryption_service: EncryptionService):
         """
-        Initialize AccountService with database session.
+        Initialize AccountService with database session and encryption service.
 
         Args:
             session: Async database session
+            encryption_service: Service for encrypting sensitive data (IBAN)
         """
         self.session = session
         self.account_repo = AccountRepository(session)
@@ -57,6 +65,7 @@ class AccountService:
         self.user_repo = UserRepository(session)
         self.permission_service = PermissionService(session)
         self.audit_service = AuditService(session)
+        self.encryption_service = encryption_service
 
     async def create_account(
         self,
@@ -66,6 +75,11 @@ class AccountService:
         currency: str,
         opening_balance: Decimal,
         current_user: User,
+        bank_name: str | None = None,
+        iban: str | None = None,
+        color_hex: str = "#818E8F",
+        icon_url: HttpUrl | None = None,
+        notes: str | None = None,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -122,6 +136,20 @@ class AccountService:
                 f"Invalid currency code '{currency}'. Must be 3 uppercase letters (e.g., USD, EUR, GBP)"
             )
 
+        # Process IBAN if provided
+        encrypted_iban = None
+        iban_last_four = None
+        if iban:
+            try:
+                # Encrypt full IBAN
+                encrypted_iban = self.encryption_service.encrypt(iban)
+                # Extract last 4 digits for display
+                iban_last_four = iban[-4:] if len(iban) >= 4 else iban
+                logger.info("IBAN encrypted successfully for account creation")
+            except Exception as e:
+                logger.error(f"IBAN encryption failed: {e}")
+                raise EncryptionError("Failed to encrypt IBAN") from e
+
         # Create account
         # Phase 2: current_balance = opening_balance (no transactions yet)
         account = await self.account_repo.create(
@@ -132,6 +160,12 @@ class AccountService:
             opening_balance=opening_balance,
             current_balance=opening_balance,  # Initially same as opening balance
             is_active=True,
+            color_hex=color_hex,
+            icon_url=icon_url,
+            bank_name=bank_name,
+            iban=encrypted_iban,
+            iban_last_four=iban_last_four,
+            notes=notes,
             created_by=current_user.id,
             updated_by=current_user.id,
         )
@@ -189,7 +223,7 @@ class AccountService:
 
         if not account:
             logger.warning(f"Account {account_id} not found")
-            raise NotFoundError(f"Account")
+            raise NotFoundError("Account")
 
         # Check if user has access (owner or shared with them)
         permission = await self.permission_service.get_user_permission(
@@ -200,7 +234,7 @@ class AccountService:
             logger.warning(
                 f"User {current_user.id} attempted to access account {account_id} without permission"
             )
-            raise NotFoundError(f"Account")  # Don't reveal account exists
+            raise NotFoundError("Account")  # Don't reveal account exists
 
         return account
 
@@ -279,7 +313,7 @@ class AccountService:
         # Apply pagination to combined results
         # Note: This means pagination might not be exact when combining owned+shared
         # For a production system, we'd want to do pagination at the DB level
-        return all_accounts[skip:skip + limit] if skip > 0 else all_accounts[:limit]
+        return all_accounts[skip : skip + limit] if skip > 0 else all_accounts[:limit]
 
     async def update_account(
         self,
@@ -287,6 +321,9 @@ class AccountService:
         current_user: User,
         account_name: str | None = None,
         is_active: bool | None = None,
+        color_hex: str | None = None,
+        icon_url: HttpUrl | None = None,
+        notes: str | None = None,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -294,8 +331,8 @@ class AccountService:
         """
         Update account details.
 
-        Only account name and is_active can be updated.
-        Currency, balances, and account_type are immutable.
+        Updateable fields: account_name, is_active, color_hex, icon_url, notes
+        Immutable fields: currency, balances, account_type, bank_name, iban
 
         Phase 2A: Only owner can update.
         Phase 2B: Owner and editor can update (owner can change is_active).
@@ -332,7 +369,7 @@ class AccountService:
             logger.warning(
                 f"User {current_user.id} attempted to update account {account_id} without permission"
             )
-            raise NotFoundError(f"Account")
+            raise NotFoundError("Account")
 
         # Track changes for audit log
         changes = {}
@@ -358,11 +395,23 @@ class AccountService:
 
         # Update is_active if provided
         if is_active is not None and is_active != account.is_active:
-            changes["is_active"] = {
-                "old": account.is_active,
-                "new": is_active
-            }
+            changes["is_active"] = {"old": account.is_active, "new": is_active}
             account.is_active = is_active
+
+        # Update color_hex if provided
+        if color_hex is not None and color_hex != account.color_hex:
+            changes["color_hex"] = {"old": account.color_hex, "new": color_hex}
+            account.color_hex = color_hex
+
+        # Update icon_url if provided
+        if icon_url is not None and icon_url != account.icon_url:
+            changes["icon_url"] = {"old": account.icon_url, "new": icon_url}
+            account.icon_url = icon_url
+
+        # Update notes if provided
+        if notes is not None and notes != account.notes:
+            changes["notes"] = {"old": account.notes, "new": notes}
+            account.notes = notes
 
         # If no changes, return account as-is
         if not changes:
@@ -429,7 +478,7 @@ class AccountService:
             logger.warning(
                 f"User {current_user.id} attempted to delete account {account_id} without permission"
             )
-            raise NotFoundError(f"Account")
+            raise NotFoundError("Account")
 
         # Soft delete account
         await self.account_repo.soft_delete(account)
@@ -625,9 +674,7 @@ class AccountService:
         shares = await self.share_repo.get_by_account(account_id)
 
         # If user is not owner, filter to show only their own share
-        is_owner = await self.permission_service.is_owner(
-            current_user.id, account_id
-        )
+        is_owner = await self.permission_service.is_owner(current_user.id, account_id)
 
         if not is_owner:
             shares = [s for s in shares if s.user_id == current_user.id]
@@ -691,7 +738,10 @@ class AccountService:
             )
 
         # Cannot change own owner permission
-        if share.user_id == current_user.id and share.permission_level == PermissionLevel.owner:
+        if (
+            share.user_id == current_user.id
+            and share.permission_level == PermissionLevel.owner
+        ):
             raise ValidationError("Cannot change your own owner permission")
 
         # Store old permission for audit log
@@ -773,7 +823,10 @@ class AccountService:
             raise NotFoundError("Share not found")
 
         # Cannot revoke own owner permission
-        if share.user_id == current_user.id and share.permission_level == PermissionLevel.owner:
+        if (
+            share.user_id == current_user.id
+            and share.permission_level == PermissionLevel.owner
+        ):
             raise ValidationError("Cannot revoke your own owner permission")
 
         # Soft delete share

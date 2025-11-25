@@ -347,7 +347,8 @@ def get_account_service(db: AsyncSession = Depends(get_db)):
     """
     Dependency to get AccountService instance.
 
-    This dependency provides an AccountService with an active database session.
+    This dependency provides an AccountService with an active database session
+    and encryption service for IBAN encryption.
 
     Args:
         db: Database session
@@ -363,8 +364,9 @@ def get_account_service(db: AsyncSession = Depends(get_db)):
             return await account_service.create_account(...)
     """
     from src.services.account_service import AccountService
+    from src.services.encryption_service import encryption_service
 
-    return AccountService(db)
+    return AccountService(db, encryption_service)
 
 
 def get_admin_service(db: AsyncSession = Depends(get_db)):
