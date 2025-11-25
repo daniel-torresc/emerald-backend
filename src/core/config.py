@@ -31,7 +31,9 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     app_name: str = Field(default="Emerald Finance Platform")
     version: str = Field(default="0.1.0")
-    environment: Literal["development", "staging", "production"] = Field(default="development")
+    environment: Literal["development", "staging", "production"] = Field(
+        default="development"
+    )
     debug: bool = Field(default=False)
 
     # -------------------------------------------------------------------------
@@ -47,7 +49,7 @@ class Settings(BaseSettings):
     secret_key: str = Field(
         ...,
         min_length=32,
-        description="Secret key for JWT signing. Must be at least 32 characters."
+        description="Secret key for JWT signing. Must be at least 32 characters.",
     )
 
     # JWT Token Configuration
@@ -63,8 +65,7 @@ class Settings(BaseSettings):
     # Database Configuration
     # -------------------------------------------------------------------------
     database_url: PostgresDsn = Field(
-        ...,
-        description="PostgreSQL connection string with asyncpg driver"
+        ..., description="PostgreSQL connection string with asyncpg driver"
     )
 
     # Connection Pool Settings
@@ -78,8 +79,7 @@ class Settings(BaseSettings):
     # Redis Configuration
     # -------------------------------------------------------------------------
     redis_url: RedisDsn = Field(
-        ...,
-        description="Redis connection string for rate limiting and caching"
+        ..., description="Redis connection string for rate limiting and caching"
     )
     redis_max_connections: int = Field(default=10, ge=1, le=100)
 
@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     cors_origins: List[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000"],
-        description="Comma-separated list of allowed CORS origins"
+        description="Comma-separated list of allowed CORS origins",
     )
     cors_allow_credentials: bool = Field(default=True)
 
@@ -128,16 +128,15 @@ class Settings(BaseSettings):
         ...,
         min_length=3,
         max_length=50,
-        description="Initial superuser username (used during database migration)"
+        description="Initial superuser username (used during database migration)",
     )
     superadmin_email: EmailStr = Field(
-        ...,
-        description="Initial superuser email (used during database migration)"
+        ..., description="Initial superuser email (used during database migration)"
     )
     superadmin_password: str = Field(
         ...,
         min_length=8,
-        description="Initial superuser password (used during database migration)"
+        description="Initial superuser password (used during database migration)",
     )
     superadmin_full_name: str = Field(
         description="Initial superuser full name (used during database migration)"
@@ -156,15 +155,14 @@ class Settings(BaseSettings):
             "audit_logs:read:all",
             "admin:manage:all",
         ],
-        description="Initial superuser permissions (default: full access)"
+        description="Initial superuser permissions (default: full access)",
     )
 
     # -------------------------------------------------------------------------
     # Testing Configuration
     # -------------------------------------------------------------------------
     test_database_url: PostgresDsn | None = Field(
-        default=None,
-        description="Separate database for testing"
+        default=None, description="Separate database for testing"
     )
 
     # -------------------------------------------------------------------------

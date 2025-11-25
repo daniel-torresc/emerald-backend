@@ -106,6 +106,7 @@ async def update_current_user_profile(
 # User Lookup Endpoints
 # ============================================================================
 
+
 @router.get(
     "/{user_id}",
     response_model=UserResponse,

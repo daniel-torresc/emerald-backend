@@ -6,7 +6,7 @@ All tests are fully mocked - no database or external dependencies.
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -32,7 +32,9 @@ def mock_audit_repo():
 @pytest.fixture
 def audit_service(mock_session, mock_audit_repo):
     """Create AuditService with mocked dependencies."""
-    with patch("src.services.audit_service.AuditLogRepository", return_value=mock_audit_repo):
+    with patch(
+        "src.services.audit_service.AuditLogRepository", return_value=mock_audit_repo
+    ):
         service = AuditService(mock_session)
     return service
 
@@ -41,7 +43,9 @@ class TestLogEvent:
     """Test the core log_event method."""
 
     @pytest.mark.asyncio
-    async def test_log_event_creates_audit_log(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_event_creates_audit_log(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test that log_event creates an audit log with all parameters."""
         # Setup
         user_id = uuid.uuid4()
@@ -93,7 +97,9 @@ class TestLogEvent:
         mock_session.flush.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_log_event_with_minimal_parameters(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_event_with_minimal_parameters(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test that log_event works with minimal required parameters."""
         # Setup
         user_id = uuid.uuid4()
@@ -119,7 +125,9 @@ class TestLogEvent:
         mock_session.flush.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_log_event_with_null_user_id(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_event_with_null_user_id(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test that log_event handles system actions (NULL user_id)."""
         # Setup
         mock_audit_log = AuditLog(
@@ -149,7 +157,9 @@ class TestLogLogin:
     """Test the log_login method."""
 
     @pytest.mark.asyncio
-    async def test_log_successful_login(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_successful_login(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test logging a successful login."""
         # Setup
         user_id = uuid.uuid4()
@@ -253,7 +263,9 @@ class TestLogPasswordChange:
     """Test the log_password_change method."""
 
     @pytest.mark.asyncio
-    async def test_log_successful_password_change(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_successful_password_change(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test logging a successful password change."""
         # Setup
         user_id = uuid.uuid4()
@@ -282,7 +294,9 @@ class TestLogPasswordChange:
         assert call_args["status"] == AuditStatus.SUCCESS
 
     @pytest.mark.asyncio
-    async def test_log_failed_password_change(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_failed_password_change(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test logging a failed password change."""
         # Setup
         user_id = uuid.uuid4()
@@ -316,7 +330,9 @@ class TestLogTokenRefresh:
     """Test the log_token_refresh method."""
 
     @pytest.mark.asyncio
-    async def test_log_successful_token_refresh(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_successful_token_refresh(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test logging a successful token refresh."""
         # Setup
         user_id = uuid.uuid4()
@@ -345,7 +361,9 @@ class TestLogTokenRefresh:
         assert call_args["status"] == AuditStatus.SUCCESS
 
     @pytest.mark.asyncio
-    async def test_log_failed_token_refresh(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_failed_token_refresh(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test logging a failed token refresh."""
         # Setup
         user_id = uuid.uuid4()
@@ -378,7 +396,9 @@ class TestLogDataChange:
     """Test the log_data_change method."""
 
     @pytest.mark.asyncio
-    async def test_log_create_action(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_create_action(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test logging a CREATE action."""
         # Setup
         user_id = uuid.uuid4()
@@ -411,7 +431,9 @@ class TestLogDataChange:
         assert call_args["new_values"] == {"name": "Savings", "balance": 1000.00}
 
     @pytest.mark.asyncio
-    async def test_log_update_action(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_update_action(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test logging an UPDATE action with before/after values."""
         # Setup
         user_id = uuid.uuid4()
@@ -448,7 +470,9 @@ class TestLogDataChange:
         assert call_args["new_values"] == {"email": "new@example.com"}
 
     @pytest.mark.asyncio
-    async def test_log_delete_action(self, audit_service, mock_audit_repo, mock_session):
+    async def test_log_delete_action(
+        self, audit_service, mock_audit_repo, mock_session
+    ):
         """Test logging a DELETE action with old values."""
         # Setup
         user_id = uuid.uuid4()
@@ -485,13 +509,25 @@ class TestGetUserAuditLogs:
     """Test the get_user_audit_logs method."""
 
     @pytest.mark.asyncio
-    async def test_get_user_audit_logs_with_filters(self, audit_service, mock_audit_repo):
+    async def test_get_user_audit_logs_with_filters(
+        self, audit_service, mock_audit_repo
+    ):
         """Test getting user audit logs with filters."""
         # Setup
         user_id = uuid.uuid4()
         mock_logs = [
-            AuditLog(id=uuid.uuid4(), user_id=user_id, action=AuditAction.LOGIN, entity_type="user"),
-            AuditLog(id=uuid.uuid4(), user_id=user_id, action=AuditAction.LOGIN, entity_type="user"),
+            AuditLog(
+                id=uuid.uuid4(),
+                user_id=user_id,
+                action=AuditAction.LOGIN,
+                entity_type="user",
+            ),
+            AuditLog(
+                id=uuid.uuid4(),
+                user_id=user_id,
+                action=AuditAction.LOGIN,
+                entity_type="user",
+            ),
         ]
         mock_audit_repo.get_user_logs.return_value = mock_logs
         mock_audit_repo.count_user_logs.return_value = 25
@@ -534,11 +570,21 @@ class TestGetUserAuditLogs:
         )
 
     @pytest.mark.asyncio
-    async def test_get_user_audit_logs_with_pagination(self, audit_service, mock_audit_repo):
+    async def test_get_user_audit_logs_with_pagination(
+        self, audit_service, mock_audit_repo
+    ):
         """Test pagination of user audit logs."""
         # Setup
         user_id = uuid.uuid4()
-        mock_logs = [AuditLog(id=uuid.uuid4(), user_id=user_id, action=AuditAction.READ, entity_type="user") for _ in range(10)]
+        mock_logs = [
+            AuditLog(
+                id=uuid.uuid4(),
+                user_id=user_id,
+                action=AuditAction.READ,
+                entity_type="user",
+            )
+            for _ in range(10)
+        ]
         mock_audit_repo.get_user_logs.return_value = mock_logs
         mock_audit_repo.count_user_logs.return_value = 100
 
@@ -580,12 +626,24 @@ class TestGetAllAuditLogs:
     """Test the get_all_audit_logs method."""
 
     @pytest.mark.asyncio
-    async def test_get_all_audit_logs_with_filters(self, audit_service, mock_audit_repo):
+    async def test_get_all_audit_logs_with_filters(
+        self, audit_service, mock_audit_repo
+    ):
         """Test getting all audit logs with filters (admin only)."""
         # Setup
         mock_logs = [
-            AuditLog(id=uuid.uuid4(), user_id=uuid.uuid4(), action=AuditAction.LOGIN_FAILED, entity_type="user"),
-            AuditLog(id=uuid.uuid4(), user_id=uuid.uuid4(), action=AuditAction.LOGIN_FAILED, entity_type="user"),
+            AuditLog(
+                id=uuid.uuid4(),
+                user_id=uuid.uuid4(),
+                action=AuditAction.LOGIN_FAILED,
+                entity_type="user",
+            ),
+            AuditLog(
+                id=uuid.uuid4(),
+                user_id=uuid.uuid4(),
+                action=AuditAction.LOGIN_FAILED,
+                entity_type="user",
+            ),
         ]
         mock_audit_repo.get_all_logs.return_value = mock_logs
 
@@ -616,7 +674,15 @@ class TestGetAllAuditLogs:
     async def test_get_all_audit_logs_no_filters(self, audit_service, mock_audit_repo):
         """Test getting all audit logs without filters."""
         # Setup
-        mock_logs = [AuditLog(id=uuid.uuid4(), user_id=uuid.uuid4(), action=AuditAction.READ, entity_type="user") for _ in range(100)]
+        mock_logs = [
+            AuditLog(
+                id=uuid.uuid4(),
+                user_id=uuid.uuid4(),
+                action=AuditAction.READ,
+                entity_type="user",
+            )
+            for _ in range(100)
+        ]
         mock_audit_repo.get_all_logs.return_value = mock_logs
 
         # Execute
@@ -627,12 +693,24 @@ class TestGetAllAuditLogs:
         mock_audit_repo.get_all_logs.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_all_audit_logs_by_entity_type(self, audit_service, mock_audit_repo):
+    async def test_get_all_audit_logs_by_entity_type(
+        self, audit_service, mock_audit_repo
+    ):
         """Test filtering all audit logs by entity type."""
         # Setup
         mock_logs = [
-            AuditLog(id=uuid.uuid4(), user_id=uuid.uuid4(), action=AuditAction.CREATE, entity_type="transaction"),
-            AuditLog(id=uuid.uuid4(), user_id=uuid.uuid4(), action=AuditAction.UPDATE, entity_type="transaction"),
+            AuditLog(
+                id=uuid.uuid4(),
+                user_id=uuid.uuid4(),
+                action=AuditAction.CREATE,
+                entity_type="transaction",
+            ),
+            AuditLog(
+                id=uuid.uuid4(),
+                user_id=uuid.uuid4(),
+                action=AuditAction.UPDATE,
+                entity_type="transaction",
+            ),
         ]
         mock_audit_repo.get_all_logs.return_value = mock_logs
 

@@ -85,6 +85,11 @@ async def create_account(
         - account_type: Type (savings, credit_card, debit_card, loan, investment, other)
         - currency: ISO 4217 code (USD, EUR, GBP, etc.)
         - opening_balance: Initial balance (can be negative for loans)
+        - bank_name: Bank institution name (optional, immutable after creation)
+        - iban: IBAN account number (optional, will be encrypted, immutable)
+        - color_hex: Hex color for UI display (optional, default #818E8F)
+        - icon_url: URL to account icon (optional)
+        - notes: Personal notes about the account (optional)
 
     Returns:
         AccountResponse with created account details
@@ -95,7 +100,7 @@ async def create_account(
 
     Raises:
         - 400 Bad Request: If account name exists or currency invalid
-        - 422 Unprocessable Entity: If validation fails
+        - 422 Unprocessable Entity: If validation fails (invalid IBAN, color format, etc.)
     """
     account = await account_service.create_account(
         user_id=current_user.id,
@@ -104,6 +109,11 @@ async def create_account(
         currency=account_data.currency,
         opening_balance=account_data.opening_balance,
         current_user=current_user,
+        bank_name=account_data.bank_name,
+        iban=account_data.iban,
+        color_hex=account_data.color_hex,
+        icon_url=account_data.icon_url,
+        notes=account_data.notes,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
@@ -156,7 +166,9 @@ async def list_accounts(
     ] = 20,
     is_active: Annotated[
         bool | None,
-        Query(description="Filter by active status (true=active, false=inactive, null=all)"),
+        Query(
+            description="Filter by active status (true=active, false=inactive, null=all)"
+        ),
     ] = None,
     account_type: Annotated[
         AccountType | None, Query(description="Filter by account type")
@@ -299,6 +311,12 @@ async def update_account(
     Request body:
         - account_name: New name (optional, validates uniqueness)
         - is_active: New active status (optional)
+        - color_hex: New hex color (optional)
+        - icon_url: New icon URL (optional)
+        - notes: New notes (optional)
+
+    Immutable fields (cannot be updated):
+        - bank_name, iban, currency, opening_balance, account_type
 
     Returns:
         AccountResponse with updated account details
@@ -318,6 +336,9 @@ async def update_account(
         current_user=current_user,
         account_name=update_data.account_name,
         is_active=update_data.is_active,
+        color_hex=update_data.color_hex,
+        icon_url=update_data.icon_url,
+        notes=update_data.notes,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),

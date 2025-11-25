@@ -37,11 +37,11 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 pwd_hasher = PasswordHasher(
-    time_cost=settings.argon2_time_cost,        # 2 iterations
-    memory_cost=settings.argon2_memory_cost,    # 64 MB memory
-    parallelism=settings.argon2_parallelism,    # 4 parallel threads
-    hash_len=32,                                 # 32-byte output
-    salt_len=16,                                 # 16-byte salt
+    time_cost=settings.argon2_time_cost,  # 2 iterations
+    memory_cost=settings.argon2_memory_cost,  # 64 MB memory
+    parallelism=settings.argon2_parallelism,  # 4 parallel threads
+    hash_len=32,  # 32-byte output
+    salt_len=16,  # 16-byte salt
 )
 
 
@@ -185,12 +185,14 @@ def create_access_token(
             minutes=settings.access_token_expire_minutes
         )
 
-    to_encode.update({
-        "exp": expire,
-        "iat": datetime.now(UTC),
-        "type": TOKEN_TYPE_ACCESS,
-        "jti": str(uuid.uuid4()),  # Unique JWT ID to ensure token uniqueness
-    })
+    to_encode.update(
+        {
+            "exp": expire,
+            "iat": datetime.now(UTC),
+            "type": TOKEN_TYPE_ACCESS,
+            "jti": str(uuid.uuid4()),  # Unique JWT ID to ensure token uniqueness
+        }
+    )
 
     encoded_jwt = jwt.encode(
         to_encode,
@@ -231,16 +233,16 @@ def create_refresh_token(
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(UTC) + timedelta(
-            days=settings.refresh_token_expire_days
-        )
+        expire = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
 
-    to_encode.update({
-        "exp": expire,
-        "iat": datetime.now(UTC),
-        "type": TOKEN_TYPE_REFRESH,
-        "jti": str(uuid.uuid4()),  # Unique JWT ID to prevent hash collisions
-    })
+    to_encode.update(
+        {
+            "exp": expire,
+            "iat": datetime.now(UTC),
+            "type": TOKEN_TYPE_REFRESH,
+            "jti": str(uuid.uuid4()),  # Unique JWT ID to prevent hash collisions
+        }
+    )
 
     encoded_jwt = jwt.encode(
         to_encode,
@@ -311,6 +313,7 @@ def verify_token_type(token_data: dict[str, Any], expected_type: str) -> bool:
 # Refresh tokens are stored in the database as SHA-256 hashes for security.
 # This prevents token theft if the database is compromised.
 # =============================================================================
+
 
 def hash_refresh_token(token: str) -> str:
     """

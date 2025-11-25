@@ -16,7 +16,7 @@ This module provides:
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Path, Query, Request, status
+from fastapi import APIRouter, Depends, Path, Request, status
 
 from src.api.dependencies import (
     get_transaction_service,
@@ -24,7 +24,6 @@ from src.api.dependencies import (
 )
 from src.models.user import User
 from src.schemas.transaction import (
-    SplitItem,
     TagRequest,
     TransactionCreate,
     TransactionListResponse,

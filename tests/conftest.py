@@ -10,6 +10,7 @@ This module provides:
 
 # Set environment variables BEFORE importing anything from src
 import os
+
 os.environ["RATE_LIMIT_DEFAULT"] = "10000 per hour"
 os.environ["RATE_LIMIT_LOGIN"] = "10000 per hour"
 os.environ["RATE_LIMIT_REGISTER"] = "10000 per hour"
@@ -121,6 +122,7 @@ def client(db_session: AsyncSession) -> TestClient:
 
     This is a synchronous client for simple tests.
     """
+
     # Override the get_db dependency
     async def override_get_db():
         yield db_session
@@ -190,7 +192,11 @@ async def async_client(test_engine) -> AsyncGenerator[AsyncClient, None]:
             await session.execute(text("SET session_replication_role = 'replica'"))
 
             # Truncate all tables (order doesn't matter with FK checks disabled)
-            await session.execute(text("TRUNCATE TABLE account_shares, accounts, audit_logs, refresh_tokens, users RESTART IDENTITY CASCADE"))
+            await session.execute(
+                text(
+                    "TRUNCATE TABLE account_shares, accounts, audit_logs, refresh_tokens, users RESTART IDENTITY CASCADE"
+                )
+            )
 
             # Re-enable foreign key checks
             await session.execute(text("SET session_replication_role = 'origin'"))

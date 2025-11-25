@@ -253,7 +253,12 @@ class AuditLog(Base):
         # Index for request correlation
         Index("ix_audit_logs_request", "request_id", "created_at"),
         # Index for security monitoring (failed actions)
-        Index("ix_audit_logs_failures", "status", "created_at", postgresql_where=(status == AuditStatus.FAILURE)),
+        Index(
+            "ix_audit_logs_failures",
+            "status",
+            "created_at",
+            postgresql_where=(status == AuditStatus.FAILURE),
+        ),
     )
 
     def __repr__(self) -> str:

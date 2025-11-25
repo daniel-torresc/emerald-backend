@@ -13,14 +13,10 @@ These tests validate that administrative operations work correctly
 and that security/audit features function as expected.
 """
 
-import os
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.models.user import User
 
 
 @pytest.mark.asyncio
@@ -363,7 +359,9 @@ async def test_last_admin_protection(async_client: AsyncClient, test_engine):
     admin_headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
 
     # Get superuser ID by listing admins
-    admins_response = await async_client.get("/api/v1/admin/users", headers=admin_headers)
+    admins_response = await async_client.get(
+        "/api/v1/admin/users", headers=admin_headers
+    )
     admin_id = admins_response.json()["items"][0]["id"]
 
     # Try to delete self (last admin)
@@ -415,7 +413,9 @@ async def test_superuser_created_by_migration(async_client: AsyncClient):
 
     # Verify superuser has admin privileges
     admin_headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
-    admins_response = await async_client.get("/api/v1/admin/users", headers=admin_headers)
+    admins_response = await async_client.get(
+        "/api/v1/admin/users", headers=admin_headers
+    )
     assert admins_response.status_code == 200
     assert len(admins_response.json()["items"]) > 0
 

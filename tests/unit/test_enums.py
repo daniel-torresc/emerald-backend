@@ -7,7 +7,6 @@ Tests the AccountType and TransactionType enums to ensure:
 - Enum serialization works as expected
 """
 
-
 from src.models.enums import AccountType, TransactionType
 
 

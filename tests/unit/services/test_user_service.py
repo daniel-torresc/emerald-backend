@@ -52,9 +52,16 @@ def mock_audit_service():
 @pytest.fixture
 def user_service(mock_session, mock_user_repo, mock_token_repo, mock_audit_service):
     """Create UserService with mocked dependencies."""
-    with patch("src.services.user_service.UserRepository", return_value=mock_user_repo), \
-         patch("src.services.user_service.RefreshTokenRepository", return_value=mock_token_repo), \
-         patch("src.services.user_service.AuditService", return_value=mock_audit_service):
+    with (
+        patch("src.services.user_service.UserRepository", return_value=mock_user_repo),
+        patch(
+            "src.services.user_service.RefreshTokenRepository",
+            return_value=mock_token_repo,
+        ),
+        patch(
+            "src.services.user_service.AuditService", return_value=mock_audit_service
+        ),
+    ):
         service = UserService(mock_session)
     return service
 
@@ -63,6 +70,7 @@ def user_service(mock_session, mock_user_repo, mock_token_repo, mock_audit_servi
 def regular_user():
     """Create a regular (non-admin) User instance."""
     from datetime import UTC, datetime
+
     user = User(
         id=uuid.uuid4(),
         email="user@example.com",
@@ -81,6 +89,7 @@ def regular_user():
 def admin_user():
     """Create an admin User instance."""
     from datetime import UTC, datetime
+
     user = User(
         id=uuid.uuid4(),
         email="admin@example.com",
@@ -241,7 +250,9 @@ class TestUpdateUserProfile:
         update_data = UserUpdate(email="existing@example.com")
         mock_user_repo.get_by_id.return_value = regular_user
 
-        existing_user = User(id=uuid.uuid4(), email="existing@example.com", username="other")
+        existing_user = User(
+            id=uuid.uuid4(), email="existing@example.com", username="other"
+        )
         mock_user_repo.get_by_email.return_value = existing_user
 
         # Execute & Verify
@@ -264,7 +275,9 @@ class TestUpdateUserProfile:
         update_data = UserUpdate(username="existing_username")
         mock_user_repo.get_by_id.return_value = regular_user
 
-        existing_user = User(id=uuid.uuid4(), email="other@example.com", username="existing_username")
+        existing_user = User(
+            id=uuid.uuid4(), email="other@example.com", username="existing_username"
+        )
         mock_user_repo.get_by_username.return_value = existing_user
 
         # Execute & Verify
@@ -368,6 +381,7 @@ class TestListUsers:
     ):
         """Test admin listing users."""
         from datetime import UTC, datetime
+
         # Setup
         pagination = PaginationParams(page=1, page_size=20)
         filters = UserFilterParams()
@@ -447,7 +461,9 @@ class TestListUsers:
         filters = UserFilterParams()
 
         # Execute & Verify
-        with pytest.raises(InsufficientPermissionsError, match="Administrator privileges required"):
+        with pytest.raises(
+            InsufficientPermissionsError, match="Administrator privileges required"
+        ):
             await user_service.list_users(
                 pagination=pagination,
                 filters=filters,
@@ -496,7 +512,9 @@ class TestDeactivateUser:
     ):
         """Test non-admin user cannot deactivate users."""
         # Execute & Verify
-        with pytest.raises(InsufficientPermissionsError, match="Administrator privileges required"):
+        with pytest.raises(
+            InsufficientPermissionsError, match="Administrator privileges required"
+        ):
             await user_service.deactivate_user(
                 user_id=uuid.uuid4(),
                 current_user=regular_user,
@@ -536,6 +554,7 @@ class TestSoftDeleteUser:
     ):
         """Test admin soft deleting a user."""
         from datetime import UTC, datetime
+
         # Setup
         mock_user_repo.get_by_id.return_value = regular_user
 
@@ -569,7 +588,9 @@ class TestSoftDeleteUser:
     ):
         """Test non-admin user cannot soft delete users."""
         # Execute & Verify
-        with pytest.raises(InsufficientPermissionsError, match="Administrator privileges required"):
+        with pytest.raises(
+            InsufficientPermissionsError, match="Administrator privileges required"
+        ):
             await user_service.soft_delete_user(
                 user_id=uuid.uuid4(),
                 current_user=regular_user,

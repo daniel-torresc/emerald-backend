@@ -62,7 +62,9 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
         },
     )
     account_id = account_response.json()["id"]
-    print(f"✓ Step 1: User A created savings account (${account_response.json()['current_balance']})")
+    print(
+        f"✓ Step 1: User A created savings account (${account_response.json()['current_balance']})"
+    )
 
     # Step 2: User B registers
     register_b = await async_client.post(
@@ -93,7 +95,7 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
     )
     assert share_response.status_code == 201
     share_id = share_response.json()["id"]
-    print(f"✓ Step 2: User A shared account with User B (EDITOR)")
+    print("✓ Step 2: User A shared account with User B (EDITOR)")
 
     # Step 4: User B sees shared account in their list
     accounts_b = await async_client.get(
@@ -104,7 +106,7 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
     b_accounts = accounts_b.json()
     account_names = [acc["account_name"] for acc in b_accounts]
     assert "Shared Savings" in account_names
-    print(f"✓ Step 3: User B sees shared account in their list")
+    print("✓ Step 3: User B sees shared account in their list")
 
     # Step 5: User B adds transaction to shared account
     txn_response = await async_client.post(
@@ -119,7 +121,7 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
         },
     )
     assert txn_response.status_code == 201
-    print(f"✓ Step 4: User B added transaction (-$200)")
+    print("✓ Step 4: User B added transaction (-$200)")
 
     # Step 6: User A upgrades User B to OWNER
     upgrade_response = await async_client.put(
@@ -129,7 +131,9 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
     )
     # Note: Might not allow owner promotion via this endpoint
     # If it fails, that's expected behavior
-    print(f"✓ Step 5: Attempted to upgrade User B (status: {upgrade_response.status_code})")
+    print(
+        f"✓ Step 5: Attempted to upgrade User B (status: {upgrade_response.status_code})"
+    )
 
     # Step 7: User C registers
     register_c = await async_client.post(
@@ -160,7 +164,7 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
     )
     assert share_c_response.status_code == 201
     share_c_id = share_c_response.json()["id"]
-    print(f"✓ Step 6: User A shared account with User C (VIEWER)")
+    print("✓ Step 6: User A shared account with User C (VIEWER)")
 
     # Step 9: User C can view account
     account_c_response = await async_client.get(
@@ -168,7 +172,7 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
         headers=headers_c,
     )
     assert account_c_response.status_code == 200
-    print(f"✓ Step 7: User C can view shared account")
+    print("✓ Step 7: User C can view shared account")
 
     # Step 10: User C cannot create transaction (viewer permission)
     txn_c_response = await async_client.post(
@@ -183,7 +187,7 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
         },
     )
     assert txn_c_response.status_code == 403
-    print(f"✓ Step 8: User C correctly cannot edit (VIEWER permission)")
+    print("✓ Step 8: User C correctly cannot edit (VIEWER permission)")
 
     # Step 11: User A revokes User C's access
     revoke_response = await async_client.delete(
@@ -191,7 +195,7 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
         headers=headers_a,
     )
     assert revoke_response.status_code == 204
-    print(f"✓ Step 9: User A revoked User C's access")
+    print("✓ Step 9: User A revoked User C's access")
 
     # Step 12: User C can no longer access account
     account_c_gone = await async_client.get(
@@ -199,9 +203,11 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
         headers=headers_c,
     )
     assert account_c_gone.status_code in [403, 404]
-    print(f"✓ Step 10: User C can no longer access account")
+    print("✓ Step 10: User C can no longer access account")
 
-    print("\n🎉 Complete collaboration workflow passed! All steps completed successfully.")
+    print(
+        "\n🎉 Complete collaboration workflow passed! All steps completed successfully."
+    )
 
 
 @pytest.mark.asyncio
@@ -363,9 +369,9 @@ async def test_shared_account_transaction_visibility(async_client: AsyncClient):
             headers=headers_sharer,
             json={
                 "transaction_date": str(date.today()),
-                "amount": f"-{(i+1) * 10}.00",
+                "amount": f"-{(i + 1) * 10}.00",
                 "currency": "USD",
-                "description": f"Transaction {i+1}",
+                "description": f"Transaction {i + 1}",
                 "transaction_type": "debit",
             },
         )
@@ -421,7 +427,10 @@ async def test_share_list_visibility(async_client: AsyncClient):
 
         login = await async_client.post(
             "/api/auth/login",
-            json={"email": f"{name}@example.com", "password": f"{name.capitalize()}123!"},
+            json={
+                "email": f"{name}@example.com",
+                "password": f"{name.capitalize()}123!",
+            },
         )
         headers_list.append({"Authorization": f"Bearer {login.json()['access_token']}"})
 

@@ -82,6 +82,7 @@ class AppException(Exception):
 # Authentication Errors (401 Unauthorized)
 # =============================================================================
 
+
 class AuthenticationError(AppException):
     """Base class for authentication errors."""
 
@@ -163,6 +164,7 @@ class AccountLockedError(AuthenticationError):
 # Authorization Errors (403 Forbidden)
 # =============================================================================
 
+
 class AuthorizationError(AppException):
     """Base class for authorization errors."""
 
@@ -213,6 +215,7 @@ class ForbiddenError(AuthorizationError):
 # =============================================================================
 # Resource Errors
 # =============================================================================
+
 
 class ResourceError(AppException):
     """Base class for resource-related errors."""
@@ -290,6 +293,7 @@ class ConflictError(ResourceError):
 # Validation Errors (422 Unprocessable Entity)
 # =============================================================================
 
+
 class ValidationError(AppException):
     """Base class for validation errors."""
 
@@ -347,6 +351,7 @@ class InvalidInputError(ValidationError):
 # Rate Limiting Error (429 Too Many Requests)
 # =============================================================================
 
+
 class RateLimitExceededError(AppException):
     """Raised when rate limit is exceeded."""
 
@@ -365,5 +370,26 @@ class RateLimitExceededError(AppException):
             message=message,
             status_code=429,
             error_code="RATE_LIMIT_EXCEEDED",
+            details=details,
+        )
+
+
+# =============================================================================
+# Encryption Error (500 Internal Server Error)
+# =============================================================================
+
+
+class EncryptionError(AppException):
+    """Raised when encryption or decryption operations fail."""
+
+    def __init__(
+        self,
+        message: str = "Encryption operation failed",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            message=message,
+            status_code=500,
+            error_code="ENCRYPTION_ERROR",
             details=details,
         )

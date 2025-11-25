@@ -7,11 +7,13 @@ This module provides:
 - Account filtering schemas
 """
 
+import re
 import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
+from schwifty import IBAN
 
 from src.models.enums import AccountType
 
@@ -24,6 +26,8 @@ class AccountBase(BaseModel):
         account_name: Descriptive name for the account
         account_type: Type of account (savings, credit_card, etc.)
         currency: ISO 4217 currency code (3 uppercase letters)
+        bank_name: Name of the financial institution (optional)
+        notes: User's personal notes about the account (optional)
     """
 
     account_name: str = Field(
@@ -43,6 +47,24 @@ class AccountBase(BaseModel):
         max_length=3,
         description="ISO 4217 currency code (3 uppercase letters)",
         examples=["USD", "EUR", "GBP"],
+    )
+
+    bank_name: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Name of the financial institution",
+        examples=["Chase Bank", "Bank of America", "Wells Fargo"],
+    )
+
+    notes: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Personal notes about the account",
+        examples=[
+            "Joint account with spouse",
+            "Savings for vacation",
+            "Emergency fund",
+        ],
     )
 
     @field_validator("currency")
@@ -82,11 +104,34 @@ class AccountCreate(AccountBase):
         account_type: Type of account
         currency: ISO 4217 currency code (immutable after creation)
         opening_balance: Initial balance (can be negative for loans/credit cards)
+        bank_name: Bank institution name (immutable after creation)
+        iban: Full IBAN (will be encrypted, immutable after creation)
+        color_hex: Hex color code for UI display
+        icon_url: URL to account icon
+        notes: User notes
     """
 
     opening_balance: Decimal = Field(
         description="Initial account balance (can be negative for loans/credit cards)",
         examples=["1000.00", "-500.00", "0.00"],
+    )
+
+    iban: str | None = Field(
+        default=None,
+        description="IBAN (International Bank Account Number) - will be encrypted",
+        examples=["DE89370400440532013000", "GB82 WEST 1234 5698 7654 32"],
+    )
+
+    color_hex: str = Field(
+        default="#818E8F",
+        description="Hex color code for account visualization (e.g., #FF5733)",
+        examples=["#FF5733", "#3498DB", "#2ECC71"],
+    )
+
+    icon_url: HttpUrl | None = Field(
+        default=None,
+        description="URL to account icon image",
+        examples=["https://cdn.example.com/icons/bank.png"],
     )
 
     @field_validator("opening_balance")
@@ -107,19 +152,64 @@ class AccountCreate(AccountBase):
 
         return value
 
+    @field_validator("color_hex")
+    @classmethod
+    def validate_color_hex(cls, value: str) -> str:
+        """
+        Validate hex color format.
+
+        Must be #RRGGBB (7 characters: # + 6 hex digits).
+        """
+        if not re.match(r"^#[0-9A-Fa-f]{6}$", value):
+            raise ValueError("Color must be a valid hex code (e.g., #FF5733, #3498DB)")
+        return value.upper()  # Normalize to uppercase
+
+    @field_validator("iban")
+    @classmethod
+    def validate_iban(cls, value: str | None) -> str | None:
+        """
+        Validate IBAN format and checksum.
+
+        Uses schwifty library for comprehensive IBAN validation.
+        """
+        if value is None:
+            return None
+
+        try:
+            # Remove spaces and hyphens, normalize
+            normalized = value.replace(" ", "").replace("-", "").upper()
+
+            # Validate using schwifty
+            IBAN(normalized)
+
+            return normalized
+        except Exception as e:
+            raise ValueError(f"Invalid IBAN: {str(e)}") from e
+
+    @field_validator("icon_url")
+    @classmethod
+    def validate_icon_url(cls, value: HttpUrl | str | None) -> str | None:
+        """Convert HttpUrl to string if provided."""
+        if value is None:
+            return None
+        return str(value)
+
 
 class AccountUpdate(BaseModel):
     """
     Schema for updating account information.
 
-    Only account_name and is_active can be updated.
-    Currency, balances, and account_type are immutable.
+    Updateable fields: account_name, is_active, color_hex, icon_url, notes
+    Immutable fields: currency, balances, account_type, bank_name, iban
 
     All fields are optional to support partial updates (PATCH).
 
     Attributes:
         account_name: New account name (optional)
         is_active: New active status (optional)
+        color_hex: New hex color code (optional)
+        icon_url: New icon URL (optional)
+        notes: New notes (optional)
     """
 
     account_name: str | None = Field(
@@ -136,6 +226,25 @@ class AccountUpdate(BaseModel):
         examples=[True, False],
     )
 
+    color_hex: str | None = Field(
+        default=None,
+        description="Hex color code for account visualization",
+        examples=["#FF5733", "#3498DB"],
+    )
+
+    icon_url: HttpUrl | None = Field(
+        default=None,
+        description="URL to account icon image",
+        examples=["https://cdn.example.com/icons/bank.png"],
+    )
+
+    notes: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Personal notes about the account",
+        examples=["Updated notes"],
+    )
+
     @field_validator("account_name")
     @classmethod
     def validate_account_name(cls, value: str | None) -> str | None:
@@ -146,6 +255,26 @@ class AccountUpdate(BaseModel):
                 raise ValueError("Account name cannot be empty or only whitespace")
         return value
 
+    @field_validator("color_hex")
+    @classmethod
+    def validate_color_hex(cls, value: str | None) -> str | None:
+        """Validate hex color format if provided."""
+        if value is not None:
+            if not re.match(r"^#[0-9A-Fa-f]{6}$", value):
+                raise ValueError(
+                    "Color must be a valid hex code (e.g., #FF5733, #3498DB)"
+                )
+            return value.upper()
+        return value
+
+    @field_validator("icon_url")
+    @classmethod
+    def validate_icon_url(cls, value: HttpUrl | str | None) -> str | None:
+        """Convert HttpUrl to string if provided."""
+        if value is None:
+            return None
+        return str(value)
+
 
 class AccountResponse(AccountBase):
     """
@@ -153,15 +282,22 @@ class AccountResponse(AccountBase):
 
     Returns full account details including balances and metadata.
 
+    SECURITY NOTE: Full IBAN is NEVER returned (only last 4 digits).
+
     Attributes:
         id: Account UUID
         user_id: Owner's user ID
         account_name: Account name
         account_type: Account type
         currency: Currency code
+        bank_name: Bank institution name
+        notes: User notes
         opening_balance: Initial balance
         current_balance: Current calculated balance
         is_active: Active status
+        color_hex: Hex color code
+        icon_url: Icon URL
+        iban_last_four: Last 4 digits of IBAN (for display)
         created_at: Creation timestamp
         updated_at: Last update timestamp
     """
@@ -178,6 +314,13 @@ class AccountResponse(AccountBase):
         description="Whether account is active (inactive accounts hidden by default)"
     )
 
+    # Metadata fields
+    color_hex: str = Field(description="Hex color code for UI display")
+    icon_url: str | None = Field(description="URL to account icon")
+    iban_last_four: str | None = Field(
+        description="Last 4 digits of IBAN for display (never full IBAN)"
+    )
+
     created_at: datetime = Field(description="When account was created")
     updated_at: datetime = Field(description="When account was last updated")
 
@@ -189,7 +332,7 @@ class AccountListItem(BaseModel):
     Schema for account list item (optimized response).
 
     Lighter version of AccountResponse for list endpoints.
-    Excludes some fields for performance.
+    Includes visual metadata (color, icon, bank_name) for UI display.
 
     Attributes:
         id: Account UUID
@@ -198,6 +341,9 @@ class AccountListItem(BaseModel):
         currency: Currency code
         current_balance: Current balance
         is_active: Active status
+        color_hex: Hex color code
+        icon_url: Icon URL
+        bank_name: Bank name
         created_at: Creation timestamp
     """
 
@@ -207,6 +353,9 @@ class AccountListItem(BaseModel):
     currency: str
     current_balance: Decimal
     is_active: bool
+    color_hex: str
+    icon_url: str | None
+    bank_name: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

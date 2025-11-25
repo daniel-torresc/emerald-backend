@@ -256,7 +256,9 @@ class UserService:
             logger.warning(
                 f"User {current_user.id} attempted to list users without admin permission"
             )
-            raise InsufficientPermissionsError("Administrator privileges required to list users")
+            raise InsufficientPermissionsError(
+                "Administrator privileges required to list users"
+            )
 
         # Get filtered users
         users = await self.user_repo.filter_users(
@@ -340,7 +342,9 @@ class UserService:
             logger.warning(
                 f"User {current_user.id} attempted to deactivate user {user_id} without admin permission"
             )
-            raise InsufficientPermissionsError("Administrator privileges required to deactivate users")
+            raise InsufficientPermissionsError(
+                "Administrator privileges required to deactivate users"
+            )
 
         # Get user from database
         user = await self.user_repo.get_by_id(user_id)
@@ -409,7 +413,9 @@ class UserService:
             logger.warning(
                 f"User {current_user.id} attempted to delete user {user_id} without admin permission"
             )
-            raise InsufficientPermissionsError("Administrator privileges required to delete users")
+            raise InsufficientPermissionsError(
+                "Administrator privileges required to delete users"
+            )
 
         # Get user from database
         user = await self.user_repo.get_by_id(user_id)
@@ -421,7 +427,11 @@ class UserService:
         # Soft delete user
         old_values = {"deleted_at": None}
         deleted_user = await self.user_repo.soft_delete(user)
-        new_values = {"deleted_at": deleted_user.deleted_at.isoformat() if deleted_user.deleted_at else None}
+        new_values = {
+            "deleted_at": deleted_user.deleted_at.isoformat()
+            if deleted_user.deleted_at
+            else None
+        }
 
         # Revoke all refresh tokens
         await self.token_repo.revoke_user_tokens(user_id)

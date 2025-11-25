@@ -215,9 +215,7 @@ class PermissionService:
             if await permission_service.is_owner(user.id, account.id):
                 # User is owner, can delete account
         """
-        return await self.check_permission(
-            user_id, account_id, PermissionLevel.owner
-        )
+        return await self.check_permission(user_id, account_id, PermissionLevel.owner)
 
     async def can_read(
         self,
@@ -240,9 +238,7 @@ class PermissionService:
             if await permission_service.can_read(user.id, account.id):
                 # Show account details
         """
-        return await self.check_permission(
-            user_id, account_id, PermissionLevel.viewer
-        )
+        return await self.check_permission(user_id, account_id, PermissionLevel.viewer)
 
     async def can_write(
         self,
@@ -265,6 +261,4 @@ class PermissionService:
             if await permission_service.can_write(user.id, account.id):
                 # Allow account updates
         """
-        return await self.check_permission(
-            user_id, account_id, PermissionLevel.editor
-        )
+        return await self.check_permission(user_id, account_id, PermissionLevel.editor)

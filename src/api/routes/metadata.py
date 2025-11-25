@@ -53,9 +53,7 @@ async def get_account_types() -> AccountTypesResponse:
         }
     """
     logger.debug("Fetching account types metadata")
-    account_types = [
-        AccountTypeItem(**item) for item in AccountType.to_dict_list()
-    ]
+    account_types = [AccountTypeItem(**item) for item in AccountType.to_dict_list()]
     return AccountTypesResponse(account_types=account_types)
 
 

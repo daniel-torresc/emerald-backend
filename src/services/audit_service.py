@@ -164,7 +164,9 @@ class AuditService:
         """
         action = AuditAction.LOGIN if success else AuditAction.LOGIN_FAILED
         status = AuditStatus.SUCCESS if success else AuditStatus.FAILURE
-        description = "User logged in successfully" if success else "Login attempt failed"
+        description = (
+            "User logged in successfully" if success else "Login attempt failed"
+        )
 
         return await self.log_event(
             user_id=user_id,
@@ -298,7 +300,9 @@ class AuditService:
         """
         status = AuditStatus.SUCCESS if success else AuditStatus.FAILURE
         description = (
-            "Token refreshed successfully" if success else "Token refresh attempt failed"
+            "Token refreshed successfully"
+            if success
+            else "Token refresh attempt failed"
         )
 
         return await self.log_event(

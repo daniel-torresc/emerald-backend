@@ -28,6 +28,8 @@ $4
 
 ---
 
+Start by creating a new branch following best practices convention (feature/, /hotfix, /bug, etc.)
+
 ## Strategy by Size
 
 ### 🔹 XS/S Tasks (< 200 lines)

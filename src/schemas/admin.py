@@ -159,7 +159,9 @@ class AdminUserResponse(BaseModel):
     email: str = Field(description="Admin email address")
     full_name: str | None = Field(default=None, description="Admin full name")
     is_active: bool = Field(description="Whether admin account is active")
-    is_admin: bool = Field(description="Whether user has admin privileges (always true)")
+    is_admin: bool = Field(
+        description="Whether user has admin privileges (always true)"
+    )
     permissions: list[str] = Field(description="List of permission strings")
     created_at: datetime = Field(description="Account creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")

@@ -187,11 +187,10 @@ class BaseRepository(Generic[ModelType]):
             await user_repo.soft_delete(user)
         """
         if not hasattr(instance, "deleted_at"):
-            raise AttributeError(
-                f"{self.model.__name__} does not support soft delete"
-            )
+            raise AttributeError(f"{self.model.__name__} does not support soft delete")
 
         from datetime import UTC, datetime
+
         instance.deleted_at = datetime.now(UTC)
 
         await self.session.flush()

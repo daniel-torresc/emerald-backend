@@ -54,7 +54,7 @@ def generate_strong_password(length: int = 20) -> str:
         Random password with letters, digits, and special characters
     """
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+[]{}|;:,.<>?"
-    password = ''.join(secrets.choice(alphabet) for _ in range(length))
+    password = "".join(secrets.choice(alphabet) for _ in range(length))
 
     # Ensure password meets requirements
     has_upper = any(c.isupper() for c in password)
@@ -161,7 +161,8 @@ class AdminService:
             admin_role = await self.role_repo.create(
                 name="admin",
                 description="System Administrator with full access",
-                permissions=request.permissions or [
+                permissions=request.permissions
+                or [
                     "users:read:all",
                     "users:write:all",
                     "users:delete:all",
@@ -188,6 +189,7 @@ class AdminService:
 
         # Assign admin role using association table directly (avoid lazy-loading issues)
         from src.models.user import user_roles
+
         await self.session.execute(
             user_roles.insert().values(user_id=admin_user.id, role_id=admin_role.id)
         )
@@ -628,8 +630,11 @@ class AdminService:
             )
             # Add to user's roles
             from src.models.user import user_roles
+
             await self.session.execute(
-                user_roles.insert().values(user_id=user.id, role_id=user_specific_role.id)
+                user_roles.insert().values(
+                    user_id=user.id, role_id=user_specific_role.id
+                )
             )
         else:
             # Update existing user-specific role

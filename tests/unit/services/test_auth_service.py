@@ -6,7 +6,7 @@ All tests are fully mocked - no database or external dependencies.
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from jose import JWTError
@@ -49,8 +49,13 @@ def mock_token_repo():
 @pytest.fixture
 def auth_service(mock_session, mock_user_repo, mock_token_repo):
     """Create AuthService with mocked dependencies."""
-    with patch("src.services.auth_service.UserRepository", return_value=mock_user_repo), \
-         patch("src.services.auth_service.RefreshTokenRepository", return_value=mock_token_repo):
+    with (
+        patch("src.services.auth_service.UserRepository", return_value=mock_user_repo),
+        patch(
+            "src.services.auth_service.RefreshTokenRepository",
+            return_value=mock_token_repo,
+        ),
+    ):
         service = AuthService(mock_session)
     return service
 
@@ -208,7 +213,9 @@ class TestLogin:
         assert tokens.access_token == "access_token_123"
 
         mock_user_repo.get_by_email.assert_called_once_with("test@example.com")
-        mock_verify_password.assert_called_once_with("correct_password", sample_user.password_hash)
+        mock_verify_password.assert_called_once_with(
+            "correct_password", sample_user.password_hash
+        )
         mock_user_repo.update_last_login.assert_called_once_with(sample_user.id)
         mock_session.commit.assert_called()
 
@@ -612,7 +619,9 @@ class TestChangePassword:
         )
 
         # Verify
-        mock_verify_password.assert_called_once_with("OldP@ss123", original_password_hash)
+        mock_verify_password.assert_called_once_with(
+            "OldP@ss123", original_password_hash
+        )
         mock_hash_password.assert_called_once_with("NewP@ss456")
         assert sample_user.password_hash == "new_hashed_password"
         mock_token_repo.revoke_user_tokens.assert_called_once_with(sample_user.id)
@@ -651,7 +660,9 @@ class TestChangePassword:
         mock_verify_password.return_value = False
 
         # Execute & Verify
-        with pytest.raises(InvalidCredentialsError, match="Current password is incorrect"):
+        with pytest.raises(
+            InvalidCredentialsError, match="Current password is incorrect"
+        ):
             await auth_service.change_password(
                 user_id=sample_user.id,
                 current_password="wrong_password",

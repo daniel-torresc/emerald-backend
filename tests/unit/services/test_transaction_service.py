@@ -13,7 +13,7 @@ Tests:
 - Permission enforcement
 """
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -23,9 +23,8 @@ from src.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from src.models.enums import AccountType, PermissionLevel, TransactionType
+from src.models.enums import TransactionType
 from src.repositories.account_repository import AccountRepository
-from src.services.account_service import AccountService
 from src.services.transaction_service import TransactionService
 
 
@@ -33,7 +32,9 @@ from src.services.transaction_service import TransactionService
 class TestTransactionServiceCreate:
     """Test suite for TransactionService.create_transaction."""
 
-    async def test_create_transaction_success(self, db_session, test_user, test_account):
+    async def test_create_transaction_success(
+        self, db_session, test_user, test_account
+    ):
         """Test successful transaction creation."""
         service = TransactionService(db_session)
 
@@ -100,7 +101,9 @@ class TestTransactionServiceCreate:
 
         assert "currency" in str(exc_info.value).lower()
 
-    async def test_create_transaction_zero_amount(self, db_session, test_user, test_account):
+    async def test_create_transaction_zero_amount(
+        self, db_session, test_user, test_account
+    ):
         """Test that zero amount raises error."""
         service = TransactionService(db_session)
 
@@ -229,7 +232,9 @@ class TestTransactionServiceRead:
 class TestTransactionServiceUpdate:
     """Test suite for TransactionService.update_transaction."""
 
-    async def test_update_transaction_success(self, db_session, test_user, test_account):
+    async def test_update_transaction_success(
+        self, db_session, test_user, test_account
+    ):
         """Test successful transaction update."""
         service = TransactionService(db_session)
 
@@ -371,7 +376,9 @@ class TestTransactionServiceUpdate:
 class TestTransactionServiceDelete:
     """Test suite for TransactionService.delete_transaction."""
 
-    async def test_delete_transaction_success(self, db_session, test_user, test_account):
+    async def test_delete_transaction_success(
+        self, db_session, test_user, test_account
+    ):
         """Test successful transaction deletion."""
         service = TransactionService(db_session)
 
@@ -514,7 +521,10 @@ class TestTransactionServiceSplit:
                 transaction_id=parent.id,
                 splits=[
                     {"amount": Decimal("-30.00"), "description": "Split 1"},
-                    {"amount": Decimal("-15.00"), "description": "Split 2"},  # Only 45 total
+                    {
+                        "amount": Decimal("-15.00"),
+                        "description": "Split 2",
+                    },  # Only 45 total
                 ],
                 current_user=test_user,
             )
