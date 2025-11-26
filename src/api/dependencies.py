@@ -223,7 +223,7 @@ def get_auth_service(db: AsyncSession = Depends(get_db)):
         AuthService instance
 
     Usage:
-        @app.post("/api/v1/auth/login")
+        @app.post("/api/auth/login")
         async def login(
             auth_service: AuthService = Depends(get_auth_service)
         ):
