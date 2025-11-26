@@ -118,7 +118,7 @@ async def get_current_user(
 
     # Get user from database
     user_repo = UserRepository(db)
-    user = await user_repo.get_with_roles(user_id)
+    user = await user_repo.get_by_id(user_id)
 
     if not user:
         logger.warning(f"Authentication failed: user not found - {user_id}")
@@ -205,67 +205,6 @@ async def require_admin(
     return current_user
 
 
-def require_permission(permission: str):
-    """
-    Dependency factory to check for specific permissions.
-
-    This creates a dependency that verifies the user has a specific
-    permission based on their roles.
-
-    Permission format: resource:action[:scope]
-    Examples:
-    - "users:read:self" - Read own user data
-    - "users:read:all" - Read all users' data
-    - "transactions:write:all" - Write any transaction
-    - "audit_logs:read:all" - Read all audit logs
-
-    Args:
-        permission: Required permission string
-
-    Returns:
-        Dependency function that checks for the permission
-
-    Raises:
-        HTTPException (403): If user lacks the required permission
-
-    Usage:
-        @app.delete("/api/v1/users/{user_id}")
-        async def delete_user(
-            user_id: int,
-            current_user: User = Depends(require_permission("users:delete:all"))
-        ):
-            # Only users with "users:delete:all" permission can delete users
-            pass
-    """
-
-    async def _check_permission(
-        current_user: User = Depends(require_active_user),
-    ) -> User:
-        """Check if user has required permission."""
-        # Admin users have all permissions
-        if current_user.is_admin:
-            return current_user
-
-        # Check if user has the permission in any of their roles
-        user_permissions = set()
-        for role in current_user.roles:
-            if role.permissions:
-                user_permissions.update(role.permissions)
-
-        if permission not in user_permissions:
-            logger.warning(
-                f"Access denied: user {current_user.id} lacks permission '{permission}'"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission required: {permission}",
-            )
-
-        return current_user
-
-    return _check_permission
-
-
 # ============================================================================
 # Service Dependencies
 # ============================================================================
@@ -284,7 +223,7 @@ def get_auth_service(db: AsyncSession = Depends(get_db)):
         AuthService instance
 
     Usage:
-        @app.post("/api/v1/auth/login")
+        @app.post("/api/auth/login")
         async def login(
             auth_service: AuthService = Depends(get_auth_service)
         ):

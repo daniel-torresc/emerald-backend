@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions import (
     AlreadyExistsError,
+    AuthorizationError,
     EncryptionError,
     NotFoundError,
     ValidationError,

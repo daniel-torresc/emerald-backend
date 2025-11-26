@@ -412,7 +412,7 @@ async def test_account(test_engine, test_user):
         account = Account(
             user_id=test_user.id,
             account_name="Test Checking",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),

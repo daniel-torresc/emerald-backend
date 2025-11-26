@@ -44,7 +44,7 @@ class TestTransactionServiceCreate:
             amount=Decimal("-50.25"),
             currency="USD",
             description="Grocery shopping",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             merchant="Whole Foods",
             tags=["groceries", "food"],
             current_user=test_user,
@@ -74,7 +74,7 @@ class TestTransactionServiceCreate:
             amount=Decimal("-100.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -95,7 +95,7 @@ class TestTransactionServiceCreate:
                 amount=Decimal("-50.00"),
                 currency="EUR",  # Account is USD
                 description="Test",
-                transaction_type=TransactionType.debit,
+                transaction_type=TransactionType.expense,
                 current_user=test_user,
             )
 
@@ -114,7 +114,7 @@ class TestTransactionServiceCreate:
                 amount=Decimal("0.00"),
                 currency="USD",
                 description="Test",
-                transaction_type=TransactionType.debit,
+                transaction_type=TransactionType.expense,
                 current_user=test_user,
             )
 
@@ -134,7 +134,7 @@ class TestTransactionServiceCreate:
                 amount=Decimal("-50.00"),
                 currency="USD",
                 description="Test",
-                transaction_type=TransactionType.debit,
+                transaction_type=TransactionType.expense,
                 current_user=admin_user,  # Different user
             )
 
@@ -154,7 +154,7 @@ class TestTransactionServiceRead:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -186,7 +186,7 @@ class TestTransactionServiceRead:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -213,7 +213,7 @@ class TestTransactionServiceRead:
                 currency="USD",
                 description="Test",
                 transaction_type=(
-                    TransactionType.credit if amount > 0 else TransactionType.debit
+                    TransactionType.income if amount > 0 else TransactionType.expense
                 ),
                 current_user=test_user,
             )
@@ -222,7 +222,7 @@ class TestTransactionServiceRead:
         results, total = await service.search_transactions(
             account_id=test_account.id,
             current_user=test_user,
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
         )
 
         assert total == 3  # Three debit transactions
@@ -245,7 +245,7 @@ class TestTransactionServiceUpdate:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Original",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -277,7 +277,7 @@ class TestTransactionServiceUpdate:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -309,7 +309,7 @@ class TestTransactionServiceUpdate:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -359,7 +359,7 @@ class TestTransactionServiceUpdate:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -389,7 +389,7 @@ class TestTransactionServiceDelete:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -419,7 +419,7 @@ class TestTransactionServiceDelete:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -443,7 +443,7 @@ class TestTransactionServiceDelete:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -480,7 +480,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -511,7 +511,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -544,7 +544,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -573,7 +573,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -610,7 +610,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Parent",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -645,7 +645,7 @@ class TestTransactionServiceSplit:
             amount=Decimal("-50.00"),
             currency="USD",
             description="No splits",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -671,7 +671,7 @@ class TestTransactionServiceTags:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 
@@ -691,7 +691,7 @@ class TestTransactionServiceTags:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             tags=["groceries"],
             current_user=test_user,
         )
@@ -714,7 +714,7 @@ class TestTransactionServiceTags:
             amount=Decimal("-50.00"),
             currency="USD",
             description="Test",
-            transaction_type=TransactionType.debit,
+            transaction_type=TransactionType.expense,
             current_user=test_user,
         )
 

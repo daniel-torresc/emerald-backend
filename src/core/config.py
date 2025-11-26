@@ -141,22 +141,6 @@ class Settings(BaseSettings):
     superadmin_full_name: str = Field(
         description="Initial superuser full name (used during database migration)"
     )
-    superadmin_permissions: List[str] = Field(
-        default=[
-            "users:read:all",
-            "users:write:all",
-            "users:delete:all",
-            "accounts:read:all",
-            "accounts:write:all",
-            "accounts:delete:all",
-            "transactions:read:all",
-            "transactions:write:all",
-            "transactions:delete:all",
-            "audit_logs:read:all",
-            "admin:manage:all",
-        ],
-        description="Initial superuser permissions (default: full access)",
-    )
 
     # -------------------------------------------------------------------------
     # Testing Configuration

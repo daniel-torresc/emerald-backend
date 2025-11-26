@@ -24,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.api.routes import (
     account_shares,
     accounts,
-    admin,
     audit_logs,
     auth,
     health,
@@ -286,7 +285,6 @@ v1_router.include_router(users.router)
 v1_router.include_router(accounts.router)
 v1_router.include_router(account_shares.router)
 v1_router.include_router(transactions.router)
-v1_router.include_router(admin.router)
 
 # Create API Router
 api_router = APIRouter(prefix="/api")

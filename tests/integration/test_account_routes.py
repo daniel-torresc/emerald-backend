@@ -62,7 +62,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Credit Card",
-                "account_type": "credit_card",
+                "account_type": "other",
                 "currency": "USD",
                 "opening_balance": "-500.00",
             },
@@ -209,7 +209,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Credit Card",
-                "account_type": "credit_card",
+                "account_type": "other",
                 "currency": "USD",
                 "opening_balance": "-500.00",
             },

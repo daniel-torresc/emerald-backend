@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/health", tags=["Health"])
 
 
-@router.get("/")
+@router.get("")
 async def health_check() -> dict[str, str]:
     """
     Basic health check endpoint.

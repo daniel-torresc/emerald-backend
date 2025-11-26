@@ -11,7 +11,7 @@ from src.models.base import Base
 from src.models.enums import AccountType, PermissionLevel
 from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 from src.models.refresh_token import RefreshToken
-from src.models.user import Role, User, user_roles
+from src.models.user import User
 
 __all__ = [
     # Base
@@ -22,8 +22,6 @@ __all__ = [
     "AuditFieldsMixin",
     # User models
     "User",
-    "Role",
-    "user_roles",
     # Token models
     "RefreshToken",
     # Audit models

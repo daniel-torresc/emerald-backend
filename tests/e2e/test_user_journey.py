@@ -105,7 +105,7 @@ async def test_complete_user_journey(async_client: AsyncClient):
             "currency": "USD",
             "description": "Monthly Salary",
             "merchant": "ACME Corp",
-            "transaction_type": "credit",
+            "transaction_type": "income",
             "tags": ["income", "salary"],
         },
     )
@@ -123,7 +123,7 @@ async def test_complete_user_journey(async_client: AsyncClient):
             "currency": "USD",
             "description": "Grocery Shopping",
             "merchant": "Whole Foods",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
             "tags": ["groceries", "food"],
         },
     )
@@ -262,7 +262,7 @@ async def test_new_user_creates_multiple_accounts_and_transactions(
                 "amount": f"-{10 + i * 5}.00",
                 "currency": "USD",
                 "description": f"Checking Expense {i + 1}",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
             },
         )
 
@@ -275,7 +275,7 @@ async def test_new_user_creates_multiple_accounts_and_transactions(
             "amount": "100.00",
             "currency": "USD",
             "description": "Interest Payment",
-            "transaction_type": "credit",
+            "transaction_type": "income",
         },
     )
 
@@ -387,7 +387,7 @@ async def test_transaction_tag_management_workflow(async_client: AsyncClient):
             "amount": "-50.00",
             "currency": "USD",
             "description": "Restaurant",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
             "tags": ["food", "dining"],
         },
     )
@@ -471,7 +471,7 @@ async def test_transaction_split_and_join_workflow(async_client: AsyncClient):
             "amount": "-100.00",
             "currency": "USD",
             "description": "Shopping",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     txn_id = txn_response.json()["id"]

@@ -126,8 +126,6 @@ def upgrade() -> None:
         "DELETE",
         "PERMISSION_GRANT",
         "PERMISSION_REVOKE",
-        "ROLE_ASSIGN",
-        "ROLE_REMOVE",
         "ACCOUNT_ACTIVATE",
         "ACCOUNT_DEACTIVATE",
         "ACCOUNT_LOCK",

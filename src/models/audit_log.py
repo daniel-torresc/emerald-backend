@@ -49,8 +49,6 @@ class AuditAction(str, enum.Enum):
     # Authorization actions
     PERMISSION_GRANT = "PERMISSION_GRANT"
     PERMISSION_REVOKE = "PERMISSION_REVOKE"
-    ROLE_ASSIGN = "ROLE_ASSIGN"
-    ROLE_REMOVE = "ROLE_REMOVE"
 
     # Administrative actions
     ACCOUNT_ACTIVATE = "ACCOUNT_ACTIVATE"

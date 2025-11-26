@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Emerald Finance Platform - Backend**: A production-ready FastAPI backend for personal finance management with comprehensive authentication, audit logging, and role-based access control.
+**Emerald Finance Platform - Backend**: A production-ready FastAPI backend for personal finance management with comprehensive authentication, audit logging, and admin-based access control.
 
 **Tech Stack:**
 - Python 3.13+, FastAPI 0.115+, SQLAlchemy 2.0 (async), PostgreSQL 16+, Redis 7+, Alembic
@@ -187,7 +187,7 @@ class UserRepository(BaseRepository[User]):
 FastAPI dependencies in `src/api/dependencies.py`:
 - `get_db()`: Provides async database session
 - `get_current_user()`: Validates JWT and returns authenticated user
-- `get_current_admin()`: Enforces admin role requirement
+- `get_current_admin()`: Enforces admin requirement (checks `is_admin` flag)
 - `get_<service_name>()`: Factory functions for service instances
 
 **Example:**

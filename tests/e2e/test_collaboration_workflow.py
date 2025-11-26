@@ -117,7 +117,7 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
             "amount": "-200.00",
             "currency": "USD",
             "description": "User B transaction",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     assert txn_response.status_code == 201
@@ -183,7 +183,7 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
             "amount": "-50.00",
             "currency": "USD",
             "description": "User C transaction",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     assert txn_c_response.status_code == 403
@@ -281,7 +281,7 @@ async def test_permission_downgrade_workflow(async_client: AsyncClient):
             "amount": "-50.00",
             "currency": "USD",
             "description": "Editor transaction",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     assert txn1_response.status_code == 201
@@ -303,7 +303,7 @@ async def test_permission_downgrade_workflow(async_client: AsyncClient):
             "amount": "-25.00",
             "currency": "USD",
             "description": "Should fail",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     assert txn2_response.status_code == 403
@@ -372,7 +372,7 @@ async def test_shared_account_transaction_visibility(async_client: AsyncClient):
                 "amount": f"-{(i + 1) * 10}.00",
                 "currency": "USD",
                 "description": f"Transaction {i + 1}",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
             },
         )
 

@@ -30,7 +30,7 @@ class TestAccountRepository:
         account = await repo.create(
             user_id=test_user.id,
             account_name="Test Savings",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
@@ -41,7 +41,7 @@ class TestAccountRepository:
 
         assert account.id is not None
         assert account.account_name == "Test Savings"
-        assert account.account_type == AccountType.SAVINGS
+        assert account.account_type == AccountType.savings
         assert account.currency == "USD"
         assert account.opening_balance == Decimal("1000.00")
         assert account.current_balance == Decimal("1000.00")
@@ -56,7 +56,7 @@ class TestAccountRepository:
         created = await repo.create(
             user_id=test_user.id,
             account_name="Test Account",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("500.00"),
             current_balance=Decimal("500.00"),
@@ -80,7 +80,7 @@ class TestAccountRepository:
         await repo.create(
             user_id=test_user.id,
             account_name="Savings",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
@@ -115,7 +115,7 @@ class TestAccountRepository:
         await repo.create(
             user_id=test_user.id,
             account_name="Active Savings",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
@@ -127,7 +127,7 @@ class TestAccountRepository:
         await repo.create(
             user_id=test_user.id,
             account_name="Inactive Savings",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("500.00"),
             current_balance=Decimal("500.00"),
@@ -155,14 +155,14 @@ class TestAccountRepository:
 
         # Filter by account_type=SAVINGS
         savings_accounts = await repo.get_by_user(
-            user_id=test_user.id, account_type=AccountType.SAVINGS
+            user_id=test_user.id, account_type=AccountType.savings
         )
         assert len(savings_accounts) == 2
-        assert all(acc.account_type == AccountType.SAVINGS for acc in savings_accounts)
+        assert all(acc.account_type == AccountType.savings for acc in savings_accounts)
 
         # Filter by both
         active_savings = await repo.get_by_user(
-            user_id=test_user.id, is_active=True, account_type=AccountType.SAVINGS
+            user_id=test_user.id, is_active=True, account_type=AccountType.savings
         )
         assert len(active_savings) == 1
         assert active_savings[0].account_name == "Active Savings"
@@ -176,7 +176,7 @@ class TestAccountRepository:
             await repo.create(
                 user_id=test_user.id,
                 account_name=f"Account {i}",
-                account_type=AccountType.SAVINGS,
+                account_type=AccountType.savings,
                 currency="USD",
                 opening_balance=Decimal("100.00"),
                 current_balance=Decimal("100.00"),
@@ -205,7 +205,7 @@ class TestAccountRepository:
         await repo.create(
             user_id=test_user.id,
             account_name="My Savings",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
@@ -242,7 +242,7 @@ class TestAccountRepository:
         await repo.create(
             user_id=test_user.id,
             account_name="Existing Account",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
@@ -277,7 +277,7 @@ class TestAccountRepository:
         account1 = await repo.create(
             user_id=test_user.id,
             account_name="Account One",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
@@ -289,7 +289,7 @@ class TestAccountRepository:
         await repo.create(
             user_id=test_user.id,
             account_name="Account Two",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("2000.00"),
             current_balance=Decimal("2000.00"),
@@ -323,7 +323,7 @@ class TestAccountRepository:
             await repo.create(
                 user_id=test_user.id,
                 account_name=f"Active {i}",
-                account_type=AccountType.SAVINGS,
+                account_type=AccountType.savings,
                 currency="USD",
                 opening_balance=Decimal("100.00"),
                 current_balance=Decimal("100.00"),
@@ -336,7 +336,7 @@ class TestAccountRepository:
         await repo.create(
             user_id=test_user.id,
             account_name="Inactive",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("100.00"),
             current_balance=Decimal("100.00"),
@@ -365,7 +365,7 @@ class TestAccountRepository:
         account = await repo.create(
             user_id=test_user.id,
             account_name="To Delete",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),

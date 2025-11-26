@@ -13,21 +13,22 @@ Prerequisites:
   * PostgreSQL pg_trgm extension for fuzzy text search
 
 Tables Created:
-- roles: User roles and permissions
-- users: User accounts and authentication
+- users: User accounts and authentication (with is_admin flag)
 - audit_logs: Complete audit trail
 - refresh_tokens: JWT token management
-- user_roles: User-role associations
 - accounts: Financial accounts
 - account_shares: Shared account permissions
 - transactions: Financial transactions
 - transaction_tags: Transaction categorization
 
 This consolidates migrations from:
-- f13dbedae659_initial_migration (users, roles, audit, tokens)
+- f13dbedae659_initial_migration (users, audit, tokens)
 - 7cd3ac786069_add_admin_support (admin flags, bootstrap)
 - 5ed7d2606ef9_create_accounts (accounts, shares)
 - 1d78ffc27a9c_create_transactions (transactions, tags)
+
+Note: Role-based authorization has been removed. Admin access is controlled
+via the is_admin boolean flag on the users table.
 """
 
 from typing import Sequence, Union
@@ -54,49 +55,20 @@ def upgrade() -> None:
     Creates complete database schema from scratch.
 
     This consolidates migrations from:
-    - f13dbedae659_initial_migration (users, roles, audit, tokens)
+    - f13dbedae659_initial_migration (users, audit, tokens)
     - 7cd3ac786069_add_admin_support (admin flags, bootstrap)
     - 5ed7d2606ef9_create_accounts (accounts, shares)
     - 1d78ffc27a9c_create_transactions (transactions, tags)
 
     Note: This migration depends on 9cfdc3051d85_create_enums_and_extensions
     which creates all required enum types and PostgreSQL extensions.
+
+    Role-based authorization has been removed - admin access is controlled
+    via the is_admin boolean flag on users.
     """
     # =========================================================================
     # STEP 1: Create Base Tables (no dependencies)
     # =========================================================================
-
-    # roles table
-    op.create_table(
-        "roles",
-        sa.Column("name", sa.String(length=50), nullable=False),
-        sa.Column("description", sa.String(length=255), nullable=True),
-        sa.Column(
-            "permissions", postgresql.JSONB(astext_type=sa.Text()), nullable=False
-        ),
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            nullable=False,
-            server_default=sa.text("gen_random_uuid()"),
-        ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-            onupdate=sa.func.now(),
-        ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_roles")),
-    )
-    op.create_index(op.f("ix_roles_created_at"), "roles", ["created_at"], unique=False)
-    op.create_index(op.f("ix_roles_name"), "roles", ["name"], unique=True)
 
     # users table
     op.create_table(
@@ -351,39 +323,6 @@ def upgrade() -> None:
         "refresh_tokens",
         ["user_id", "is_revoked", "expires_at"],
         unique=False,
-    )
-
-    # user_roles table
-    op.create_table(
-        "user_roles",
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("role_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            "assigned_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-        ),
-        sa.Column("assigned_by", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["assigned_by"],
-            ["users.id"],
-            name=op.f("fk_user_roles_assigned_by_users"),
-            ondelete="SET NULL",
-        ),
-        sa.ForeignKeyConstraint(
-            ["role_id"],
-            ["roles.id"],
-            name=op.f("fk_user_roles_role_id_roles"),
-            ondelete="CASCADE",
-        ),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["users.id"],
-            name=op.f("fk_user_roles_user_id_users"),
-            ondelete="CASCADE",
-        ),
-        sa.PrimaryKeyConstraint("user_id", "role_id", name=op.f("pk_user_roles")),
     )
 
     # =========================================================================
@@ -838,7 +777,6 @@ def upgrade() -> None:
         email = settings.superadmin_email
         password = settings.superadmin_password
         full_name = settings.superadmin_full_name
-        permissions = settings.superadmin_permissions
 
         # Validate uniqueness (username and email)
         result = bind.execute(
@@ -888,45 +826,6 @@ def upgrade() -> None:
                 "created_at": now,
                 "updated_at": now,
                 "deleted_at": None,
-            },
-        )
-
-        # Create or get admin role
-        result = bind.execute(sa.text("SELECT id FROM roles WHERE name = 'admin'"))
-        admin_role = result.first()
-
-        if admin_role:
-            role_id = admin_role[0]
-        else:
-            role_id = uuid.uuid4()
-            # Convert permissions list to JSON string for PostgreSQL JSONB
-            permissions_json = json.dumps(permissions)
-
-            bind.execute(
-                sa.text(
-                    "INSERT INTO roles (id, name, description, permissions, created_at, updated_at) "
-                    "VALUES (:id, :name, :description, CAST(:permissions AS jsonb), :created_at, :updated_at)"
-                ),
-                {
-                    "id": str(role_id),
-                    "name": "admin",
-                    "description": "System Administrator with full access",
-                    "permissions": permissions_json,
-                    "created_at": now,
-                    "updated_at": now,
-                },
-            )
-
-        # Link user to admin role
-        bind.execute(
-            sa.text(
-                "INSERT INTO user_roles (user_id, role_id, assigned_at) "
-                "VALUES (:user_id, :role_id, :assigned_at)"
-            ),
-            {
-                "user_id": str(user_id),
-                "role_id": str(role_id),
-                "assigned_at": now,
             },
         )
 
@@ -1019,8 +918,6 @@ def downgrade() -> None:
     op.drop_table("transactions")
     op.drop_table("account_shares")
     op.drop_table("accounts")
-    op.drop_table("user_roles")
     op.drop_table("refresh_tokens")
     op.drop_table("audit_logs")
     op.drop_table("users")
-    op.drop_table("roles")

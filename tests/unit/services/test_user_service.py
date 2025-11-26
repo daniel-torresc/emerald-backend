@@ -117,7 +117,7 @@ class TestGetUserProfile:
     ):
         """Test user viewing their own profile."""
         # Setup
-        mock_user_repo.get_with_roles.return_value = regular_user
+        mock_user_repo.get_by_id.return_value = regular_user
 
         # Execute
         result = await user_service.get_user_profile(
@@ -127,7 +127,7 @@ class TestGetUserProfile:
 
         # Verify
         assert result.id == regular_user.id
-        mock_user_repo.get_with_roles.assert_called_once_with(regular_user.id)
+        mock_user_repo.get_by_id.assert_called_once_with(regular_user.id)
         # Should not log audit event when viewing own profile
         mock_audit_service.log_event.assert_not_called()
 
@@ -142,7 +142,7 @@ class TestGetUserProfile:
     ):
         """Test admin viewing another user's profile."""
         # Setup
-        mock_user_repo.get_with_roles.return_value = regular_user
+        mock_user_repo.get_by_id.return_value = regular_user
 
         # Execute
         result = await user_service.get_user_profile(
@@ -185,7 +185,7 @@ class TestGetUserProfile:
     ):
         """Test viewing profile of non-existent user."""
         # Setup
-        mock_user_repo.get_with_roles.return_value = None
+        mock_user_repo.get_by_id.return_value = None
 
         # Execute & Verify
         with pytest.raises(NotFoundError):
@@ -445,8 +445,8 @@ class TestListUsers:
 
         # Verify
         call_args = mock_user_repo.filter_users.call_args[1]
-        assert call_args["is_active"] == True
-        assert call_args["is_admin"] == False
+        assert call_args["is_active"]
+        assert not call_args["is_admin"]
         assert call_args["search"] == "john"
 
     @pytest.mark.asyncio
