@@ -391,7 +391,6 @@ class TestAccountService:
             current_user=test_user,
         )
 
-        original_updated_at = account.updated_at
 
         # Update with no changes
         updated = await service.update_account(

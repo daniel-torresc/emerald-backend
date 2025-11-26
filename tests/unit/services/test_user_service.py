@@ -445,8 +445,8 @@ class TestListUsers:
 
         # Verify
         call_args = mock_user_repo.filter_users.call_args[1]
-        assert call_args["is_active"] == True
-        assert call_args["is_admin"] == False
+        assert call_args["is_active"]
+        assert not call_args["is_admin"]
         assert call_args["search"] == "john"
 
     @pytest.mark.asyncio

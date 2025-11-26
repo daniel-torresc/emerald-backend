@@ -96,7 +96,7 @@ class UserService:
             )
 
         # Get user from database
-        user = await self.user_repo.get_with_roles(user_id)
+        user = await self.user_repo.get_by_id(user_id)
 
         if not user:
             logger.warning(f"User {user_id} not found")

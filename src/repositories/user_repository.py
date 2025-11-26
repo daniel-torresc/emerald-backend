@@ -10,7 +10,6 @@ import uuid
 from pydantic import EmailStr
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from src.models.user import User
 from src.repositories.base import BaseRepository
@@ -54,9 +53,7 @@ class UserRepository(BaseRepository[User]):
             if user is None:
                 raise InvalidCredentialsError()
         """
-        query = (
-            select(User).where(User.email == email).options(selectinload(User.roles))
-        )
+        query = select(User).where(User.email == email)
         query = self._apply_soft_delete_filter(query)
 
         result = await self.session.execute(query)
@@ -78,38 +75,7 @@ class UserRepository(BaseRepository[User]):
         Example:
             user = await user_repo.get_by_username("johndoe")
         """
-        query = (
-            select(User)
-            .where(User.username == username)
-            .options(selectinload(User.roles))
-        )
-        query = self._apply_soft_delete_filter(query)
-
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
-
-    async def get_with_roles(self, user_id: uuid.UUID) -> User | None:
-        """
-        Get user by ID with roles eager loaded.
-
-        Useful when you need to check permissions immediately after
-        fetching the user.
-
-        Args:
-            user_id: UUID of the user
-
-        Returns:
-            User instance with roles loaded, or None if not found
-
-        Example:
-            user = await user_repo.get_with_roles(user_id)
-            if user is None:
-                raise NotFoundError("User")
-
-            # Roles are already loaded, no additional query
-            permissions = [perm for role in user.roles for perm in role.permissions]
-        """
-        query = select(User).where(User.id == user_id).options(selectinload(User.roles))
+        query = select(User).where(User.username == username)
         query = self._apply_soft_delete_filter(query)
 
         result = await self.session.execute(query)
@@ -170,7 +136,7 @@ class UserRepository(BaseRepository[User]):
                 limit=20
             )
         """
-        query = select(User).options(selectinload(User.roles))
+        query = select(User)
         query = self._apply_soft_delete_filter(query)
 
         # Apply search filter

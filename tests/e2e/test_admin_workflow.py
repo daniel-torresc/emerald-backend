@@ -13,10 +13,8 @@ These tests validate that administrative operations work correctly
 and that security/audit features function as expected.
 """
 
-
 import pytest
 from httpx import AsyncClient
-
 
 
 @pytest.mark.asyncio
@@ -71,7 +69,7 @@ async def test_complete_admin_workflow(async_client: AsyncClient, test_engine):
         },
     )
     assert second_admin_login.status_code == 200
-    second_admin_headers = {
+    {
         "Authorization": f"Bearer {second_admin_login.json()['access_token']}"
     }
     print("✓ Step 4: Second admin authenticated successfully")

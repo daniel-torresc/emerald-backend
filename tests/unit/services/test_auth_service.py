@@ -738,7 +738,7 @@ class TestGenerateTokens:
         mock_hash_refresh.return_value = "refresh_hash"
 
         # Execute
-        tokens = await auth_service._generate_tokens(
+        await auth_service._generate_tokens(
             user=sample_user,
             token_family_id=existing_family_id,
         )
