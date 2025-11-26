@@ -118,7 +118,7 @@ async def get_current_user(
 
     # Get user from database
     user_repo = UserRepository(db)
-    user = await user_repo.get_with_roles(user_id)
+    user = await user_repo.get_by_id(user_id)
 
     if not user:
         logger.warning(f"Authentication failed: user not found - {user_id}")
