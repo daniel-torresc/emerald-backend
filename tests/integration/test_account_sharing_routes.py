@@ -787,7 +787,7 @@ async def test_shared_viewer_cannot_create_transaction(
         f"/api/v1/accounts/{test_account.id}/transactions",
         json={
             "amount": "100.00",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
             "description": "Test transaction",
             "currency": "USD",
             "transaction_date": "2025-11-10",

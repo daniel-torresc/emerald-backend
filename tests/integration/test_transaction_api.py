@@ -35,7 +35,7 @@ class TestTransactionAPI:
                 "currency": "USD",
                 "description": "Grocery shopping",
                 "merchant": "Whole Foods",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
                 "tags": ["groceries", "food"],
             },
         )
@@ -61,7 +61,7 @@ class TestTransactionAPI:
                     "amount": f"-{10 + i}.00",
                     "currency": "USD",
                     "description": f"Transaction {i}",
-                    "transaction_type": "debit",
+                    "transaction_type": "expense",
                 },
             )
 
@@ -89,7 +89,7 @@ class TestTransactionAPI:
                 "amount": "-25.00",
                 "currency": "USD",
                 "description": "Test transaction",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
             },
         )
 
@@ -119,7 +119,7 @@ class TestTransactionAPI:
                 "amount": "-25.00",
                 "currency": "USD",
                 "description": "Original",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
             },
         )
 
@@ -153,7 +153,7 @@ class TestTransactionAPI:
                 "amount": "-25.00",
                 "currency": "USD",
                 "description": "To delete",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
             },
         )
 
@@ -188,7 +188,7 @@ class TestTransactionAPI:
                 "amount": "-50.00",
                 "currency": "USD",
                 "description": "Shopping",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
             },
         )
 
@@ -224,7 +224,7 @@ class TestTransactionAPI:
                 "amount": "-50.00",
                 "currency": "USD",
                 "description": "Shopping",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
             },
         )
 
@@ -264,7 +264,7 @@ class TestTransactionAPI:
                 "amount": "-25.00",
                 "currency": "USD",
                 "description": "Transaction",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
             },
         )
 
@@ -294,7 +294,7 @@ class TestTransactionAPI:
                 "amount": "-25.00",
                 "currency": "USD",
                 "description": "Transaction",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
                 "tags": ["groceries"],
             },
         )
@@ -330,7 +330,7 @@ class TestTransactionAPI:
                 "amount": "-25.00",
                 "currency": "USD",
                 "description": "Transaction",
-                "transaction_type": "debit",
+                "transaction_type": "expense",
             },
         )
 
@@ -408,7 +408,7 @@ async def test_viewer_cannot_create_transaction(
             "amount": "-25.00",
             "currency": "USD",
             "description": "Test",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
 
@@ -438,7 +438,7 @@ async def test_viewer_cannot_update_transaction(
             "amount": "-25.00",
             "currency": "USD",
             "description": "Original",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     transaction_id = create_response.json()["id"]
@@ -512,7 +512,7 @@ async def test_viewer_cannot_delete_transaction(
             "amount": "-25.00",
             "currency": "USD",
             "description": "To delete",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     transaction_id = create_response.json()["id"]
@@ -620,7 +620,7 @@ async def test_editor_can_create_transaction(
             "amount": "-25.00",
             "currency": "USD",
             "description": "Editor transaction",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
 
@@ -645,7 +645,7 @@ async def test_owner_has_full_access(
             "amount": "-25.00",
             "currency": "USD",
             "description": "Owner transaction",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     assert create_response.status_code == 201
@@ -692,7 +692,7 @@ async def test_cannot_create_transaction_with_wrong_currency(
             "amount": "-25.00",
             "currency": "EUR",  # Account is USD
             "description": "Wrong currency",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
 
@@ -714,7 +714,7 @@ async def test_cannot_create_transaction_with_zero_amount(
             "amount": "0.00",
             "currency": "USD",
             "description": "Zero amount",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
 
@@ -737,7 +737,7 @@ async def test_split_transaction_maintains_balance(
             "amount": "-50.00",
             "currency": "USD",
             "description": "Shopping",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     transaction_id = create_response.json()["id"]
@@ -774,7 +774,7 @@ async def test_cannot_split_already_split_transaction(
             "amount": "-50.00",
             "currency": "USD",
             "description": "Shopping",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     transaction_id = create_response.json()["id"]
@@ -883,7 +883,7 @@ async def test_cannot_create_transaction_in_non_member_account(
             "amount": "-25.00",
             "currency": "USD",
             "description": "Unauthorized transaction",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
 
@@ -911,7 +911,7 @@ async def test_cannot_access_another_users_transaction(
             "amount": "-25.00",
             "currency": "USD",
             "description": "Test transaction",
-            "transaction_type": "debit",
+            "transaction_type": "expense",
         },
     )
     transaction_id = create_response.json()["id"]
