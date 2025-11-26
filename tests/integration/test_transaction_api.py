@@ -842,7 +842,7 @@ async def test_cannot_create_transaction_in_non_member_account(
         other_account = Account(
             user_id=other_user.id,
             account_name="Other Account",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),

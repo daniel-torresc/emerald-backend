@@ -106,7 +106,7 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             update(RefreshToken)
             .where(
                 RefreshToken.user_id == user_id,
-                not RefreshToken.is_revoked,
+                ~RefreshToken.is_revoked,
             )
             .values(
                 is_revoked=True,
@@ -143,7 +143,7 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             update(RefreshToken)
             .where(
                 RefreshToken.token_family_id == token_family_id,
-                not RefreshToken.is_revoked,
+                ~RefreshToken.is_revoked,
             )
             .values(
                 is_revoked=True,
@@ -208,7 +208,7 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             select(RefreshToken)
             .where(
                 RefreshToken.user_id == user_id,
-                not RefreshToken.is_revoked,
+                ~RefreshToken.is_revoked,
                 RefreshToken.expires_at > datetime.now(UTC),
             )
             .order_by(RefreshToken.created_at.desc())

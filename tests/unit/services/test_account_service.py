@@ -31,7 +31,7 @@ class TestAccountService:
         account = await service.create_account(
             user_id=test_user.id,
             account_name="My Checking",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1500.00"),
             current_user=test_user,
@@ -40,7 +40,7 @@ class TestAccountService:
         assert account.id is not None
         assert account.user_id == test_user.id
         assert account.account_name == "My Checking"
-        assert account.account_type == AccountType.SAVINGS
+        assert account.account_type == AccountType.savings
         assert account.currency == "USD"
         assert account.opening_balance == Decimal("1500.00")
         assert account.current_balance == Decimal("1500.00")
@@ -56,7 +56,7 @@ class TestAccountService:
         await service.create_account(
             user_id=test_user.id,
             account_name="Savings",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -67,7 +67,7 @@ class TestAccountService:
             await service.create_account(
                 user_id=test_user.id,
                 account_name="savings",  # Different case
-                account_type=AccountType.SAVINGS,
+                account_type=AccountType.savings,
                 currency="USD",
                 opening_balance=Decimal("2000.00"),
                 current_user=test_user,
@@ -87,7 +87,7 @@ class TestAccountService:
                 await service.create_account(
                     user_id=test_user.id,
                     account_name=f"Account {invalid_currency}",
-                    account_type=AccountType.SAVINGS,
+                    account_type=AccountType.savings,
                     currency=invalid_currency,
                     opening_balance=Decimal("1000.00"),
                     current_user=test_user,
@@ -119,7 +119,7 @@ class TestAccountService:
         created = await service.create_account(
             user_id=test_user.id,
             account_name="Test Account",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="EUR",
             opening_balance=Decimal("2000.00"),
             current_user=test_user,
@@ -142,7 +142,7 @@ class TestAccountService:
         created = await service.create_account(
             user_id=test_user.id,
             account_name="Private Account",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -178,7 +178,7 @@ class TestAccountService:
             await service.create_account(
                 user_id=test_user.id,
                 account_name=f"Account {i}",
-                account_type=AccountType.SAVINGS,
+                account_type=AccountType.savings,
                 currency="USD",
                 opening_balance=Decimal("1000.00"),
                 current_user=test_user,
@@ -200,7 +200,7 @@ class TestAccountService:
         account1 = await service.create_account(
             user_id=test_user.id,
             account_name="Active Savings",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -249,7 +249,7 @@ class TestAccountService:
             await service.create_account(
                 user_id=test_user.id,
                 account_name=f"Account {i}",
-                account_type=AccountType.SAVINGS,
+                account_type=AccountType.savings,
                 currency="USD",
                 opening_balance=Decimal("100.00"),
                 current_user=test_user,
@@ -281,7 +281,7 @@ class TestAccountService:
         await service.create_account(
             user_id=test_user.id,
             account_name="Test",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("100.00"),
             current_user=test_user,
@@ -305,7 +305,7 @@ class TestAccountService:
         account = await service.create_account(
             user_id=test_user.id,
             account_name="Old Name",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -329,7 +329,7 @@ class TestAccountService:
         account = await service.create_account(
             user_id=test_user.id,
             account_name="Test",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -354,7 +354,7 @@ class TestAccountService:
         account1 = await service.create_account(
             user_id=test_user.id,
             account_name="Account One",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -363,7 +363,7 @@ class TestAccountService:
         await service.create_account(
             user_id=test_user.id,
             account_name="Account Two",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("2000.00"),
             current_user=test_user,
@@ -385,7 +385,7 @@ class TestAccountService:
         account = await service.create_account(
             user_id=test_user.id,
             account_name="Test",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -410,7 +410,7 @@ class TestAccountService:
         account = await service.create_account(
             user_id=test_user.id,
             account_name="To Delete",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -444,7 +444,7 @@ class TestAccountService:
         account = await service.create_account(
             user_id=test_user.id,
             account_name="Test",
-            account_type=AccountType.SAVINGS,
+            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -473,7 +473,7 @@ class TestAccountService:
             await service.create_account(
                 user_id=test_user.id,
                 account_name=f"Account {i}",
-                account_type=AccountType.SAVINGS,
+                account_type=AccountType.savings,
                 currency="USD",
                 opening_balance=Decimal("100.00"),
                 current_user=test_user,
