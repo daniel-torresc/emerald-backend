@@ -7,15 +7,6 @@ This package provides all Pydantic models used for:
 - API documentation
 """
 
-from src.schemas.admin import (
-    AdminUserFilterParams,
-    AdminUserListItem,
-    AdminUserResponse,
-    CreateAdminUserRequest,
-    ResetPasswordRequest,
-    UpdateAdminUserRequest,
-    UpdatePermissionsRequest,
-)
 from src.schemas.audit import AuditLogFilterParams, AuditLogResponse
 from src.schemas.auth import (
     AccessTokenResponse,
@@ -67,12 +58,4 @@ __all__ = [
     # Audit schemas
     "AuditLogResponse",
     "AuditLogFilterParams",
-    # Admin schemas
-    "CreateAdminUserRequest",
-    "UpdateAdminUserRequest",
-    "ResetPasswordRequest",
-    "UpdatePermissionsRequest",
-    "AdminUserResponse",
-    "AdminUserListItem",
-    "AdminUserFilterParams",
 ]
