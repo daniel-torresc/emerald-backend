@@ -1,13 +1,13 @@
 # Emerald Finance Platform - Backend
 
-A production-ready FastAPI backend for a personal finance management platform with comprehensive authentication, audit logging, and role-based access control.
+A production-ready FastAPI backend for a personal finance management platform with comprehensive authentication, audit logging, and admin-based access control.
 
 ## Features (Phase 1.1 Complete)
 
 - ✅ **Async-First Architecture**: FastAPI + SQLAlchemy 2.0 with asyncpg
 - ✅ **Argon2id Password Hashing**: NIST-recommended, memory-hard algorithm
 - ✅ **JWT Authentication**: Access/refresh tokens with rotation and reuse detection
-- ✅ **Role-Based Access Control**: Flexible RBAC with JSONB permissions
+- ✅ **Admin-Based Access Control**: Simple `is_admin` flag for administrative privileges
 - ✅ **Comprehensive Audit Logging**: GDPR-compliant immutable audit trail
 - ✅ **Soft Deletes**: Data retention for compliance (7-year SOX/GDPR)
 - ✅ **Connection Pooling**: Optimized database performance
@@ -309,64 +309,32 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
   -d '{"email":"admin@example.com","password":"YourSecureP@ss123!"}'
 ```
 
-### Admin API Endpoints
+### Admin Access Control
 
-Once you have an admin account, you can manage admin users via authenticated endpoints:
+The platform uses a simple admin flag (`is_admin = true`) for administrative privileges:
 
-| Endpoint | Method | Description | Auth Required |
-|----------|--------|-------------|---------------|
-| `/api/v1/admin/users` | POST | Create new admin user | ✅ Admin |
-| `/api/v1/admin/users` | GET | List all admin users (paginated) | ✅ Admin |
-| `/api/v1/admin/users/{id}` | GET | Get admin user details | ✅ Admin |
-| `/api/v1/admin/users/{id}` | PUT | Update admin user | ✅ Admin |
-| `/api/v1/admin/users/{id}` | DELETE | Delete admin user (soft delete) | ✅ Admin |
-| `/api/v1/admin/users/{id}/password` | PUT | Reset admin password | ✅ Admin |
-| `/api/v1/admin/users/{id}/permissions` | PUT | Update admin permissions | ✅ Admin |
-
-**Admin Safeguards:**
-- Cannot delete yourself
-- Cannot delete the last admin user
-- Cannot remove your own admin privileges
-- All admin operations are fully audited
-
-### Admin Authentication
-
-All admin endpoints require:
-1. Valid JWT access token (from `/api/v1/auth/login`)
-2. Admin role (`is_admin = true`)
-
-**Complete workflow example:**
+**Creating the Initial Admin:**
 ```bash
-# Step 1: Configure .env with superuser credentials (before migrations)
+# Step 1: Configure .env with superadmin credentials (before migrations)
 # Edit .env file:
 # SUPERADMIN_USERNAME="admin"
 # SUPERADMIN_EMAIL="admin@example.com"
 # SUPERADMIN_PASSWORD="SecureP@ss123"
 
-# Step 2: Run migrations (creates database AND superuser automatically)
+# Step 2: Run migrations (creates database AND superadmin automatically)
 uv run alembic upgrade head
 
-# Step 3: Login as superuser
-curl -X POST http://localhost:8000/api/v1/auth/login \
+# Step 3: Login as superadmin
+curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@example.com","password":"SecureP@ss123"}'
-
-# Step 4: Use access token for admin operations
-curl http://localhost:8000/api/v1/admin/users \
-  -H "Authorization: Bearer <access_token>"
-
-# Step 5: Create another admin (requires auth)
-curl -X POST http://localhost:8000/api/v1/admin/users \
-  -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin2","email":"admin2@example.com","password":"Admin2Pass123!"}'
-
-# Step 6: Change admin password if needed (requires auth)
-curl -X PUT http://localhost:8000/api/v1/admin/users/<admin_id>/password \
-  -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"new_password":"NewSecureP@ss456"}'
 ```
+
+**Admin Capabilities:**
+- Admin users (`is_admin = true`) have elevated privileges for administrative operations
+- Admin status is set at the database level via the `is_admin` boolean flag
+- All endpoints requiring admin access use the `get_current_admin()` dependency
+- Admin operations are fully audited in the audit log
 
 ## Database Migrations
 
@@ -487,8 +455,6 @@ docker exec -it emerald-postgres psql -U emerald_user -d emerald_db -c "SELECT *
 
 **Expected Tables:**
 - `users` - User accounts
-- `roles` - User roles
-- `user_roles` - User-role associations
 - `refresh_tokens` - JWT refresh tokens
 - `audit_logs` - Audit trail
 - `bootstrap_state` - Bootstrap tracking
