@@ -6,9 +6,11 @@ Import models from this module to ensure proper initialization.
 """
 
 from src.models.account import Account, AccountShare
+from src.models.account_type import AccountType as AccountTypeModel
 from src.models.audit_log import AuditAction, AuditLog, AuditStatus
 from src.models.base import Base
 from src.models.enums import AccountType, PermissionLevel
+from src.models.financial_institution import FinancialInstitution
 from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 from src.models.refresh_token import RefreshToken
 from src.models.user import User
@@ -31,6 +33,9 @@ __all__ = [
     # Account models
     "Account",
     "AccountShare",
-    "AccountType",
+    "AccountType",  # Enum (legacy - will be migrated to AccountTypeModel)
+    "AccountTypeModel",  # New master data table
     "PermissionLevel",
+    # Master data models
+    "FinancialInstitution",
 ]
