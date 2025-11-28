@@ -5,9 +5,10 @@ This module defines:
 - AccountType: Types of financial accounts (savings, credit_card, etc.)
 - PermissionLevel: Permission levels for account sharing (owner, editor, viewer)
 - TransactionType: Types of financial transactions (debit, credit, transfer, etc.)
+- InstitutionType: Types of financial institutions (bank, credit_union, brokerage, fintech, other)
 
-These enums are used by the Account, AccountShare, and Transaction models and are also
-created as PostgreSQL ENUM types in the database for type safety.
+These enums are used by the Account, AccountShare, Transaction, and FinancialInstitution models
+and are also created as PostgreSQL ENUM types in the database for type safety.
 """
 
 import enum
@@ -178,6 +179,77 @@ class TransactionType(str, enum.Enum):
                 {"key": "income", "label": "Income"},
                 {"key": "expense", "label": "Expense"},
                 {"key": "transfer", "label": "Transfer"}
+            ]
+        """
+        return [
+            {"key": item.value, "label": item.value.replace("_", " ").title()}
+            for item in cls
+        ]
+
+
+class InstitutionType(str, enum.Enum):
+    """
+    Financial institution types.
+
+    Supported institution types for the platform. Used to categorize
+    financial institutions for filtering and reporting.
+
+    Attributes:
+        bank: Traditional banks (commercial, retail, universal banks)
+            Examples: JPMorgan Chase, Bank of America, HSBC, Deutsche Bank,
+            Wells Fargo, Citibank, Barclays
+
+        credit_union: Credit unions and cooperative banks
+            Examples: Navy Federal Credit Union, State Employees' Credit Union,
+            Pentagon Federal Credit Union, Alliant Credit Union
+
+        brokerage: Investment firms and brokerage houses
+            Examples: Fidelity Investments, Vanguard, Charles Schwab,
+            Goldman Sachs, Morgan Stanley, TD Ameritrade
+
+        fintech: Financial technology companies
+            Examples: Revolut, N26, Wise, Chime, Cash App, PayPal,
+            Stripe, Square, Robinhood
+
+        other: Other financial institutions not covered above
+            Examples: Payment processors, specialized lenders, fintech startups,
+            regional institutions
+
+    Usage:
+        institution = FinancialInstitution(
+            name="JPMorgan Chase Bank, N.A.",
+            short_name="Chase",
+            institution_type=InstitutionType.bank,
+            country_code="US",
+            ...
+        )
+
+    Note:
+        Institution types affect how institutions are categorized in the UI
+        and enable filtering by type (e.g., "show only banks").
+    """
+
+    bank = "bank"
+    credit_union = "credit_union"
+    brokerage = "brokerage"
+    fintech = "fintech"
+    other = "other"
+
+    @classmethod
+    def to_dict_list(cls) -> list[dict[str, str]]:
+        """
+        Return list of dicts with 'key' and 'label' for API responses.
+
+        Returns:
+            List of dictionaries with 'key' (enum value) and 'label' (display name)
+
+        Example:
+            [
+                {"key": "bank", "label": "Bank"},
+                {"key": "credit_union", "label": "Credit Union"},
+                {"key": "brokerage", "label": "Brokerage"},
+                {"key": "fintech", "label": "Fintech"},
+                {"key": "other", "label": "Other"}
             ]
         """
         return [

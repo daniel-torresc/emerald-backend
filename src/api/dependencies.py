@@ -356,6 +356,30 @@ def get_transaction_service(db: AsyncSession = Depends(get_db)):
     return TransactionService(db)
 
 
+def get_financial_institution_service(db: AsyncSession = Depends(get_db)):
+    """
+    Dependency to get FinancialInstitutionService instance.
+
+    This dependency provides a FinancialInstitutionService with an active database session.
+
+    Args:
+        db: Database session
+
+    Returns:
+        FinancialInstitutionService instance
+
+    Usage:
+        @app.post("/api/v1/financial-institutions")
+        async def create_institution(
+            service: FinancialInstitutionService = Depends(get_financial_institution_service)
+        ):
+            return await service.create_institution(...)
+    """
+    from src.services.financial_institution_service import FinancialInstitutionService
+
+    return FinancialInstitutionService(db)
+
+
 # Convenience type aliases for common dependencies
 CurrentUser = Annotated[User, Depends(get_current_user)]
 ActiveUser = Annotated[User, Depends(require_active_user)]

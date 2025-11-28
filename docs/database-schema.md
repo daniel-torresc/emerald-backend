@@ -7,7 +7,7 @@ This document provides a comprehensive overview of the Emerald Finance Platform 
 **Database**: PostgreSQL 16+
 **ORM**: SQLAlchemy 2.0 (Async)
 **Schema Management**: Alembic migrations
-**Last Updated**: 2025-11-25
+**Last Updated**: 2025-11-27
 
 ---
 
@@ -16,8 +16,6 @@ This document provides a comprehensive overview of the Emerald Finance Platform 
 ```mermaid
 erDiagram
     %% Core User Management
-    users ||--o{ user_roles : "has many"
-    roles ||--o{ user_roles : "assigned to"
     users ||--o{ refresh_tokens : "owns"
     users ||--o{ audit_logs : "performed by"
 
@@ -30,6 +28,22 @@ erDiagram
     accounts ||--o{ transactions : "contains"
     transactions ||--o{ transactions : "split into (parent-child)"
     transactions ||--o{ transaction_tags : "tagged with"
+
+    %% Financial Institutions (Master Data)
+    financial_institutions {
+        uuid id PK
+        string name "200 chars, indexed"
+        string short_name "100 chars, indexed"
+        string swift_code "8-11 chars, nullable, partial unique"
+        string routing_number "9 chars, nullable, partial unique"
+        string country_code "2 chars ISO3166, indexed"
+        enum institution_type "indexed (bank, credit_union, etc)"
+        string logo_url "500 chars, nullable"
+        string website_url "500 chars, nullable"
+        boolean is_active "default true, indexed"
+        timestamp created_at "indexed"
+        timestamp updated_at
+    }
 
     %% User Entity
     users {
@@ -46,24 +60,6 @@ erDiagram
         timestamp deleted_at "soft delete, indexed, nullable"
         uuid created_by "nullable, indexed"
         uuid updated_by "nullable, indexed"
-    }
-
-    %% Role Entity
-    roles {
-        uuid id PK
-        string name UK "unique, 50 chars, indexed"
-        string description "nullable, 255 chars"
-        jsonb permissions "array of permission strings"
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    %% User-Role Junction Table
-    user_roles {
-        uuid user_id PK,FK
-        uuid role_id PK,FK
-        timestamp assigned_at "default now"
-        uuid assigned_by FK "nullable, references users"
     }
 
     %% Refresh Token Entity
@@ -179,7 +175,7 @@ erDiagram
 - **Argon2id password hashing**: NIST-recommended, memory-hard algorithm
 - **Soft delete**: Users are never physically deleted (compliance requirement)
 - **Unique constraints**: Email and username remain unique even after deletion
-- **Admin flag**: `is_admin` for quick admin checks (use roles for fine-grained permissions)
+- **Admin flag**: `is_admin` for administrative privileges (superadmin access)
 
 **Indexes**:
 - `username` (unique, for login)
@@ -191,7 +187,6 @@ erDiagram
 - `created_by`, `updated_by` (for audit queries)
 
 **Relationships**:
-- `roles`: Many-to-many via `user_roles` junction table
 - `refresh_tokens`: One-to-many (user has multiple tokens)
 - `accounts`: One-to-many (user owns multiple accounts)
 - `account_shares`: One-to-many (user can access shared accounts)
@@ -203,54 +198,7 @@ erDiagram
 
 ---
 
-### 2. **roles**
-
-**Purpose**: Role-based access control (RBAC) with flexible permissions
-
-**Mixins Applied**:
-- `TimestampMixin` (created_at, updated_at)
-
-**Key Features**:
-- **JSONB permissions**: Flexible permission array (e.g., `["users:read:all", "transactions:write:self"]`)
-- **Permission format**: `resource:action[:scope]`
-- **Built-in roles**: admin, user, readonly (created in migrations)
-
-**Indexes**:
-- `name` (unique, for role lookup)
-
-**Relationships**:
-- `users`: Many-to-many via `user_roles` junction table
-
-**Permission Examples**:
-```
-users:read:self     - Read own user profile
-users:read:all      - Read all user profiles (admin)
-users:write:self    - Update own user profile
-users:write:all     - Update any user profile (admin)
-transactions:write:self - Create own transactions
-audit_logs:read:all - View all audit logs (admin)
-```
-
----
-
-### 3. **user_roles**
-
-**Purpose**: Junction table linking users to roles (many-to-many)
-
-**Key Features**:
-- **Composite primary key**: (user_id, role_id)
-- **Audit trail**: Tracks when role was assigned and by whom
-- **Cascade deletes**: If user or role deleted, assignments removed
-
-**Columns**:
-- `user_id`: FK to users (ON DELETE CASCADE)
-- `role_id`: FK to roles (ON DELETE CASCADE)
-- `assigned_at`: When the role was assigned
-- `assigned_by`: Who assigned the role (nullable for system assignments)
-
----
-
-### 4. **refresh_tokens**
+### 2. **refresh_tokens**
 
 **Purpose**: JWT refresh token storage with rotation and reuse detection
 
@@ -279,7 +227,7 @@ audit_logs:read:all - View all audit logs (admin)
 
 ---
 
-### 5. **audit_logs**
+### 3. **audit_logs**
 
 **Purpose**: Immutable audit trail for compliance (GDPR, SOX, PCI DSS)
 
@@ -307,13 +255,13 @@ audit_logs:read:all - View all audit logs (admin)
 - Authentication: LOGIN, LOGOUT, LOGIN_FAILED, PASSWORD_CHANGE, TOKEN_REFRESH
 - CRUD: CREATE, READ, UPDATE, DELETE
 - Transactions: SPLIT_TRANSACTION, JOIN_TRANSACTION
-- Authorization: PERMISSION_GRANT, PERMISSION_REVOKE, ROLE_ASSIGN, ROLE_REMOVE
+- Authorization: PERMISSION_GRANT, PERMISSION_REVOKE
 - Administrative: ACCOUNT_ACTIVATE, ACCOUNT_DEACTIVATE, ACCOUNT_LOCK, ACCOUNT_UNLOCK
 - Security: RATE_LIMIT_EXCEEDED, INVALID_TOKEN, PERMISSION_DENIED
 
 ---
 
-### 6. **accounts**
+### 4. **accounts**
 
 **Purpose**: Financial account management with multi-currency and metadata support
 
@@ -362,9 +310,9 @@ audit_logs:read:all - View all audit logs (admin)
 
 ---
 
-### 7. **account_shares**
+### 5. **account_shares**
 
-**Purpose**: Account sharing with role-based permissions (RBAC)
+**Purpose**: Account sharing with permission-level based access control
 
 **Mixins Applied**:
 - `TimestampMixin` (created_at, updated_at)
@@ -398,7 +346,7 @@ audit_logs:read:all - View all audit logs (admin)
 
 ---
 
-### 8. **transactions**
+### 6. **transactions**
 
 **Purpose**: Financial transaction tracking with splitting and tagging
 
@@ -447,7 +395,7 @@ audit_logs:read:all - View all audit logs (admin)
 
 ---
 
-### 9. **transaction_tags**
+### 7. **transaction_tags**
 
 **Purpose**: Free-form tagging for transaction categorization
 
@@ -490,6 +438,74 @@ ORDER BY usage_count DESC;
 
 ---
 
+### 8. **financial_institutions**
+
+**Purpose**: Master data repository for financial institutions (banks, credit unions, etc.)
+
+**Mixins Applied**:
+- `TimestampMixin` (created_at, updated_at)
+
+**Key Features**:
+- **Global institution catalog**: Centralized repository of financial institutions
+- **SWIFT/BIC codes**: International bank identification (8 or 11 characters)
+- **Routing numbers**: US ABA routing numbers (9 digits)
+- **Active flag**: Uses `is_active` instead of soft delete (master data pattern)
+- **Multi-country support**: ISO 3166-1 alpha-2 country codes
+
+**Indexes**:
+- `name` (for searching by full legal name)
+- `short_name` (for searching by display name)
+- `country_code` (for filtering by country)
+- `institution_type` (for filtering by type)
+- `is_active` (for filtering active institutions)
+- `created_at` (for sorting)
+- Partial unique: `swift_code WHERE swift_code IS NOT NULL` (uniqueness only for non-NULL)
+- Partial unique: `routing_number WHERE routing_number IS NOT NULL` (uniqueness only for non-NULL)
+
+**Constraints**:
+- `swift_code` CHECK: Length must be 8 or 11 characters (if provided)
+- `routing_number` CHECK: Length must be exactly 9 characters (if provided)
+- `country_code` CHECK: Length must be exactly 2 characters (ISO 3166-1 alpha-2)
+
+**Institution Types**:
+- `bank`: Traditional banks
+- `credit_union`: Credit unions and cooperative banks
+- `brokerage`: Investment and brokerage firms
+- `fintech`: Digital-only financial technology companies
+- `other`: Other financial institutions
+
+**Important Notes**:
+- **NOT soft deleted**: Uses `is_active` flag instead (master data pattern)
+- **Optional identifiers**: SWIFT code and routing number are optional (not all institutions have both)
+- **Partial unique indexes**: Ensure uniqueness only when SWIFT/routing values are provided
+- **Validation**: SWIFT codes validated using schwifty library, routing numbers via pydantic-extra-types
+- **Future use**: Will be linked to accounts table for account-to-institution relationships
+
+**Common Use Cases**:
+```sql
+-- Find institution by SWIFT code
+SELECT * FROM financial_institutions
+WHERE swift_code = 'BSCHESMM';
+
+-- Find US bank by routing number
+SELECT * FROM financial_institutions
+WHERE routing_number = '021000021';
+
+-- List active Spanish banks
+SELECT * FROM financial_institutions
+WHERE country_code = 'ES'
+  AND institution_type = 'bank'
+  AND is_active = true
+ORDER BY short_name;
+
+-- Search institutions by name
+SELECT * FROM financial_institutions
+WHERE name ILIKE '%santander%'
+   OR short_name ILIKE '%santander%';
+```
+
+---
+
 ## Database Enums
 
 ### AuditAction (audit_action_enum)
@@ -497,8 +513,9 @@ ORDER BY usage_count DESC;
 LOGIN, LOGOUT, LOGIN_FAILED, PASSWORD_CHANGE, TOKEN_REFRESH,
 CREATE, READ, UPDATE, DELETE,
 SPLIT_TRANSACTION, JOIN_TRANSACTION,
-PERMISSION_GRANT, PERMISSION_REVOKE, ROLE_ASSIGN, ROLE_REMOVE,
+PERMISSION_GRANT, PERMISSION_REVOKE,
 ACCOUNT_ACTIVATE, ACCOUNT_DEACTIVATE, ACCOUNT_LOCK, ACCOUNT_UNLOCK,
+CREATE_FINANCIAL_INSTITUTION, UPDATE_FINANCIAL_INSTITUTION, DEACTIVATE_FINANCIAL_INSTITUTION,
 RATE_LIMIT_EXCEEDED, INVALID_TOKEN, PERMISSION_DENIED
 ```
 
@@ -510,6 +527,11 @@ SUCCESS, FAILURE, PARTIAL
 ### AccountType (accounttype)
 ```
 checking, savings, investment, other
+```
+
+### InstitutionType (institution_type)
+```
+bank, credit_union, brokerage, fintech, other
 ```
 
 ### PermissionLevel (permissionlevel)
@@ -562,14 +584,6 @@ income, expense, transfer
    - Transaction has multiple tags
    - FK: `transaction_tags.transaction_id → transactions.id`
    - Cascade: ON DELETE CASCADE
-
-### Many-to-Many Relationships
-
-1. **users ↔ roles** (via user_roles)
-   - Users can have multiple roles
-   - Roles can be assigned to multiple users
-   - Junction table: `user_roles`
-   - Cascade: ON DELETE CASCADE on both FKs
 
 ### Self-Referencing Relationships
 
@@ -675,7 +689,7 @@ All models with `SoftDeleteMixin` use soft delete:
 - **Accidental deletion recovery**
 - **Transaction history integrity**
 
-**Important**: `transaction_tags`, `refresh_tokens`, `audit_logs`, `roles` use hard delete (no soft delete mixin).
+**Important**: `transaction_tags`, `refresh_tokens`, `audit_logs` use hard delete (no soft delete mixin).
 
 ---
 
@@ -688,7 +702,7 @@ All models with `SoftDeleteMixin` use soft delete:
 - All foreign keys indexed for join performance
 
 ### Lookup Indexes
-- Unique constraints: email, username, token_hash, role name
+- Unique constraints: email, username, token_hash
 - Common filters: is_active, is_admin, transaction_type, account_type
 - Soft delete: deleted_at (for filtering)
 
@@ -751,7 +765,7 @@ All models with `SoftDeleteMixin` use soft delete:
 - Created automatically in migrations (not via API)
 - Uses `SUPERADMIN_EMAIL` and `SUPERADMIN_PASSWORD` from `.env`
 - Idempotent - skips if admin already exists
-- Assigned `admin` role automatically
+- Has `is_admin=True` flag for administrative access
 
 ---
 
@@ -800,31 +814,30 @@ All models with `SoftDeleteMixin` use soft delete:
 
 ## Database Statistics
 
-### Current Tables: 10
+### Current Tables: 9
 1. users
-2. roles
-3. user_roles
-4. refresh_tokens
-5. audit_logs
-6. accounts
-7. account_shares
-8. transactions
-9. transaction_tags
-10. alembic_version
+2. refresh_tokens
+3. audit_logs
+4. accounts
+5. account_shares
+6. transactions
+7. transaction_tags
+8. financial_institutions
+9. alembic_version
 
-### Enums: 5
-1. AuditAction (24 values)
+### Enums: 6
+1. AuditAction (25 values)
 2. AuditStatus (3 values)
 3. AccountType (4 values)
-4. PermissionLevel (3 values)
-5. TransactionType (3 values)
+4. InstitutionType (5 values)
+5. PermissionLevel (3 values)
+6. TransactionType (3 values)
 
-### Relationships: 15
+### Relationships: 13
 - One-to-many: 7
-- Many-to-many: 1
 - Self-referencing: 1
 
-### Indexes: 50+ (including composite and partial)
+### Indexes: 40+ (including composite and partial)
 
 ---
 
@@ -834,7 +847,7 @@ The Emerald Finance Platform database schema is designed for:
 - **Scalability**: UUID primary keys, efficient indexing
 - **Security**: Argon2id password hashing, token rotation, encrypted sensitive data
 - **Compliance**: Immutable audit logs, soft deletes, 7-year retention
-- **Flexibility**: JSONB permissions, multi-currency support, account sharing
+- **Flexibility**: Admin-based authorization, multi-currency support, account sharing
 - **Performance**: Connection pooling, eager loading, cached balances
 
 **Next Steps** (based on gaps identified):

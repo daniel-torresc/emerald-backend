@@ -1,0 +1,540 @@
+"""
+Financial institution management service for CRUD operations.
+
+This module provides:
+- Create financial institution (admin only)
+- Get financial institution details
+- List/search financial institutions with filters
+- Update financial institution (admin only)
+- Deactivate financial institution (admin only)
+
+All state-changing operations are logged to audit trail.
+"""
+
+import logging
+import uuid
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.exceptions import AlreadyExistsError, NotFoundError
+from src.models.audit_log import AuditAction
+from src.models.user import User
+from src.repositories.financial_institution_repository import (
+    FinancialInstitutionRepository,
+)
+from src.schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
+from src.schemas.financial_institution import (
+    FinancialInstitutionCreate,
+    FinancialInstitutionFilterParams,
+    FinancialInstitutionListItem,
+    FinancialInstitutionResponse,
+    FinancialInstitutionUpdate,
+)
+from src.services.audit_service import AuditService
+
+logger = logging.getLogger(__name__)
+
+
+class FinancialInstitutionService:
+    """
+    Service class for financial institution management operations.
+
+    This service handles:
+    - Institution creation (with uniqueness validation)
+    - Institution retrieval by ID, SWIFT code, or routing number
+    - Institution listing and searching with filters
+    - Institution updates (with conflict checks)
+    - Institution deactivation (soft disable)
+
+    All methods require an active database session.
+    Admin-only operations: create, update, deactivate
+    Authenticated user operations: get, list (all authenticated users can access)
+    """
+
+    def __init__(self, session: AsyncSession):
+        """
+        Initialize FinancialInstitutionService with database session.
+
+        Args:
+            session: Async database session
+        """
+        self.session = session
+        self.institution_repo = FinancialInstitutionRepository(session)
+        self.audit_service = AuditService(session)
+
+    async def create_institution(
+        self,
+        data: FinancialInstitutionCreate,
+        current_user: User,
+        request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> FinancialInstitutionResponse:
+        """
+        Create a new financial institution (admin only).
+
+        Validates uniqueness of SWIFT code and routing number before creation.
+        Logs creation to audit trail.
+
+        Args:
+            data: Institution creation data
+            current_user: Currently authenticated user (must be admin)
+            request_id: Request ID for audit logging
+            ip_address: Client IP address
+            user_agent: Client user agent
+
+        Returns:
+            FinancialInstitutionResponse with created institution data
+
+        Raises:
+            AlreadyExistsError: If SWIFT code or routing number already exists
+
+        Example:
+            institution = await service.create_institution(
+                data=FinancialInstitutionCreate(
+                    name="Banco Santander, S.A.",
+                    short_name="Santander",
+                    swift_code="BSCHESMM",
+                    country_code="ES",
+                    institution_type=InstitutionType.bank
+                ),
+                current_user=admin_user
+            )
+        """
+        # Check for duplicate SWIFT code
+        if data.swift_code:
+            exists = await self.institution_repo.exists_by_swift_code(data.swift_code)
+            if exists:
+                logger.warning(
+                    f"Institution creation failed: SWIFT code {data.swift_code} already exists"
+                )
+                raise AlreadyExistsError(
+                    f"Institution with SWIFT code {data.swift_code} already exists"
+                )
+
+        # Check for duplicate routing number
+        if data.routing_number:
+            exists = await self.institution_repo.exists_by_routing_number(
+                data.routing_number
+            )
+            if exists:
+                logger.warning(
+                    f"Institution creation failed: Routing number {data.routing_number} already exists"
+                )
+                raise AlreadyExistsError(
+                    f"Institution with routing number {data.routing_number} already exists"
+                )
+
+        # Create institution
+        institution = await self.institution_repo.create(
+            name=data.name,
+            short_name=data.short_name,
+            swift_code=data.swift_code,
+            routing_number=data.routing_number,
+            country_code=str(data.country_code),
+            institution_type=data.institution_type,
+            logo_url=str(data.logo_url) if data.logo_url else None,
+            website_url=str(data.website_url) if data.website_url else None,
+            is_active=data.is_active,
+        )
+
+        # Commit transaction
+        await self.session.commit()
+
+        logger.info(
+            f"Institution created: {institution.id} ({institution.short_name}) by admin {current_user.id}"
+        )
+
+        # Log to audit trail
+        await self.audit_service.log_event(
+            user_id=current_user.id,
+            action=AuditAction.CREATE_FINANCIAL_INSTITUTION,
+            entity_type="financial_institution",
+            entity_id=institution.id,
+            new_values={
+                "institution_name": institution.short_name,
+                "swift_code": institution.swift_code,
+                "country_code": institution.country_code,
+            },
+            request_id=request_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
+        return FinancialInstitutionResponse.model_validate(institution)
+
+    async def get_institution(
+        self,
+        institution_id: uuid.UUID,
+    ) -> FinancialInstitutionResponse:
+        """
+        Get financial institution by ID.
+
+        Available to all authenticated users.
+        Returns institution regardless of is_active status.
+
+        Args:
+            institution_id: Institution UUID
+
+        Returns:
+            FinancialInstitutionResponse with institution data
+
+        Raises:
+            NotFoundError: If institution not found
+
+        Example:
+            institution = await service.get_institution(institution_id)
+        """
+        institution = await self.institution_repo.get_by_id(institution_id)
+
+        if not institution:
+            raise NotFoundError(f"Institution with ID {institution_id} not found")
+
+        return FinancialInstitutionResponse.model_validate(institution)
+
+    async def get_by_swift_code(
+        self,
+        swift_code: str,
+    ) -> FinancialInstitutionResponse:
+        """
+        Get financial institution by SWIFT/BIC code.
+
+        Available to all authenticated users.
+        Useful for institution lookup by identifier.
+
+        Args:
+            swift_code: SWIFT/BIC code (case-insensitive)
+
+        Returns:
+            FinancialInstitutionResponse with institution data
+
+        Raises:
+            NotFoundError: If institution not found
+
+        Example:
+            institution = await service.get_by_swift_code("BSCHESMM")
+        """
+        institution = await self.institution_repo.get_by_swift_code(swift_code)
+
+        if not institution:
+            raise NotFoundError(f"Institution with SWIFT code {swift_code} not found")
+
+        return FinancialInstitutionResponse.model_validate(institution)
+
+    async def get_by_routing_number(
+        self,
+        routing_number: str,
+    ) -> FinancialInstitutionResponse:
+        """
+        Get financial institution by ABA routing number.
+
+        Available to all authenticated users.
+        Useful for US bank lookup.
+
+        Args:
+            routing_number: ABA routing number (9 digits)
+
+        Returns:
+            FinancialInstitutionResponse with institution data
+
+        Raises:
+            NotFoundError: If institution not found
+
+        Example:
+            institution = await service.get_by_routing_number("021000021")
+        """
+        institution = await self.institution_repo.get_by_routing_number(routing_number)
+
+        if not institution:
+            raise NotFoundError(
+                f"Institution with routing number {routing_number} not found"
+            )
+
+        return FinancialInstitutionResponse.model_validate(institution)
+
+    async def list_institutions(
+        self,
+        pagination: PaginationParams,
+        filters: FinancialInstitutionFilterParams,
+    ) -> PaginatedResponse[FinancialInstitutionListItem]:
+        """
+        List financial institutions with pagination and filtering.
+
+        Available to all authenticated users.
+        Returns active institutions by default.
+        Supports filtering by country, type, and search query.
+
+        Args:
+            pagination: Pagination parameters (page, per_page)
+            filters: Filter parameters (country_code, institution_type, is_active, search)
+
+        Returns:
+            PaginatedResponse with list of institutions and metadata
+
+        Example:
+            # Get active Spanish banks
+            result = await service.list_institutions(
+                pagination=PaginationParams(page=1, per_page=20),
+                filters=FinancialInstitutionFilterParams(
+                    country_code="ES",
+                    institution_type=InstitutionType.bank,
+                    is_active=True
+                )
+            )
+        """
+        # Calculate offset
+        offset = (pagination.page - 1) * pagination.page_size
+
+        # Get institutions
+        institutions = await self.institution_repo.search(
+            query_text=filters.search,
+            country_code=str(filters.country_code) if filters.country_code else None,
+            institution_type=filters.institution_type,
+            is_active=filters.is_active,
+            limit=pagination.page_size,
+            offset=offset,
+        )
+
+        # Get total count
+        total_count = await self.institution_repo.count_filtered(
+            query_text=filters.search,
+            country_code=str(filters.country_code) if filters.country_code else None,
+            institution_type=filters.institution_type,
+            is_active=filters.is_active,
+        )
+
+        # Convert to list items
+        items = [
+            FinancialInstitutionListItem.model_validate(inst) for inst in institutions
+        ]
+
+        # Calculate pagination metadata
+        total_pages = (
+            (total_count + pagination.page_size - 1) // pagination.page_size
+            if total_count > 0
+            else 0
+        )
+
+        metadata = PaginationMeta(
+            page=pagination.page,
+            page_size=pagination.page_size,
+            total=total_count,
+            total_pages=total_pages,
+        )
+
+        return PaginatedResponse(data=items, meta=metadata)
+
+    async def update_institution(
+        self,
+        institution_id: uuid.UUID,
+        data: FinancialInstitutionUpdate,
+        current_user: User,
+        request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> FinancialInstitutionResponse:
+        """
+        Update financial institution (admin only).
+
+        Validates uniqueness constraints if SWIFT code or routing number changed.
+        Logs update to audit trail.
+
+        Args:
+            institution_id: Institution UUID to update
+            data: Update data (partial update supported)
+            current_user: Currently authenticated user (must be admin)
+            request_id: Request ID for audit logging
+            ip_address: Client IP address
+            user_agent: Client user agent
+
+        Returns:
+            FinancialInstitutionResponse with updated institution data
+
+        Raises:
+            NotFoundError: If institution not found
+            AlreadyExistsError: If new SWIFT code or routing number already exists
+
+        Example:
+            institution = await service.update_institution(
+                institution_id=uuid.UUID("..."),
+                data=FinancialInstitutionUpdate(
+                    is_active=False
+                ),
+                current_user=admin_user
+            )
+        """
+        # Get existing institution
+        institution = await self.institution_repo.get_by_id(institution_id)
+        if not institution:
+            raise NotFoundError(f"Institution with ID {institution_id} not found")
+
+        # Track what changed (for audit log)
+        changes = {}
+
+        # Check for SWIFT code conflicts (if changed)
+        if data.swift_code is not None and data.swift_code != institution.swift_code:
+            exists = await self.institution_repo.exists_by_swift_code(data.swift_code)
+            if exists:
+                raise AlreadyExistsError(
+                    f"Institution with SWIFT code {data.swift_code} already exists"
+                )
+            changes["swift_code"] = {
+                "old": institution.swift_code,
+                "new": data.swift_code,
+            }
+            institution.swift_code = data.swift_code
+
+        # Check for routing number conflicts (if changed)
+        if (
+            data.routing_number is not None
+            and data.routing_number != institution.routing_number
+        ):
+            exists = await self.institution_repo.exists_by_routing_number(
+                data.routing_number
+            )
+            if exists:
+                raise AlreadyExistsError(
+                    f"Institution with routing number {data.routing_number} already exists"
+                )
+            changes["routing_number"] = {
+                "old": institution.routing_number,
+                "new": data.routing_number,
+            }
+            institution.routing_number = data.routing_number
+
+        # Update other fields
+        if data.name is not None:
+            changes["name"] = {"old": institution.name, "new": data.name}
+            institution.name = data.name
+
+        if data.short_name is not None:
+            changes["short_name"] = {
+                "old": institution.short_name,
+                "new": data.short_name,
+            }
+            institution.short_name = data.short_name
+
+        if data.country_code is not None:
+            changes["country_code"] = {
+                "old": institution.country_code,
+                "new": str(data.country_code),
+            }
+            institution.country_code = str(data.country_code)
+
+        if data.institution_type is not None:
+            changes["institution_type"] = {
+                "old": institution.institution_type.value,
+                "new": data.institution_type.value,
+            }
+            institution.institution_type = data.institution_type
+
+        if data.logo_url is not None:
+            changes["logo_url"] = {
+                "old": institution.logo_url,
+                "new": str(data.logo_url),
+            }
+            institution.logo_url = str(data.logo_url)
+
+        if data.website_url is not None:
+            changes["website_url"] = {
+                "old": institution.website_url,
+                "new": str(data.website_url),
+            }
+            institution.website_url = str(data.website_url)
+
+        if data.is_active is not None:
+            changes["is_active"] = {"old": institution.is_active, "new": data.is_active}
+            institution.is_active = data.is_active
+
+        # Commit transaction
+        await self.session.commit()
+        await self.session.refresh(institution)
+
+        logger.info(
+            f"Institution updated: {institution.id} ({institution.short_name}) by admin {current_user.id}"
+        )
+
+        # Log to audit trail
+        await self.audit_service.log_event(
+            user_id=current_user.id,
+            action=AuditAction.UPDATE_FINANCIAL_INSTITUTION,
+            entity_type="financial_institution",
+            entity_id=institution.id,
+            extra_metadata={
+                "institution_name": institution.short_name,
+                "changes": changes,
+            },
+            request_id=request_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
+        return FinancialInstitutionResponse.model_validate(institution)
+
+    async def deactivate_institution(
+        self,
+        institution_id: uuid.UUID,
+        current_user: User,
+        request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> FinancialInstitutionResponse:
+        """
+        Deactivate financial institution (admin only).
+
+        Sets is_active = False. Institution remains in database for
+        historical references but won't appear in active listings.
+
+        Logs deactivation to audit trail.
+
+        Args:
+            institution_id: Institution UUID to deactivate
+            current_user: Currently authenticated user (must be admin)
+            request_id: Request ID for audit logging
+            ip_address: Client IP address
+            user_agent: Client user agent
+
+        Returns:
+            FinancialInstitutionResponse with deactivated institution data
+
+        Raises:
+            NotFoundError: If institution not found
+
+        Example:
+            institution = await service.deactivate_institution(
+                institution_id=uuid.UUID("..."),
+                current_user=admin_user
+            )
+        """
+        # Get institution
+        institution = await self.institution_repo.get_by_id(institution_id)
+        if not institution:
+            raise NotFoundError(f"Institution with ID {institution_id} not found")
+
+        # Deactivate
+        institution.is_active = False
+
+        # Commit transaction
+        await self.session.commit()
+        await self.session.refresh(institution)
+
+        logger.info(
+            f"Institution deactivated: {institution.id} ({institution.short_name}) by admin {current_user.id}"
+        )
+
+        # Log to audit trail
+        await self.audit_service.log_event(
+            user_id=current_user.id,
+            action=AuditAction.DEACTIVATE_FINANCIAL_INSTITUTION,
+            entity_type="financial_institution",
+            entity_id=institution.id,
+            extra_metadata={
+                "institution_name": institution.short_name,
+                "swift_code": institution.swift_code,
+            },
+            request_id=request_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+
+        return FinancialInstitutionResponse.model_validate(institution)
