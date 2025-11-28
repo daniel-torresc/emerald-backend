@@ -4,8 +4,12 @@ Database repositories for Emerald Finance Platform.
 This module exports all repository classes for database operations.
 """
 
+from src.repositories.account_type_repository import AccountTypeRepository
 from src.repositories.audit_repository import AuditLogRepository
 from src.repositories.base import BaseRepository
+from src.repositories.financial_institution_repository import (
+    FinancialInstitutionRepository,
+)
 from src.repositories.refresh_token_repository import RefreshTokenRepository
 from src.repositories.user_repository import UserRepository
 
@@ -14,4 +18,6 @@ __all__ = [
     "UserRepository",
     "RefreshTokenRepository",
     "AuditLogRepository",
+    "AccountTypeRepository",
+    "FinancialInstitutionRepository",
 ]
