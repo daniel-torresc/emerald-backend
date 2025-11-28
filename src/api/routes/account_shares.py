@@ -12,10 +12,8 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_account_service, get_current_user
-from src.core.database import get_db
 from src.models.user import User
 from src.schemas.account_share import (
     AccountShareCreate,
