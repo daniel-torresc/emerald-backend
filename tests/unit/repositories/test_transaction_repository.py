@@ -190,7 +190,11 @@ class TestTransactionRepository:
         repo = TransactionRepository(db_session)
 
         # Create transactions of different types
-        types = [TransactionType.expense, TransactionType.income, TransactionType.expense]
+        types = [
+            TransactionType.expense,
+            TransactionType.income,
+            TransactionType.expense,
+        ]
         for txn_type in types:
             transaction = Transaction(
                 account_id=test_account.id,

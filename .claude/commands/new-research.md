@@ -110,18 +110,9 @@ Structure your research as a well-formatted markdown document with:
 
 ## Deliverable
 
-Save your complete research findings in a markdown file named:
+Save your complete planning in a markdown file under **`.features/research`** directory.
 
-**`.features/research/YYYYMMDD_{short-informative-title}.md`**
-
-Where:
-
-- `YYYYMMDD` is today's date (e.g., 20251013)
-- `{short-informative-title}` is a brief, descriptive name for the idea/feature using lowercase 
-  with hyphens (e.g., "ai-powered-code-review", "real-time-collaboration", 
-  "user-authentication-system")
-
-Example filename: `20251013_ai-powered-code-review.md`
+Name the file exactly the same as the feature description file.
 
 This file will be read by other team members and AI agents, so ensure it is:
 
