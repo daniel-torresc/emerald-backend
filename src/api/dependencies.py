@@ -380,6 +380,30 @@ def get_financial_institution_service(db: AsyncSession = Depends(get_db)):
     return FinancialInstitutionService(db)
 
 
+def get_account_type_service(db: AsyncSession = Depends(get_db)):
+    """
+    Dependency to get AccountTypeService instance.
+
+    This dependency provides an AccountTypeService with an active database session.
+
+    Args:
+        db: Database session
+
+    Returns:
+        AccountTypeService instance
+
+    Usage:
+        @app.post("/api/v1/account-types")
+        async def create_account_type(
+            service: AccountTypeService = Depends(get_account_type_service)
+        ):
+            return await service.create_account_type(...)
+    """
+    from src.services.account_type_service import AccountTypeService
+
+    return AccountTypeService(db)
+
+
 # Convenience type aliases for common dependencies
 CurrentUser = Annotated[User, Depends(get_current_user)]
 ActiveUser = Annotated[User, Depends(require_active_user)]
