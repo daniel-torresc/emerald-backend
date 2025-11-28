@@ -41,6 +41,7 @@ Constraints:
 - routing_number must be exactly 9 characters (if provided)
 - swift_code must be 8 or 11 characters (if provided)
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -49,8 +50,8 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = '411f995a959f'
-down_revision: Union[str, Sequence[str], None] = '42098b69a0a9'
+revision: str = "411f995a959f"
+down_revision: Union[str, Sequence[str], None] = "42098b69a0a9"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -66,37 +67,66 @@ def upgrade() -> None:
     op.create_table(
         "financial_institutions",
         # Identification fields
-        sa.Column("name", sa.String(length=200), nullable=False, comment="Official legal name of the institution"),
-        sa.Column("short_name", sa.String(length=100), nullable=False, comment="Common/display name used in UI"),
-
+        sa.Column(
+            "name",
+            sa.String(length=200),
+            nullable=False,
+            comment="Official legal name of the institution",
+        ),
+        sa.Column(
+            "short_name",
+            sa.String(length=100),
+            nullable=False,
+            comment="Common/display name used in UI",
+        ),
         # Banking identifiers
-        sa.Column("swift_code", sa.String(length=11), nullable=True, comment="BIC/SWIFT code (8 or 11 alphanumeric characters)"),
-        sa.Column("routing_number", sa.String(length=9), nullable=True, comment="ABA routing number for US banks (9 digits)"),
-
+        sa.Column(
+            "swift_code",
+            sa.String(length=11),
+            nullable=True,
+            comment="BIC/SWIFT code (8 or 11 alphanumeric characters)",
+        ),
+        sa.Column(
+            "routing_number",
+            sa.String(length=9),
+            nullable=True,
+            comment="ABA routing number for US banks (9 digits)",
+        ),
         # Geographic information
-        sa.Column("country_code", sa.String(length=2), nullable=False, comment="ISO 3166-1 alpha-2 country code (e.g., US, GB, DE)"),
-
+        sa.Column(
+            "country_code",
+            sa.String(length=2),
+            nullable=False,
+            comment="ISO 3166-1 alpha-2 country code (e.g., US, GB, DE)",
+        ),
         # Institution classification
         sa.Column(
             "institution_type",
             postgresql.ENUM(name="institution_type", create_type=False),
             nullable=False,
-            comment="Type of financial institution"
+            comment="Type of financial institution",
         ),
-
         # Metadata
-        sa.Column("logo_url", sa.String(length=500), nullable=True, comment="URL to institution's logo image"),
-        sa.Column("website_url", sa.String(length=500), nullable=True, comment="Official website URL"),
-
+        sa.Column(
+            "logo_url",
+            sa.String(length=500),
+            nullable=True,
+            comment="URL to institution's logo image",
+        ),
+        sa.Column(
+            "website_url",
+            sa.String(length=500),
+            nullable=True,
+            comment="Official website URL",
+        ),
         # Status
         sa.Column(
             "is_active",
             sa.Boolean(),
             nullable=False,
             server_default=sa.text("TRUE"),
-            comment="Whether the institution is operational"
+            comment="Whether the institution is operational",
         ),
-
         # Standard fields (id, timestamps)
         sa.Column(
             "id",
@@ -116,22 +146,20 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
-
         # Primary key
         sa.PrimaryKeyConstraint("id", name=op.f("pk_financial_institutions")),
-
         # Check constraints
         sa.CheckConstraint(
             "LENGTH(country_code) = 2",
-            name=op.f("ck_financial_institutions_country_code_length")
+            name=op.f("ck_financial_institutions_country_code_length"),
         ),
         sa.CheckConstraint(
             "routing_number IS NULL OR LENGTH(routing_number) = 9",
-            name=op.f("ck_financial_institutions_routing_number_length")
+            name=op.f("ck_financial_institutions_routing_number_length"),
         ),
         sa.CheckConstraint(
             "swift_code IS NULL OR LENGTH(swift_code) IN (8, 11)",
-            name=op.f("ck_financial_institutions_swift_code_length")
+            name=op.f("ck_financial_institutions_swift_code_length"),
         ),
     )
 
@@ -140,37 +168,37 @@ def upgrade() -> None:
         op.f("ix_financial_institutions_name"),
         "financial_institutions",
         ["name"],
-        unique=False
+        unique=False,
     )
     op.create_index(
         op.f("ix_financial_institutions_short_name"),
         "financial_institutions",
         ["short_name"],
-        unique=False
+        unique=False,
     )
     op.create_index(
         op.f("ix_financial_institutions_country_code"),
         "financial_institutions",
         ["country_code"],
-        unique=False
+        unique=False,
     )
     op.create_index(
         op.f("ix_financial_institutions_institution_type"),
         "financial_institutions",
         ["institution_type"],
-        unique=False
+        unique=False,
     )
     op.create_index(
         op.f("ix_financial_institutions_is_active"),
         "financial_institutions",
         ["is_active"],
-        unique=False
+        unique=False,
     )
     op.create_index(
         op.f("ix_financial_institutions_created_at"),
         "financial_institutions",
         ["created_at"],
-        unique=False
+        unique=False,
     )
 
     # Create partial unique indexes (uniqueness only for non-NULL values)
@@ -180,7 +208,7 @@ def upgrade() -> None:
         "financial_institutions",
         ["swift_code"],
         unique=True,
-        postgresql_where=sa.text("swift_code IS NOT NULL")
+        postgresql_where=sa.text("swift_code IS NOT NULL"),
     )
 
     # Routing number must be unique if provided
@@ -189,7 +217,7 @@ def upgrade() -> None:
         "financial_institutions",
         ["routing_number"],
         unique=True,
-        postgresql_where=sa.text("routing_number IS NOT NULL")
+        postgresql_where=sa.text("routing_number IS NOT NULL"),
     )
 
 
@@ -200,35 +228,33 @@ def downgrade() -> None:
     # Drop all indexes
     op.drop_index(
         "ix_financial_institutions_routing_number_unique",
-        table_name="financial_institutions"
+        table_name="financial_institutions",
     )
     op.drop_index(
         "ix_financial_institutions_swift_code_unique",
-        table_name="financial_institutions"
+        table_name="financial_institutions",
     )
     op.drop_index(
         op.f("ix_financial_institutions_created_at"),
-        table_name="financial_institutions"
+        table_name="financial_institutions",
     )
     op.drop_index(
-        op.f("ix_financial_institutions_is_active"),
-        table_name="financial_institutions"
+        op.f("ix_financial_institutions_is_active"), table_name="financial_institutions"
     )
     op.drop_index(
         op.f("ix_financial_institutions_institution_type"),
-        table_name="financial_institutions"
+        table_name="financial_institutions",
     )
     op.drop_index(
         op.f("ix_financial_institutions_country_code"),
-        table_name="financial_institutions"
+        table_name="financial_institutions",
     )
     op.drop_index(
         op.f("ix_financial_institutions_short_name"),
-        table_name="financial_institutions"
+        table_name="financial_institutions",
     )
     op.drop_index(
-        op.f("ix_financial_institutions_name"),
-        table_name="financial_institutions"
+        op.f("ix_financial_institutions_name"), table_name="financial_institutions"
     )
 
     # Drop table

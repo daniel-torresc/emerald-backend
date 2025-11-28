@@ -16,6 +16,7 @@ Enum Values:
 This enum is used by the financial_institutions table to classify institutions
 for filtering and reporting purposes.
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -23,8 +24,8 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = '42098b69a0a9'
-down_revision: Union[str, Sequence[str], None] = '4aabd1426c98'
+revision: str = "42098b69a0a9"
+down_revision: Union[str, Sequence[str], None] = "4aabd1426c98"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
