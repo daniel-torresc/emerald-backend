@@ -26,6 +26,7 @@ from src.api.routes import (
     accounts,
     audit_logs,
     auth,
+    financial_institutions,
     health,
     metadata,
     root,
@@ -282,6 +283,7 @@ app.add_middleware(
 v1_router = APIRouter(prefix="/v1")
 v1_router.include_router(audit_logs.router)
 v1_router.include_router(users.router)
+v1_router.include_router(financial_institutions.router)
 v1_router.include_router(accounts.router)
 v1_router.include_router(account_shares.router)
 v1_router.include_router(transactions.router)

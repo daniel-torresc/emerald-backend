@@ -24,6 +24,13 @@ from src.schemas.common import (
     ResponseMeta,
     SuccessResponse,
 )
+from src.schemas.financial_institution import (
+    FinancialInstitutionCreate,
+    FinancialInstitutionFilterParams,
+    FinancialInstitutionListItem,
+    FinancialInstitutionResponse,
+    FinancialInstitutionUpdate,
+)
 from src.schemas.user import (
     UserCreate,
     UserFilterParams,
@@ -58,4 +65,10 @@ __all__ = [
     # Audit schemas
     "AuditLogResponse",
     "AuditLogFilterParams",
+    # Financial Institution schemas
+    "FinancialInstitutionCreate",
+    "FinancialInstitutionUpdate",
+    "FinancialInstitutionResponse",
+    "FinancialInstitutionListItem",
+    "FinancialInstitutionFilterParams",
 ]
