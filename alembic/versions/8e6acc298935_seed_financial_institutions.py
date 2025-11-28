@@ -14,6 +14,7 @@ Additional institutions can be added via admin API or future migrations.
 
 This migration is idempotent - it checks if institutions already exist before inserting.
 """
+
 from typing import Sequence, Union
 from datetime import datetime, UTC
 import uuid
@@ -24,8 +25,8 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = '8e6acc298935'
-down_revision: Union[str, Sequence[str], None] = '411f995a959f'
+revision: str = "8e6acc298935"
+down_revision: Union[str, Sequence[str], None] = "411f995a959f"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -39,59 +40,60 @@ def upgrade() -> None:
     """
     # Create table reference
     financial_institutions = sa.table(
-        'financial_institutions',
-        sa.Column('id', postgresql.UUID(as_uuid=True)),
-        sa.Column('name', sa.String(200)),
-        sa.Column('short_name', sa.String(100)),
-        sa.Column('swift_code', sa.String(11)),
-        sa.Column('routing_number', sa.String(9)),
-        sa.Column('country_code', sa.String(2)),
-        sa.Column('institution_type', postgresql.ENUM(name='institution_type', create_type=False)),
-        sa.Column('logo_url', sa.String(500)),
-        sa.Column('website_url', sa.String(500)),
-        sa.Column('is_active', sa.Boolean()),
-        sa.Column('created_at', sa.DateTime(timezone=True)),
-        sa.Column('updated_at', sa.DateTime(timezone=True)),
+        "financial_institutions",
+        sa.Column("id", postgresql.UUID(as_uuid=True)),
+        sa.Column("name", sa.String(200)),
+        sa.Column("short_name", sa.String(100)),
+        sa.Column("swift_code", sa.String(11)),
+        sa.Column("routing_number", sa.String(9)),
+        sa.Column("country_code", sa.String(2)),
+        sa.Column(
+            "institution_type",
+            postgresql.ENUM(name="institution_type", create_type=False),
+        ),
+        sa.Column("logo_url", sa.String(500)),
+        sa.Column("website_url", sa.String(500)),
+        sa.Column("is_active", sa.Boolean()),
+        sa.Column("created_at", sa.DateTime(timezone=True)),
+        sa.Column("updated_at", sa.DateTime(timezone=True)),
     )
 
     # Define seed data
     now = datetime.now(UTC)
     seed_institutions = [
         {
-            'id': uuid.uuid4(),
-            'name': 'Banco Santander, S.A.',
-            'short_name': 'Santander',
-            'swift_code': 'BSCHESMM',
-            'routing_number': None,
-            'country_code': 'ES',
-            'institution_type': 'bank',
-            'logo_url': 'https://logo.clearbit.com/santander.com',
-            'website_url': 'https://www.santander.com',
-            'is_active': True,
-            'created_at': now,
-            'updated_at': now,
+            "id": uuid.uuid4(),
+            "name": "Banco Santander, S.A.",
+            "short_name": "Santander",
+            "swift_code": "BSCHESMM",
+            "routing_number": None,
+            "country_code": "ES",
+            "institution_type": "bank",
+            "logo_url": "https://logo.clearbit.com/santander.com",
+            "website_url": "https://www.santander.com",
+            "is_active": True,
+            "created_at": now,
+            "updated_at": now,
         },
         {
-            'id': uuid.uuid4(),
-            'name': 'Banco Bilbao Vizcaya Argentaria, S.A.',
-            'short_name': 'BBVA',
-            'swift_code': 'BBVAESMM',
-            'routing_number': None,
-            'country_code': 'ES',
-            'institution_type': 'bank',
-            'logo_url': 'https://logo.clearbit.com/bbva.com',
-            'website_url': 'https://www.bbva.com',
-            'is_active': True,
-            'created_at': now,
-            'updated_at': now,
+            "id": uuid.uuid4(),
+            "name": "Banco Bilbao Vizcaya Argentaria, S.A.",
+            "short_name": "BBVA",
+            "swift_code": "BBVAESMM",
+            "routing_number": None,
+            "country_code": "ES",
+            "institution_type": "bank",
+            "logo_url": "https://logo.clearbit.com/bbva.com",
+            "website_url": "https://www.bbva.com",
+            "is_active": True,
+            "created_at": now,
+            "updated_at": now,
         },
     ]
 
     # Check if any institutions already exist (idempotent check)
     connection = op.get_bind()
-    result = connection.execute(
-        sa.text("SELECT COUNT(*) FROM financial_institutions")
-    )
+    result = connection.execute(sa.text("SELECT COUNT(*) FROM financial_institutions"))
     count = result.scalar()
 
     # Only insert if table is empty
