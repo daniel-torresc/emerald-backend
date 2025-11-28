@@ -7,6 +7,12 @@ This package provides all Pydantic models used for:
 - API documentation
 """
 
+from src.schemas.account_type import (
+    AccountTypeCreate,
+    AccountTypeListItem,
+    AccountTypeResponse,
+    AccountTypeUpdate,
+)
 from src.schemas.audit import AuditLogFilterParams, AuditLogResponse
 from src.schemas.auth import (
     AccessTokenResponse,
@@ -65,6 +71,11 @@ __all__ = [
     # Audit schemas
     "AuditLogResponse",
     "AuditLogFilterParams",
+    # Account Type schemas
+    "AccountTypeCreate",
+    "AccountTypeUpdate",
+    "AccountTypeResponse",
+    "AccountTypeListItem",
     # Financial Institution schemas
     "FinancialInstitutionCreate",
     "FinancialInstitutionUpdate",
