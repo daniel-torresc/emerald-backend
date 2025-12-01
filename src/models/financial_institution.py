@@ -14,7 +14,7 @@ Architecture:
 from typing import Optional
 
 from sqlalchemy import Boolean, Enum as SQLEnum, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
 from src.models.enums import InstitutionType
@@ -135,6 +135,14 @@ class FinancialInstitution(Base, TimestampMixin):
         default=True,
         index=True,  # Index for filtering active institutions
         comment="Whether the institution is operational",
+    )
+
+    # Relationships
+    accounts: Mapped[list["Account"]] = relationship(  # type: ignore
+        "Account",
+        back_populates="financial_institution",
+        foreign_keys="Account.financial_institution_id",
+        lazy="select",  # Don't eager load accounts from institution side (rarely needed)
     )
 
     # Unique constraints and additional indexes created in migration

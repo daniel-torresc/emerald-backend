@@ -389,7 +389,44 @@ def admin_headers(admin_token: dict) -> dict:
 # Account & Transaction Fixtures
 # ============================================================================
 @pytest_asyncio.fixture
-async def test_account(test_engine, test_user):
+async def test_financial_institution(test_engine):
+    """
+    Create a test financial institution in the database.
+
+    Returns:
+        FinancialInstitution instance for testing
+    """
+    from src.models.financial_institution import FinancialInstitution
+    from src.models.enums import InstitutionType
+
+    async_session_factory = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_factory() as session:
+        institution = FinancialInstitution(
+            name="Chase Bank N.A.",
+            short_name="Chase",
+            swift_code="CHASUS33",
+            routing_number="021000021",
+            country_code="US",
+            institution_type=InstitutionType.bank,
+            logo_url="https://example.com/chase-logo.png",
+            website_url="https://www.chase.com",
+            is_active=True,
+        )
+
+        session.add(institution)
+        await session.commit()
+        await session.refresh(institution)
+
+        return institution
+
+
+@pytest_asyncio.fixture
+async def test_account(test_engine, test_user, test_financial_institution):
     """
     Create a test account in the database.
 
@@ -411,6 +448,7 @@ async def test_account(test_engine, test_user):
     async with async_session_factory() as session:
         account = Account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Test Checking",
             account_type=AccountType.savings,
             currency="USD",

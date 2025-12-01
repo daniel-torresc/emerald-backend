@@ -26,7 +26,11 @@ class TestAccountRoutes:
     # ========================================================================
 
     async def test_create_account_success(
-        self, async_client: AsyncClient, test_user: User, user_token: dict
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        user_token: dict,
+        test_financial_institution,
     ):
         """Test successful account creation."""
         response = await async_client.post(
@@ -36,6 +40,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1500.50",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -55,7 +60,7 @@ class TestAccountRoutes:
         assert "updated_at" in data
 
     async def test_create_account_negative_balance(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test creating account with negative balance (credit card/loan)."""
         response = await async_client.post(
@@ -65,6 +70,7 @@ class TestAccountRoutes:
                 "account_type": "other",
                 "currency": "USD",
                 "opening_balance": "-500.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -75,7 +81,7 @@ class TestAccountRoutes:
         assert data["current_balance"] == "-500.00"
 
     async def test_create_account_duplicate_name(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test that duplicate account name fails."""
         # Create first account
@@ -86,6 +92,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -98,6 +105,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "2000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -110,7 +118,7 @@ class TestAccountRoutes:
         assert "already exists" in error_message
 
     async def test_create_account_invalid_currency(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test that invalid currency format fails validation."""
         invalid_currencies = ["US", "USDD", "usd", "123"]
@@ -123,13 +131,16 @@ class TestAccountRoutes:
                     "account_type": "savings",
                     "currency": currency,
                     "opening_balance": "1000.00",
+                    "financial_institution_id": str(test_financial_institution.id),
                 },
                 headers={"Authorization": f"Bearer {user_token['access_token']}"},
             )
 
             assert response.status_code == 422  # Validation error
 
-    async def test_create_account_unauthenticated(self, async_client: AsyncClient):
+    async def test_create_account_unauthenticated(
+        self, async_client: AsyncClient, test_financial_institution
+    ):
         """Test that unauthenticated request fails."""
         response = await async_client.post(
             "/api/v1/accounts",
@@ -138,6 +149,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
         )
 
@@ -162,7 +174,7 @@ class TestAccountRoutes:
         assert len(data) == 0
 
     async def test_list_accounts_multiple(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test listing multiple accounts."""
         # Create 3 accounts
@@ -174,6 +186,7 @@ class TestAccountRoutes:
                     "account_type": "savings",
                     "currency": "USD",
                     "opening_balance": "1000.00",
+                    "financial_institution_id": str(test_financial_institution.id),
                 },
                 headers={"Authorization": f"Bearer {user_token['access_token']}"},
             )
@@ -189,7 +202,7 @@ class TestAccountRoutes:
         assert len(data) == 3
 
     async def test_list_accounts_filter_by_type(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test filtering accounts by type."""
         # Create savings account
@@ -200,6 +213,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -212,6 +226,7 @@ class TestAccountRoutes:
                 "account_type": "other",
                 "currency": "USD",
                 "opening_balance": "-500.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -228,7 +243,7 @@ class TestAccountRoutes:
         assert data[0]["account_type"] == "savings"
 
     async def test_list_accounts_filter_by_active(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test filtering accounts by active status."""
         # Create active account
@@ -239,6 +254,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -259,6 +275,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "2000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -275,7 +292,7 @@ class TestAccountRoutes:
         assert data[0]["is_active"] is True
 
     async def test_list_accounts_pagination(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test pagination for list accounts."""
         # Create 5 accounts
@@ -287,6 +304,7 @@ class TestAccountRoutes:
                     "account_type": "savings",
                     "currency": "USD",
                     "opening_balance": "100.00",
+                    "financial_institution_id": str(test_financial_institution.id),
                 },
                 headers={"Authorization": f"Bearer {user_token['access_token']}"},
             )
@@ -312,7 +330,7 @@ class TestAccountRoutes:
     # ========================================================================
 
     async def test_get_account_success(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test getting account by ID."""
         # Create account
@@ -323,6 +341,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "EUR",
                 "opening_balance": "2000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -363,6 +382,7 @@ class TestAccountRoutes:
         admin_user: User,
         user_token: dict,
         admin_token: dict,
+        test_financial_institution,
     ):
         """Test that non-owner cannot access account."""
         # Create account as test_user
@@ -373,6 +393,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -392,7 +413,7 @@ class TestAccountRoutes:
     # ========================================================================
 
     async def test_update_account_name(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test updating account name."""
         # Create account
@@ -403,6 +424,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -421,7 +443,7 @@ class TestAccountRoutes:
         assert data["account_name"] == "New Name"
 
     async def test_update_account_is_active(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test updating account active status."""
         # Create account
@@ -432,6 +454,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -450,7 +473,7 @@ class TestAccountRoutes:
         assert data["is_active"] is False
 
     async def test_update_account_duplicate_name(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test that updating to duplicate name fails."""
         # Create two accounts
@@ -461,6 +484,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -472,6 +496,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "2000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -492,7 +517,7 @@ class TestAccountRoutes:
     # ========================================================================
 
     async def test_delete_account_success(
-        self, async_client: AsyncClient, user_token: dict
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
     ):
         """Test deleting account (soft delete)."""
         # Create account
@@ -503,6 +528,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
@@ -525,7 +551,11 @@ class TestAccountRoutes:
         assert get_response.status_code == 404
 
     async def test_delete_account_not_owner(
-        self, async_client: AsyncClient, user_token: dict, admin_token: dict
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        admin_token: dict,
+        test_financial_institution,
     ):
         """Test that non-owner cannot delete account."""
         # Create account as test_user
@@ -536,6 +566,7 @@ class TestAccountRoutes:
                 "account_type": "savings",
                 "currency": "USD",
                 "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
             },
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
