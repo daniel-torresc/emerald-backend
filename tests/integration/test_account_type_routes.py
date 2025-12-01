@@ -129,8 +129,7 @@ class TestAccountTypeRoutes:
         data = response.json()
         # Check that validation error mentions the key field
         assert any(
-            "key" in str(detail.get("field", ""))
-            for detail in data["error"]["details"]
+            "key" in str(detail.get("field", "")) for detail in data["error"]["details"]
         )
 
         # Test special characters (hyphen) - should fail
@@ -146,8 +145,7 @@ class TestAccountTypeRoutes:
         assert response.status_code == 422
         data = response.json()
         assert any(
-            "key" in str(detail.get("field", ""))
-            for detail in data["error"]["details"]
+            "key" in str(detail.get("field", "")) for detail in data["error"]["details"]
         )
 
         # Test uppercase letters - should fail pattern validation
@@ -163,8 +161,7 @@ class TestAccountTypeRoutes:
         assert response.status_code == 422
         data = response.json()
         assert any(
-            "key" in str(detail.get("field", ""))
-            for detail in data["error"]["details"]
+            "key" in str(detail.get("field", "")) for detail in data["error"]["details"]
         )
 
         # Test valid key (lowercase with underscores and numbers) - should succeed
@@ -454,9 +451,7 @@ class TestAccountTypeRoutes:
 
         # Filter to our test types
         test_types = [
-            item
-            for item in data
-            if item["key"] in ["z_type", "a_type", "b_type"]
+            item for item in data if item["key"] in ["z_type", "a_type", "b_type"]
         ]
 
         # Should be ordered: b_type (sort=0), a_type (sort=1, name=A), z_type (sort=1, name=Z)

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, HttpUrl, field_validator
 from schwifty import IBAN
 
 from src.models.enums import AccountType
+from src.schemas.financial_institution import FinancialInstitutionResponse
 
 
 class AccountBase(BaseModel):
@@ -26,7 +27,6 @@ class AccountBase(BaseModel):
         account_name: Descriptive name for the account
         account_type: Type of account (savings, credit_card, etc.)
         currency: ISO 4217 currency code (3 uppercase letters)
-        bank_name: Name of the financial institution (optional)
         notes: User's personal notes about the account (optional)
     """
 
@@ -47,13 +47,6 @@ class AccountBase(BaseModel):
         max_length=3,
         description="ISO 4217 currency code (3 uppercase letters)",
         examples=["USD", "EUR", "GBP"],
-    )
-
-    bank_name: str | None = Field(
-        default=None,
-        max_length=100,
-        description="Name of the financial institution",
-        examples=["Chase Bank", "Bank of America", "Wells Fargo"],
     )
 
     notes: str | None = Field(
@@ -103,13 +96,18 @@ class AccountCreate(AccountBase):
         account_name: Name of the account
         account_type: Type of account
         currency: ISO 4217 currency code (immutable after creation)
+        financial_institution_id: Financial institution ID (REQUIRED, must reference active institution)
         opening_balance: Initial balance (can be negative for loans/credit cards)
-        bank_name: Bank institution name (immutable after creation)
         iban: Full IBAN (will be encrypted, immutable after creation)
         color_hex: Hex color code for UI display
         icon_url: URL to account icon
         notes: User notes
     """
+
+    financial_institution_id: uuid.UUID = Field(
+        description="Financial institution ID (required, must reference active institution)",
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
+    )
 
     opening_balance: Decimal = Field(
         description="Initial account balance (can be negative for loans/credit cards)",
@@ -194,19 +192,34 @@ class AccountCreate(AccountBase):
             return None
         return str(value)
 
+    @field_validator("financial_institution_id")
+    @classmethod
+    def validate_financial_institution_id(cls, value: uuid.UUID) -> uuid.UUID:
+        """
+        Validate financial institution ID is a valid UUID.
+
+        Business validation (exists, is_active) happens in service layer.
+        """
+        # UUID validation is automatic from type hint
+        # Just ensure it's not nil UUID
+        if value == uuid.UUID("00000000-0000-0000-0000-000000000000"):
+            raise ValueError("Financial institution ID cannot be nil UUID")
+        return value
+
 
 class AccountUpdate(BaseModel):
     """
     Schema for updating account information.
 
-    Updateable fields: account_name, is_active, color_hex, icon_url, notes
-    Immutable fields: currency, balances, account_type, bank_name, iban
+    Updateable fields: account_name, is_active, financial_institution_id, color_hex, icon_url, notes
+    Immutable fields: currency, balances, account_type, iban
 
     All fields are optional to support partial updates (PATCH).
 
     Attributes:
         account_name: New account name (optional)
         is_active: New active status (optional)
+        financial_institution_id: New institution ID (optional, must be active)
         color_hex: New hex color code (optional)
         icon_url: New icon URL (optional)
         notes: New notes (optional)
@@ -224,6 +237,12 @@ class AccountUpdate(BaseModel):
         default=None,
         description="Active status (inactive accounts hidden by default)",
         examples=[True, False],
+    )
+
+    financial_institution_id: uuid.UUID | None = Field(
+        default=None,
+        description="New financial institution ID (optional, must reference active institution)",
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
 
     color_hex: str | None = Field(
@@ -275,6 +294,18 @@ class AccountUpdate(BaseModel):
             return None
         return str(value)
 
+    @field_validator("financial_institution_id")
+    @classmethod
+    def validate_financial_institution_id(
+        cls, value: uuid.UUID | None
+    ) -> uuid.UUID | None:
+        """Validate institution ID if provided."""
+        if value is not None and value == uuid.UUID(
+            "00000000-0000-0000-0000-000000000000"
+        ):
+            raise ValueError("Financial institution ID cannot be nil UUID")
+        return value
+
 
 class AccountResponse(AccountBase):
     """
@@ -287,10 +318,11 @@ class AccountResponse(AccountBase):
     Attributes:
         id: Account UUID
         user_id: Owner's user ID
+        financial_institution_id: Financial institution ID
+        financial_institution: Financial institution details (name, logo, etc.)
         account_name: Account name
         account_type: Account type
         currency: Currency code
-        bank_name: Bank institution name
         notes: User notes
         opening_balance: Initial balance
         current_balance: Current calculated balance
@@ -304,6 +336,11 @@ class AccountResponse(AccountBase):
 
     id: uuid.UUID = Field(description="Account unique identifier")
     user_id: uuid.UUID = Field(description="Owner's user ID")
+
+    financial_institution_id: uuid.UUID = Field(description="Financial institution ID")
+    financial_institution: FinancialInstitutionResponse = Field(
+        description="Financial institution details (name, logo, etc.)"
+    )
 
     opening_balance: Decimal = Field(description="Initial account balance")
     current_balance: Decimal = Field(
@@ -332,7 +369,7 @@ class AccountListItem(BaseModel):
     Schema for account list item (optimized response).
 
     Lighter version of AccountResponse for list endpoints.
-    Includes visual metadata (color, icon, bank_name) for UI display.
+    Includes visual metadata (color, icon, institution) for UI display.
 
     Attributes:
         id: Account UUID
@@ -343,7 +380,8 @@ class AccountListItem(BaseModel):
         is_active: Active status
         color_hex: Hex color code
         icon_url: Icon URL
-        bank_name: Bank name
+        financial_institution_id: Institution ID
+        financial_institution: Full institution details
         created_at: Creation timestamp
     """
 
@@ -355,7 +393,8 @@ class AccountListItem(BaseModel):
     is_active: bool
     color_hex: str
     icon_url: str | None
-    bank_name: str | None
+    financial_institution_id: uuid.UUID
+    financial_institution: FinancialInstitutionResponse
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -370,6 +409,7 @@ class AccountFilterParams(BaseModel):
     Attributes:
         is_active: Filter by active status (None = all)
         account_type: Filter by account type (None = all types)
+        financial_institution_id: Filter by institution (None = all)
     """
 
     is_active: bool | None = Field(
@@ -380,4 +420,9 @@ class AccountFilterParams(BaseModel):
     account_type: AccountType | None = Field(
         default=None,
         description="Filter by account type",
+    )
+
+    financial_institution_id: uuid.UUID | None = Field(
+        default=None,
+        description="Filter by financial institution",
     )

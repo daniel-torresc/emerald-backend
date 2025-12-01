@@ -75,8 +75,8 @@ class AccountService:
         account_type: AccountType,
         currency: str,
         opening_balance: Decimal,
+        financial_institution_id: uuid.UUID,
         current_user: User,
-        bank_name: str | None = None,
         iban: str | None = None,
         color_hex: str = "#818E8F",
         icon_url: HttpUrl | None = None,
@@ -90,6 +90,7 @@ class AccountService:
 
         Creates an account with the specified details. The account name must be
         unique per user (case-insensitive). Currency is immutable after creation.
+        Financial institution is mandatory (all accounts must be linked to an institution).
 
         Args:
             user_id: ID of user who will own the account
@@ -97,7 +98,12 @@ class AccountService:
             account_type: Type of account (savings, credit_card, etc.)
             currency: ISO 4217 currency code (3 uppercase letters)
             opening_balance: Initial account balance (can be negative for loans)
+            financial_institution_id: Financial institution ID (REQUIRED, must be active)
             current_user: Currently authenticated user (for audit logging)
+            iban: IBAN number (optional, will be encrypted)
+            color_hex: Hex color for UI (optional, default #818E8F)
+            icon_url: Account icon URL (optional)
+            notes: User notes (optional)
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
@@ -108,6 +114,7 @@ class AccountService:
         Raises:
             AlreadyExistsError: If account name already exists for user
             NotFoundError: If user_id does not exist (foreign key constraint)
+            ValidationError: If institution not found or is not active
 
         Example:
             account = await account_service.create_account(
@@ -116,6 +123,7 @@ class AccountService:
                 account_type=AccountType.SAVINGS,
                 currency="USD",
                 opening_balance=Decimal("1000.00"),
+                financial_institution_id=chase_id,
                 current_user=user
             )
         """
@@ -137,6 +145,20 @@ class AccountService:
                 f"Invalid currency code '{currency}'. Must be 3 uppercase letters (e.g., USD, EUR, GBP)"
             )
 
+        # Validate financial institution exists and is active
+        is_valid = await self.account_repo.validate_institution_active(
+            financial_institution_id
+        )
+        if not is_valid:
+            logger.warning(
+                f"User {user_id} attempted to create account with invalid/inactive "
+                f"institution: {financial_institution_id}"
+            )
+            raise ValidationError(
+                "Financial institution not found or is not active. "
+                "Please select a different institution."
+            )
+
         # Process IBAN if provided
         encrypted_iban = None
         iban_last_four = None
@@ -155,6 +177,7 @@ class AccountService:
         # Phase 2: current_balance = opening_balance (no transactions yet)
         account = await self.account_repo.create(
             user_id=user_id,
+            financial_institution_id=financial_institution_id,
             account_name=account_name,
             account_type=account_type,
             currency=currency,
@@ -163,7 +186,6 @@ class AccountService:
             is_active=True,
             color_hex=color_hex,
             icon_url=icon_url,
-            bank_name=bank_name,
             iban=encrypted_iban,
             iban_last_four=iban_last_four,
             notes=notes,
@@ -181,12 +203,14 @@ class AccountService:
             action=AuditAction.CREATE,
             entity_type="account",
             entity_id=account.id,
-            description=f"Created account '{account.account_name}' ({account.account_type.value}, {account.currency})",
+            description=f"Created account '{account.account_name}' at {account.financial_institution.short_name} ({account.account_type.value}, {account.currency})",
             extra_metadata={
                 "account_name": account.account_name,
                 "account_type": account.account_type.value,
                 "currency": account.currency,
                 "opening_balance": str(opening_balance),
+                "financial_institution_id": str(financial_institution_id),
+                "financial_institution_name": account.financial_institution.short_name,
             },
             ip_address=ip_address,
             user_agent=user_agent,
@@ -247,6 +271,7 @@ class AccountService:
         limit: int = 20,
         is_active: bool | None = None,
         account_type: AccountType | None = None,
+        financial_institution_id: uuid.UUID | None = None,
     ) -> list[Account]:
         """
         List all accounts for a user with pagination and filtering.
@@ -260,6 +285,7 @@ class AccountService:
             limit: Maximum number of records to return (max 100)
             is_active: Filter by active status (None = all)
             account_type: Filter by account type (None = all types)
+            financial_institution_id: Filter by institution (None = all)
 
         Returns:
             List of Account instances (owned + shared)
@@ -272,6 +298,7 @@ class AccountService:
                 user_id=user.id,
                 current_user=user,
                 is_active=True,
+                financial_institution_id=chase_id,
                 limit=20
             )
         """
@@ -286,13 +313,14 @@ class AccountService:
         if limit > 100:
             limit = 100
 
-        # Get owned accounts
+        # Get owned accounts (without pagination - we'll paginate the combined results)
         owned_accounts = await self.account_repo.get_by_user(
             user_id=user_id,
-            skip=skip,
-            limit=limit,
+            skip=0,
+            limit=100,  # Get all owned accounts (up to 100)
             is_active=is_active,
             account_type=account_type,
+            financial_institution_id=financial_institution_id,
         )
 
         # Get shared accounts (accounts where user has a share)
@@ -300,6 +328,7 @@ class AccountService:
             user_id=user_id,
             is_active=is_active,
             account_type=account_type,
+            financial_institution_id=financial_institution_id,
         )
 
         # Combine and deduplicate (in case user owns AND has a share on same account)
@@ -312,9 +341,9 @@ class AccountService:
                 account_ids_seen.add(shared_acc.id)
 
         # Apply pagination to combined results
-        # Note: This means pagination might not be exact when combining owned+shared
+        # Note: This combines owned+shared before pagination
         # For a production system, we'd want to do pagination at the DB level
-        return all_accounts[skip : skip + limit] if skip > 0 else all_accounts[:limit]
+        return all_accounts[skip : skip + limit]
 
     async def update_account(
         self,
@@ -322,6 +351,7 @@ class AccountService:
         current_user: User,
         account_name: str | None = None,
         is_active: bool | None = None,
+        financial_institution_id: uuid.UUID | None = None,
         color_hex: str | None = None,
         icon_url: HttpUrl | None = None,
         notes: str | None = None,
@@ -332,8 +362,8 @@ class AccountService:
         """
         Update account details.
 
-        Updateable fields: account_name, is_active, color_hex, icon_url, notes
-        Immutable fields: currency, balances, account_type, bank_name, iban
+        Updateable fields: account_name, is_active, financial_institution_id, color_hex, icon_url, notes
+        Immutable fields: currency, balances, account_type, iban
 
         Phase 2A: Only owner can update.
         Phase 2B: Owner and editor can update (owner can change is_active).
@@ -343,6 +373,10 @@ class AccountService:
             current_user: Currently authenticated user
             account_name: New account name (optional, validates uniqueness)
             is_active: New active status (optional)
+            financial_institution_id: New institution (optional, validates exists and active)
+            color_hex: New color hex (optional)
+            icon_url: New icon URL (optional)
+            notes: New notes (optional)
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
@@ -353,12 +387,14 @@ class AccountService:
         Raises:
             NotFoundError: If account not found or user has no access
             AlreadyExistsError: If new account name already exists for user
+            ValidationError: If new institution not found or is not active
 
         Example:
             account = await account_service.update_account(
                 account_id=account.id,
                 current_user=user,
                 account_name="New Name",
+                financial_institution_id=new_institution_id,
                 is_active=True
             )
         """
@@ -398,6 +434,31 @@ class AccountService:
         if is_active is not None and is_active != account.is_active:
             changes["is_active"] = {"old": account.is_active, "new": is_active}
             account.is_active = is_active
+
+        # Update financial institution if provided
+        if (
+            financial_institution_id is not None
+            and financial_institution_id != account.financial_institution_id
+        ):
+            # Validate new institution exists and is active
+            is_valid = await self.account_repo.validate_institution_active(
+                financial_institution_id
+            )
+            if not is_valid:
+                logger.warning(
+                    f"User {current_user.id} attempted to update account {account_id} "
+                    f"with invalid/inactive institution: {financial_institution_id}"
+                )
+                raise ValidationError(
+                    "Financial institution not found or is not active. "
+                    "Please select a different institution."
+                )
+
+            changes["financial_institution_id"] = {
+                "old": str(account.financial_institution_id),
+                "new": str(financial_institution_id),
+            }
+            account.financial_institution_id = financial_institution_id
 
         # Update color_hex if provided
         if color_hex is not None and color_hex != account.color_hex:

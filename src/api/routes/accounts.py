@@ -84,22 +84,23 @@ async def create_account(
         - account_name: Account name (1-100 characters, unique per user)
         - account_type: Type (savings, credit_card, debit_card, loan, investment, other)
         - currency: ISO 4217 code (USD, EUR, GBP, etc.)
+        - financial_institution_id: Financial institution UUID (REQUIRED, must be active)
         - opening_balance: Initial balance (can be negative for loans)
-        - bank_name: Bank institution name (optional, immutable after creation)
         - iban: IBAN account number (optional, will be encrypted, immutable)
         - color_hex: Hex color for UI display (optional, default #818E8F)
         - icon_url: URL to account icon (optional)
         - notes: Personal notes about the account (optional)
 
     Returns:
-        AccountResponse with created account details
+        AccountResponse with created account details including institution info
 
     Requires:
         - Valid access token
         - Active user account
+        - Valid financial_institution_id referencing active institution
 
     Raises:
-        - 400 Bad Request: If account name exists or currency invalid
+        - 400 Bad Request: If account name exists, currency invalid, or institution invalid/inactive
         - 422 Unprocessable Entity: If validation fails (invalid IBAN, color format, etc.)
     """
     account = await account_service.create_account(
@@ -108,8 +109,8 @@ async def create_account(
         account_type=account_data.account_type,
         currency=account_data.currency,
         opening_balance=account_data.opening_balance,
+        financial_institution_id=account_data.financial_institution_id,
         current_user=current_user,
-        bank_name=account_data.bank_name,
         iban=account_data.iban,
         color_hex=account_data.color_hex,
         icon_url=account_data.icon_url,
@@ -173,6 +174,9 @@ async def list_accounts(
     account_type: Annotated[
         AccountType | None, Query(description="Filter by account type")
     ] = None,
+    financial_institution_id: Annotated[
+        uuid.UUID | None, Query(description="Filter by financial institution")
+    ] = None,
 ) -> list[AccountListItem]:
     """
     List user's accounts with pagination and filtering.
@@ -182,9 +186,10 @@ async def list_accounts(
         - limit: Max records to return (default: 20, max: 100)
         - is_active: Filter by status (optional)
         - account_type: Filter by type (optional)
+        - financial_institution_id: Filter by institution (optional)
 
     Returns:
-        List of AccountListItem (optimized response)
+        List of AccountListItem (optimized response with institution details)
 
     Requires:
         - Valid access token
@@ -197,6 +202,7 @@ async def list_accounts(
         limit=limit,
         is_active=is_active,
         account_type=account_type,
+        financial_institution_id=financial_institution_id,
     )
 
     return [AccountListItem.model_validate(account) for account in accounts]
@@ -311,12 +317,13 @@ async def update_account(
     Request body:
         - account_name: New name (optional, validates uniqueness)
         - is_active: New active status (optional)
+        - financial_institution_id: New institution (optional, must be active)
         - color_hex: New hex color (optional)
         - icon_url: New icon URL (optional)
         - notes: New notes (optional)
 
     Immutable fields (cannot be updated):
-        - bank_name, iban, currency, opening_balance, account_type
+        - iban, currency, opening_balance, account_type
 
     Returns:
         AccountResponse with updated account details
@@ -327,7 +334,7 @@ async def update_account(
         - Account ownership
 
     Raises:
-        - 400 Bad Request: If new name already exists
+        - 400 Bad Request: If new name already exists or institution invalid/inactive
         - 404 Not Found: If account doesn't exist or user has no access
         - 422 Unprocessable Entity: If validation fails
     """
@@ -336,6 +343,7 @@ async def update_account(
         current_user=current_user,
         account_name=update_data.account_name,
         is_active=update_data.is_active,
+        financial_institution_id=update_data.financial_institution_id,
         color_hex=update_data.color_hex,
         icon_url=update_data.icon_url,
         notes=update_data.notes,

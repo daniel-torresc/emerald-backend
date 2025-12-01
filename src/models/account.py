@@ -52,6 +52,7 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     Attributes:
         id: UUID primary key
         user_id: Owner of the account (foreign key to users)
+        financial_institution_id: Financial institution ID (foreign key to financial_institutions, mandatory)
         account_name: User-defined descriptive name (1-100 chars, unique per user)
         account_type: Type of account (savings, credit_card, loan, etc.)
         currency: ISO 4217 currency code (3 uppercase letters, immutable)
@@ -66,6 +67,7 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
 
     Relationships:
         owner: User object who owns this account (via user_id)
+        financial_institution: FinancialInstitution object (via financial_institution_id, eager-loaded)
         shares: List of AccountShare objects (who has access and permission level)
 
     Validation:
@@ -127,6 +129,15 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         index=True,
     )
 
+    # Financial Institution (Mandatory FK to master data)
+    financial_institution_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("financial_institutions.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+        comment="Financial institution this account belongs to (mandatory)",
+    )
+
     # Account Details
     account_name: Mapped[str] = mapped_column(
         String(100),
@@ -178,12 +189,6 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         comment="URL or path to account icon",
     )
 
-    bank_name: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-        comment="Name of the financial institution",
-    )
-
     iban: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
@@ -209,6 +214,13 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         lazy="selectin",
     )
 
+    financial_institution: Mapped["FinancialInstitution"] = relationship(  # type: ignore
+        "FinancialInstitution",
+        foreign_keys=[financial_institution_id],
+        lazy="selectin",  # Async-safe eager loading to prevent N+1 queries
+        back_populates="accounts",
+    )
+
     shares: Mapped[list["AccountShare"]] = relationship(
         "AccountShare",
         back_populates="account",
@@ -228,10 +240,10 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
 
     def __repr__(self) -> str:
         """String representation of Account."""
-        bank_info = f", bank={self.bank_name}" if self.bank_name else ""
         return (
             f"Account(id={self.id}, name={self.account_name}, "
-            f"type={self.account_type.value}, balance={self.current_balance} {self.currency}{bank_info})"
+            f"type={self.account_type.value}, balance={self.current_balance} {self.currency}, "
+            f"institution={self.financial_institution.short_name})"
         )
 
 

@@ -5,7 +5,6 @@ This module provides database operations for the FinancialInstitution model,
 including searches by SWIFT code, routing number, and filtering by country/type.
 """
 
-
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
