@@ -313,11 +313,11 @@ class AccountService:
         if limit > 100:
             limit = 100
 
-        # Get owned accounts
+        # Get owned accounts (without pagination - we'll paginate the combined results)
         owned_accounts = await self.account_repo.get_by_user(
             user_id=user_id,
-            skip=skip,
-            limit=limit,
+            skip=0,
+            limit=100,  # Get all owned accounts (up to 100)
             is_active=is_active,
             account_type=account_type,
             financial_institution_id=financial_institution_id,
@@ -341,9 +341,9 @@ class AccountService:
                 account_ids_seen.add(shared_acc.id)
 
         # Apply pagination to combined results
-        # Note: This means pagination might not be exact when combining owned+shared
+        # Note: This combines owned+shared before pagination
         # For a production system, we'd want to do pagination at the DB level
-        return all_accounts[skip : skip + limit] if skip > 0 else all_accounts[:limit]
+        return all_accounts[skip : skip + limit]
 
     async def update_account(
         self,
