@@ -33,7 +33,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
-from src.models.enums import AccountType, PermissionLevel
+from src.models.enums import PermissionLevel
 from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 
 
@@ -54,7 +54,7 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         user_id: Owner of the account (foreign key to users)
         financial_institution_id: Financial institution ID (foreign key to financial_institutions, mandatory)
         account_name: User-defined descriptive name (1-100 chars, unique per user)
-        account_type: Type of account (savings, credit_card, loan, etc.)
+        account_type_id: Foreign key to account_types (system or user-defined type)
         currency: ISO 4217 currency code (3 uppercase letters, immutable)
         opening_balance: Initial account balance (can be negative for loans)
         current_balance: Current account balance (cached, calculated from transactions)
@@ -68,11 +68,12 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     Relationships:
         owner: User object who owns this account (via user_id)
         financial_institution: FinancialInstitution object (via financial_institution_id, eager-loaded)
+        account_type: AccountType object (via account_type_id, eager-loaded)
         shares: List of AccountShare objects (who has access and permission level)
 
     Validation:
         - account_name: 1-100 characters, required, unique per user (case-insensitive)
-        - account_type: Must be valid AccountType enum value
+        - account_type_id: Must reference an active account type (system or user's custom type)
         - currency: Must match ISO 4217 format (3 uppercase letters, e.g., USD, EUR, GBP)
         - opening_balance: Decimal(15,2), can be negative
         - current_balance: Decimal(15,2), can be negative
@@ -100,7 +101,7 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     Indexes:
         Defined in migration for performance:
         - user_id (for listing user's accounts)
-        - account_type (for filtering by type)
+        - account_type_id (for filtering by type)
         - is_active (for filtering active/inactive)
         - currency (for filtering by currency)
         - Partial unique index on (user_id, LOWER(account_name)) WHERE deleted_at IS NULL
@@ -108,8 +109,9 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     Example:
         account = Account(
             user_id=user.id,
+            financial_institution_id=institution.id,
             account_name="Chase Savings",
-            account_type=AccountType.SAVINGS,
+            account_type_id=savings_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
@@ -145,9 +147,12 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         index=True,
     )
 
-    account_type: Mapped[AccountType] = mapped_column(
+    account_type_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("account_types.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+        comment="Foreign key to account_types table",
     )
 
     currency: Mapped[str] = mapped_column(
@@ -221,6 +226,12 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         back_populates="accounts",
     )
 
+    account_type: Mapped["AccountType"] = relationship(  # type: ignore
+        "AccountType",
+        foreign_keys=[account_type_id],
+        lazy="selectin",  # Async-safe eager loading to prevent N+1 queries
+    )
+
     shares: Mapped[list["AccountShare"]] = relationship(
         "AccountShare",
         back_populates="account",
@@ -242,7 +253,7 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         """String representation of Account."""
         return (
             f"Account(id={self.id}, name={self.account_name}, "
-            f"type={self.account_type.value}, balance={self.current_balance} {self.currency}, "
+            f"type={self.account_type.key}, balance={self.current_balance} {self.currency}, "
             f"institution={self.financial_institution.short_name})"
         )
 
