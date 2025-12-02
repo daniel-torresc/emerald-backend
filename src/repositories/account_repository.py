@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.models.account import Account
-from src.models.enums import AccountType
 from src.repositories.base import BaseRepository
 
 
@@ -45,31 +44,32 @@ class AccountRepository(BaseRepository[Account]):
         skip: int = 0,
         limit: int = 100,
         is_active: bool | None = None,
-        account_type: AccountType | None = None,
+        account_type_id: uuid.UUID | None = None,
         financial_institution_id: uuid.UUID | None = None,
     ) -> list[Account]:
         """
         Get all accounts for a specific user.
 
-        Includes eager loading of financial_institution relationship to prevent N+1 queries.
+        Includes eager loading of financial_institution and account_type relationships
+        to prevent N+1 queries.
 
         Args:
             user_id: ID of the user who owns the accounts
             skip: Number of records to skip (pagination)
             limit: Maximum number of records to return (max 100)
             is_active: Filter by active status (None = all)
-            account_type: Filter by account type (None = all types)
+            account_type_id: Filter by account type ID (None = all types)
             financial_institution_id: Filter by financial institution (None = all)
 
         Returns:
-            List of Account instances with eager-loaded institution
+            List of Account instances with eager-loaded institution and account type
 
         Example:
-            # Get all active savings accounts for user at specific institution
+            # Get all active checking accounts for user at specific institution
             accounts = await account_repo.get_by_user(
                 user_id=user.id,
                 is_active=True,
-                account_type=AccountType.SAVINGS,
+                account_type_id=checking_type_id,
                 financial_institution_id=chase_id
             )
         """
@@ -77,8 +77,9 @@ class AccountRepository(BaseRepository[Account]):
             select(Account)
             .where(Account.user_id == user_id)
             .options(
-                selectinload(Account.financial_institution)
-            )  # Eager load institution
+                selectinload(Account.financial_institution),
+                selectinload(Account.account_type),
+            )  # Eager load institution and account type
         )
         query = self._apply_soft_delete_filter(query)
 
@@ -86,8 +87,8 @@ class AccountRepository(BaseRepository[Account]):
         if is_active is not None:
             query = query.where(Account.is_active == is_active)
 
-        if account_type is not None:
-            query = query.where(Account.account_type == account_type)
+        if account_type_id is not None:
+            query = query.where(Account.account_type_id == account_type_id)
 
         if financial_institution_id is not None:
             query = query.where(
@@ -107,29 +108,30 @@ class AccountRepository(BaseRepository[Account]):
         self,
         user_id: uuid.UUID,
         is_active: bool | None = None,
-        account_type: AccountType | None = None,
+        account_type_id: uuid.UUID | None = None,
         financial_institution_id: uuid.UUID | None = None,
     ) -> list[Account]:
         """
         Get all accounts shared with a specific user.
 
         Returns accounts where the user has been granted access via AccountShare.
-        Includes eager loading of financial_institution relationship.
+        Includes eager loading of financial_institution and account_type relationships.
 
         Args:
             user_id: ID of the user who has been granted access
             is_active: Filter by active status (None = all)
-            account_type: Filter by account type (None = all types)
+            account_type_id: Filter by account type ID (None = all types)
             financial_institution_id: Filter by institution (None = all)
 
         Returns:
             List of Account instances shared with the user
 
         Example:
-            # Get all active accounts shared with user at specific institution
+            # Get all active checking accounts shared with user at specific institution
             shared_accounts = await account_repo.get_shared_with_user(
                 user_id=user.id,
                 is_active=True,
+                account_type_id=checking_type_id,
                 financial_institution_id=chase_id
             )
         """
@@ -141,8 +143,9 @@ class AccountRepository(BaseRepository[Account]):
             .join(AccountShare, Account.id == AccountShare.account_id)
             .where(AccountShare.user_id == user_id)
             .options(
-                selectinload(Account.financial_institution)
-            )  # Eager load institution
+                selectinload(Account.financial_institution),
+                selectinload(Account.account_type),
+            )  # Eager load institution and account type
         )
         query = self._apply_soft_delete_filter(query)
 
@@ -150,8 +153,8 @@ class AccountRepository(BaseRepository[Account]):
         if is_active is not None:
             query = query.where(Account.is_active == is_active)
 
-        if account_type is not None:
-            query = query.where(Account.account_type == account_type)
+        if account_type_id is not None:
+            query = query.where(Account.account_type_id == account_type_id)
 
         if financial_institution_id is not None:
             query = query.where(
