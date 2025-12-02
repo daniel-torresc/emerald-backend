@@ -16,7 +16,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from src.api.dependencies import get_account_service, require_active_user
-from src.models.enums import AccountType
 from src.models.user import User
 from src.schemas.account import (
     AccountCreate,
@@ -82,7 +81,7 @@ async def create_account(
 
     Request body:
         - account_name: Account name (1-100 characters, unique per user)
-        - account_type: Type (savings, credit_card, debit_card, loan, investment, other)
+        - account_type_id: Account type UUID (must reference active account type)
         - currency: ISO 4217 code (USD, EUR, GBP, etc.)
         - financial_institution_id: Financial institution UUID (REQUIRED, must be active)
         - opening_balance: Initial balance (can be negative for loans)
@@ -106,7 +105,7 @@ async def create_account(
     account = await account_service.create_account(
         user_id=current_user.id,
         account_name=account_data.account_name,
-        account_type=account_data.account_type,
+        account_type_id=account_data.account_type_id,
         currency=account_data.currency,
         opening_balance=account_data.opening_balance,
         financial_institution_id=account_data.financial_institution_id,
@@ -171,8 +170,8 @@ async def list_accounts(
             description="Filter by active status (true=active, false=inactive, null=all)"
         ),
     ] = None,
-    account_type: Annotated[
-        AccountType | None, Query(description="Filter by account type")
+    account_type_id: Annotated[
+        uuid.UUID | None, Query(description="Filter by account type ID")
     ] = None,
     financial_institution_id: Annotated[
         uuid.UUID | None, Query(description="Filter by financial institution")
@@ -185,7 +184,7 @@ async def list_accounts(
         - skip: Number of records to skip (default: 0)
         - limit: Max records to return (default: 20, max: 100)
         - is_active: Filter by status (optional)
-        - account_type: Filter by type (optional)
+        - account_type_id: Filter by account type ID (optional)
         - financial_institution_id: Filter by institution (optional)
 
     Returns:
@@ -201,7 +200,7 @@ async def list_accounts(
         skip=skip,
         limit=limit,
         is_active=is_active,
-        account_type=account_type,
+        account_type_id=account_type_id,
         financial_institution_id=financial_institution_id,
     )
 
@@ -283,8 +282,8 @@ async def get_account(
     description="""
     Update account details.
 
-    Only account_name and is_active can be updated.
-    Currency, balances, and account_type are immutable.
+    Updateable fields: account_name, is_active, account_type_id, financial_institution_id, color_hex, icon_url, notes
+    Immutable fields: currency, balances, iban
 
     **Phase 2A:** Only owner can update.
     **Phase 2B:** Owner and editors can update (only owner can change is_active).
@@ -317,13 +316,14 @@ async def update_account(
     Request body:
         - account_name: New name (optional, validates uniqueness)
         - is_active: New active status (optional)
+        - account_type_id: New account type ID (optional, must be active and accessible)
         - financial_institution_id: New institution (optional, must be active)
         - color_hex: New hex color (optional)
         - icon_url: New icon URL (optional)
         - notes: New notes (optional)
 
     Immutable fields (cannot be updated):
-        - iban, currency, opening_balance, account_type
+        - iban, currency, opening_balance
 
     Returns:
         AccountResponse with updated account details
@@ -343,6 +343,7 @@ async def update_account(
         current_user=current_user,
         account_name=update_data.account_name,
         is_active=update_data.is_active,
+        account_type_id=update_data.account_type_id,
         financial_institution_id=update_data.financial_institution_id,
         color_hex=update_data.color_hex,
         icon_url=update_data.icon_url,
