@@ -1,69 +1,20 @@
 """
 Unit tests for enum models.
 
-Tests the AccountType and TransactionType enums to ensure:
+Tests the TransactionType enum to ensure:
 - Correct values are defined
 - Helper methods work correctly
 - Enum serialization works as expected
+
+Note: AccountType is no longer an enum - it's now a database model (account_types table).
+Tests for AccountType functionality should be in test_account_type_model.py or integration tests.
 """
 
-from src.models.enums import AccountType, TransactionType
+from src.models.enums import TransactionType
 
 
-class TestAccountType:
-    """Test cases for AccountType enum."""
-
-    def test_account_type_values(self):
-        """Test that AccountType has correct values."""
-        assert AccountType.checking.value == "checking"
-        assert AccountType.savings.value == "savings"
-        assert AccountType.investment.value == "investment"
-        assert AccountType.other.value == "other"
-
-    def test_account_type_count(self):
-        """Test that AccountType has exactly 4 values."""
-        assert len(list(AccountType)) == 4
-
-    def test_account_type_to_dict_list(self):
-        """Test AccountType.to_dict_list() returns correct format."""
-        result = AccountType.to_dict_list()
-
-        # Check it's a list
-        assert isinstance(result, list)
-        assert len(result) == 4
-
-        # Check structure of each item
-        for item in result:
-            assert isinstance(item, dict)
-            assert "key" in item
-            assert "label" in item
-            assert isinstance(item["key"], str)
-            assert isinstance(item["label"], str)
-
-        # Check specific values
-        keys = [item["key"] for item in result]
-        assert "checking" in keys
-        assert "savings" in keys
-        assert "investment" in keys
-        assert "other" in keys
-
-        # Check labels are title case
-        labels = [item["label"] for item in result]
-        assert "Checking" in labels
-        assert "Savings" in labels
-        assert "Investment" in labels
-        assert "Other" in labels
-
-    def test_account_type_string_enum(self):
-        """Test that AccountType is a string enum."""
-        assert isinstance(AccountType.checking, str)
-        assert AccountType.checking == "checking"
-
-    def test_account_type_iteration(self):
-        """Test that AccountType can be iterated."""
-        account_types = list(AccountType)
-        assert len(account_types) == 4
-        assert AccountType.checking in account_types
+# AccountType enum tests removed - AccountType is now a database model, not an enum
+# See Feature 4: Convert account type from enum to foreign key relationship
 
 
 class TestTransactionType:

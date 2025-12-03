@@ -2,64 +2,18 @@
 Enums for account management and transaction models.
 
 This module defines:
-- AccountType: Types of financial accounts (savings, credit_card, etc.)
 - PermissionLevel: Permission levels for account sharing (owner, editor, viewer)
 - TransactionType: Types of financial transactions (debit, credit, transfer, etc.)
 - InstitutionType: Types of financial institutions (bank, credit_union, brokerage, fintech, other)
 
-These enums are used by the Account, AccountShare, Transaction, and FinancialInstitution models
+These enums are used by the AccountShare, Transaction, and FinancialInstitution models
 and are also created as PostgreSQL ENUM types in the database for type safety.
+
+Note: AccountType is no longer an enum. Account types are now stored in the account_types
+table as flexible master data, allowing both system-defined and user-defined types.
 """
 
 import enum
-
-
-class AccountType(str, enum.Enum):
-    """
-    Financial account types.
-
-    Supported account types for the platform. Updated to match
-    business requirements: checking, savings, investment, other.
-
-    Attributes:
-        checking: Current/checking accounts for daily transactions
-        savings: Savings accounts with positive balances
-        investment: Investment or brokerage accounts (stocks, bonds, mutual funds)
-        other: User-defined account types not covered by standard types
-
-    Usage:
-        account = Account(
-            account_name="My Checking",
-            account_type=AccountType.checking,
-            ...
-        )
-    """
-
-    checking = "checking"
-    savings = "savings"
-    investment = "investment"
-    other = "other"
-
-    @classmethod
-    def to_dict_list(cls) -> list[dict[str, str]]:
-        """
-        Return list of dicts with 'key' and 'label' for API responses.
-
-        Returns:
-            List of dictionaries with 'key' (enum value) and 'label' (display name)
-
-        Example:
-            [
-                {"key": "checking", "label": "Checking"},
-                {"key": "savings", "label": "Savings"},
-                {"key": "investment", "label": "Investment"},
-                {"key": "other", "label": "Other"}
-            ]
-        """
-        return [
-            {"key": item.value, "label": item.value.replace("_", " ").title()}
-            for item in cls
-        ]
 
 
 class PermissionLevel(str, enum.Enum):

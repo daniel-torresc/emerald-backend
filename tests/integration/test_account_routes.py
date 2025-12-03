@@ -31,13 +31,14 @@ class TestAccountRoutes:
         test_user: User,
         user_token: dict,
         test_financial_institution,
+        savings_account_type,
     ):
         """Test successful account creation."""
         response = await async_client.post(
             "/api/v1/accounts",
             json={
                 "account_name": "My Checking Account",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1500.50",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -49,7 +50,9 @@ class TestAccountRoutes:
         data = response.json()
 
         assert data["account_name"] == "My Checking Account"
-        assert data["account_type"] == "savings"
+        assert data["account_type_id"] == str(savings_account_type.id)
+        assert data["account_type"]["key"] == "savings"
+        assert data["account_type"]["name"] == "Savings"
         assert data["currency"] == "USD"
         assert data["opening_balance"] == "1500.50"
         assert data["current_balance"] == "1500.50"
@@ -60,14 +63,18 @@ class TestAccountRoutes:
         assert "updated_at" in data
 
     async def test_create_account_negative_balance(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        other_account_type,
     ):
         """Test creating account with negative balance (credit card/loan)."""
         response = await async_client.post(
             "/api/v1/accounts",
             json={
                 "account_name": "Credit Card",
-                "account_type": "other",
+                "account_type_id": str(other_account_type.id),
                 "currency": "USD",
                 "opening_balance": "-500.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -81,7 +88,11 @@ class TestAccountRoutes:
         assert data["current_balance"] == "-500.00"
 
     async def test_create_account_duplicate_name(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test that duplicate account name fails."""
         # Create first account
@@ -89,7 +100,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Savings",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -102,7 +113,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "savings",  # Different case
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "2000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -118,7 +129,11 @@ class TestAccountRoutes:
         assert "already exists" in error_message
 
     async def test_create_account_invalid_currency(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test that invalid currency format fails validation."""
         invalid_currencies = ["US", "USDD", "usd", "123"]
@@ -128,7 +143,7 @@ class TestAccountRoutes:
                 "/api/v1/accounts",
                 json={
                     "account_name": f"Account {currency}",
-                    "account_type": "savings",
+                    "account_type_id": str(savings_account_type.id),
                     "currency": currency,
                     "opening_balance": "1000.00",
                     "financial_institution_id": str(test_financial_institution.id),
@@ -139,14 +154,17 @@ class TestAccountRoutes:
             assert response.status_code == 422  # Validation error
 
     async def test_create_account_unauthenticated(
-        self, async_client: AsyncClient, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test that unauthenticated request fails."""
         response = await async_client.post(
             "/api/v1/accounts",
             json={
                 "account_name": "Test",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -174,7 +192,11 @@ class TestAccountRoutes:
         assert len(data) == 0
 
     async def test_list_accounts_multiple(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test listing multiple accounts."""
         # Create 3 accounts
@@ -183,7 +205,7 @@ class TestAccountRoutes:
                 "/api/v1/accounts",
                 json={
                     "account_name": f"Account {i}",
-                    "account_type": "savings",
+                    "account_type_id": str(savings_account_type.id),
                     "currency": "USD",
                     "opening_balance": "1000.00",
                     "financial_institution_id": str(test_financial_institution.id),
@@ -202,7 +224,12 @@ class TestAccountRoutes:
         assert len(data) == 3
 
     async def test_list_accounts_filter_by_type(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
+        other_account_type,
     ):
         """Test filtering accounts by type."""
         # Create savings account
@@ -210,7 +237,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Savings",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -223,7 +250,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Credit Card",
-                "account_type": "other",
+                "account_type_id": str(other_account_type.id),
                 "currency": "USD",
                 "opening_balance": "-500.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -231,19 +258,23 @@ class TestAccountRoutes:
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
-        # Filter by savings
+        # Filter by savings account type
         response = await async_client.get(
-            "/api/v1/accounts?account_type=savings",
+            f"/api/v1/accounts?account_type_id={str(savings_account_type.id)}",
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
-        assert data[0]["account_type"] == "savings"
+        assert data[0]["account_type"]["key"] == "savings"
 
     async def test_list_accounts_filter_by_active(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test filtering accounts by active status."""
         # Create active account
@@ -251,7 +282,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Active",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -272,7 +303,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Still Active",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "2000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -292,7 +323,11 @@ class TestAccountRoutes:
         assert data[0]["is_active"] is True
 
     async def test_list_accounts_pagination(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test pagination for list accounts."""
         # Create 5 accounts
@@ -301,7 +336,7 @@ class TestAccountRoutes:
                 "/api/v1/accounts",
                 json={
                     "account_name": f"Account {i}",
-                    "account_type": "savings",
+                    "account_type_id": str(savings_account_type.id),
                     "currency": "USD",
                     "opening_balance": "100.00",
                     "financial_institution_id": str(test_financial_institution.id),
@@ -330,7 +365,11 @@ class TestAccountRoutes:
     # ========================================================================
 
     async def test_get_account_success(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test getting account by ID."""
         # Create account
@@ -338,7 +377,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Test Account",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "EUR",
                 "opening_balance": "2000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -383,6 +422,7 @@ class TestAccountRoutes:
         user_token: dict,
         admin_token: dict,
         test_financial_institution,
+        savings_account_type,
     ):
         """Test that non-owner cannot access account."""
         # Create account as test_user
@@ -390,7 +430,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Private",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -413,7 +453,11 @@ class TestAccountRoutes:
     # ========================================================================
 
     async def test_update_account_name(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test updating account name."""
         # Create account
@@ -421,7 +465,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Old Name",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -443,7 +487,11 @@ class TestAccountRoutes:
         assert data["account_name"] == "New Name"
 
     async def test_update_account_is_active(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test updating account active status."""
         # Create account
@@ -451,7 +499,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Test",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -473,7 +521,11 @@ class TestAccountRoutes:
         assert data["is_active"] is False
 
     async def test_update_account_duplicate_name(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test that updating to duplicate name fails."""
         # Create two accounts
@@ -481,7 +533,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Account One",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -493,7 +545,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Account Two",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "2000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -517,7 +569,11 @@ class TestAccountRoutes:
     # ========================================================================
 
     async def test_delete_account_success(
-        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
     ):
         """Test deleting account (soft delete)."""
         # Create account
@@ -525,7 +581,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "To Delete",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -556,6 +612,7 @@ class TestAccountRoutes:
         user_token: dict,
         admin_token: dict,
         test_financial_institution,
+        savings_account_type,
     ):
         """Test that non-owner cannot delete account."""
         # Create account as test_user
@@ -563,7 +620,7 @@ class TestAccountRoutes:
             "/api/v1/accounts",
             json={
                 "account_name": "Test",
-                "account_type": "savings",
+                "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
                 "financial_institution_id": str(test_financial_institution.id),
@@ -595,3 +652,175 @@ class TestAccountRoutes:
         )
 
         assert response.status_code == 404
+
+    # ========================================================================
+    # Account Type Validation Tests (NEW)
+    # ========================================================================
+
+    async def test_create_account_invalid_account_type_id(
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+    ):
+        """Test creating account with non-existent account type ID."""
+        import uuid
+
+        fake_account_type_id = uuid.uuid4()
+
+        response = await async_client.post(
+            "/api/v1/accounts",
+            json={
+                "account_name": "Test Account",
+                "account_type_id": str(fake_account_type_id),
+                "currency": "USD",
+                "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
+            },
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+        )
+
+        assert response.status_code == 404
+        response_data = response.json()
+        assert "error" in response_data
+        assert "not found" in response_data["error"]["message"].lower()
+
+    async def test_create_account_nil_uuid_account_type(
+        self, async_client: AsyncClient, user_token: dict, test_financial_institution
+    ):
+        """Test creating account with nil UUID for account type."""
+        nil_uuid = "00000000-0000-0000-0000-000000000000"
+
+        response = await async_client.post(
+            "/api/v1/accounts",
+            json={
+                "account_name": "Test Account",
+                "account_type_id": nil_uuid,
+                "currency": "USD",
+                "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
+            },
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+        )
+
+        assert response.status_code == 422  # Validation error from schema
+        response_data = response.json()
+        assert "error" in response_data
+
+    async def test_create_account_inactive_account_type(
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        inactive_account_type,
+    ):
+        """Test creating account with inactive account type."""
+        response = await async_client.post(
+            "/api/v1/accounts",
+            json={
+                "account_name": "Test Account",
+                "account_type_id": str(inactive_account_type.id),
+                "currency": "USD",
+                "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
+            },
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+        )
+
+        assert response.status_code == 422  # Validation error from service
+        response_data = response.json()
+        assert "error" in response_data
+        assert "not active" in response_data["error"]["message"].lower()
+
+    async def test_create_account_system_account_type_success(
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        checking_account_type,
+    ):
+        """Test that any user can use system account types."""
+        response = await async_client.post(
+            "/api/v1/accounts",
+            json={
+                "account_name": "System Type Account",
+                "account_type_id": str(checking_account_type.id),
+                "currency": "USD",
+                "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
+            },
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["account_type"]["key"] == "checking"
+
+    async def test_update_account_change_account_type(
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
+        checking_account_type,
+    ):
+        """Test updating account to change account type."""
+        # Create account with savings type
+        create_response = await async_client.post(
+            "/api/v1/accounts",
+            json={
+                "account_name": "Test Account",
+                "account_type_id": str(savings_account_type.id),
+                "currency": "USD",
+                "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
+            },
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+        )
+
+        account_id = create_response.json()["id"]
+
+        # Update to checking type
+        response = await async_client.put(
+            f"/api/v1/accounts/{account_id}",
+            json={"account_type_id": str(checking_account_type.id)},
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["account_type"]["key"] == "checking"
+        assert data["account_type_id"] == str(checking_account_type.id)
+
+    async def test_update_account_invalid_account_type(
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
+        inactive_account_type,
+    ):
+        """Test updating account to inactive account type fails."""
+        # Create account
+        create_response = await async_client.post(
+            "/api/v1/accounts",
+            json={
+                "account_name": "Test Account",
+                "account_type_id": str(savings_account_type.id),
+                "currency": "USD",
+                "opening_balance": "1000.00",
+                "financial_institution_id": str(test_financial_institution.id),
+            },
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+        )
+
+        account_id = create_response.json()["id"]
+
+        # Try to update to inactive type
+        response = await async_client.put(
+            f"/api/v1/accounts/{account_id}",
+            json={"account_type_id": str(inactive_account_type.id)},
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+        )
+
+        assert response.status_code == 422
+        response_data = response.json()
+        assert "error" in response_data
+        assert "not active" in response_data["error"]["message"].lower()

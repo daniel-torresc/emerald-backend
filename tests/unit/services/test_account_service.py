@@ -15,7 +15,6 @@ from decimal import Decimal
 import pytest
 
 from src.exceptions import AlreadyExistsError, NotFoundError
-from src.models.enums import AccountType
 from src.services.account_service import AccountService
 from src.services.encryption_service import EncryptionService
 
@@ -24,14 +23,17 @@ from src.services.encryption_service import EncryptionService
 class TestAccountService:
     """Test suite for AccountService."""
 
-    async def test_create_account_success(self, db_session, test_user):
+    async def test_create_account_success(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test successful account creation."""
         service = AccountService(db_session, EncryptionService())
 
         account = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="My Checking",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1500.00"),
             current_user=test_user,
@@ -40,7 +42,7 @@ class TestAccountService:
         assert account.id is not None
         assert account.user_id == test_user.id
         assert account.account_name == "My Checking"
-        assert account.account_type == AccountType.savings
+        assert account.account_type_id == savings_account_type.id
         assert account.currency == "USD"
         assert account.opening_balance == Decimal("1500.00")
         assert account.current_balance == Decimal("1500.00")
@@ -48,15 +50,18 @@ class TestAccountService:
         assert account.created_by == test_user.id
         assert account.updated_by == test_user.id
 
-    async def test_create_account_duplicate_name(self, db_session, test_user):
+    async def test_create_account_duplicate_name(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test that creating account with duplicate name fails."""
         service = AccountService(db_session, EncryptionService())
 
         # Create first account
         await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Savings",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -66,8 +71,9 @@ class TestAccountService:
         with pytest.raises(AlreadyExistsError) as exc_info:
             await service.create_account(
                 user_id=test_user.id,
+                financial_institution_id=test_financial_institution.id,
                 account_name="savings",  # Different case
-                account_type=AccountType.savings,
+                account_type_id=savings_account_type.id,
                 currency="USD",
                 opening_balance=Decimal("2000.00"),
                 current_user=test_user,
@@ -75,7 +81,9 @@ class TestAccountService:
 
         assert "already exists" in str(exc_info.value).lower()
 
-    async def test_create_account_invalid_currency(self, db_session, test_user):
+    async def test_create_account_invalid_currency(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test that invalid currency format raises error."""
         service = AccountService(db_session, EncryptionService())
 
@@ -86,8 +94,9 @@ class TestAccountService:
             with pytest.raises(ValueError) as exc_info:
                 await service.create_account(
                     user_id=test_user.id,
+                    financial_institution_id=test_financial_institution.id,
                     account_name=f"Account {invalid_currency}",
-                    account_type=AccountType.savings,
+                    account_type_id=savings_account_type.id,
                     currency=invalid_currency,
                     opening_balance=Decimal("1000.00"),
                     current_user=test_user,
@@ -95,14 +104,17 @@ class TestAccountService:
 
             assert "invalid currency" in str(exc_info.value).lower()
 
-    async def test_create_account_negative_balance(self, db_session, test_user):
+    async def test_create_account_negative_balance(
+        self, db_session, test_user, test_financial_institution, other_account_type
+    ):
         """Test creating account with negative balance (for loans/credit cards)."""
         service = AccountService(db_session, EncryptionService())
 
         account = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Credit Card",
-            account_type=AccountType.credit_card,
+            account_type_id=other_account_type.id,
             currency="USD",
             opening_balance=Decimal("-500.50"),
             current_user=test_user,
@@ -111,15 +123,18 @@ class TestAccountService:
         assert account.opening_balance == Decimal("-500.50")
         assert account.current_balance == Decimal("-500.50")
 
-    async def test_get_account_success(self, db_session, test_user):
+    async def test_get_account_success(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test getting account by ID."""
         service = AccountService(db_session, EncryptionService())
 
         # Create account
         created = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Test Account",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="EUR",
             opening_balance=Decimal("2000.00"),
             current_user=test_user,
@@ -134,15 +149,23 @@ class TestAccountService:
         assert account.id == created.id
         assert account.account_name == "Test Account"
 
-    async def test_get_account_not_owner(self, db_session, test_user, admin_user):
+    async def test_get_account_not_owner(
+        self,
+        db_session,
+        test_user,
+        admin_user,
+        test_financial_institution,
+        savings_account_type,
+    ):
         """Test that non-owner cannot access account."""
         service = AccountService(db_session, EncryptionService())
 
         # Create account for test_user
         created = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Private Account",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -169,7 +192,9 @@ class TestAccountService:
                 current_user=test_user,
             )
 
-    async def test_list_accounts(self, db_session, test_user):
+    async def test_list_accounts(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test listing user's accounts."""
         service = AccountService(db_session, EncryptionService())
 
@@ -177,8 +202,9 @@ class TestAccountService:
         for i in range(3):
             await service.create_account(
                 user_id=test_user.id,
+                financial_institution_id=test_financial_institution.id,
                 account_name=f"Account {i}",
-                account_type=AccountType.savings,
+                account_type_id=savings_account_type.id,
                 currency="USD",
                 opening_balance=Decimal("1000.00"),
                 current_user=test_user,
@@ -192,15 +218,23 @@ class TestAccountService:
 
         assert len(accounts) == 3
 
-    async def test_list_accounts_with_filters(self, db_session, test_user):
+    async def test_list_accounts_with_filters(
+        self,
+        db_session,
+        test_user,
+        test_financial_institution,
+        savings_account_type,
+        other_account_type,
+    ):
         """Test listing accounts with filters."""
         service = AccountService(db_session, EncryptionService())
 
         # Create accounts with different types and statuses
         account1 = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Active Savings",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -208,8 +242,9 @@ class TestAccountService:
 
         await service.create_account(
             user_id=test_user.id,
-            account_name="Active Credit",
-            account_type=AccountType.credit_card,
+            financial_institution_id=test_financial_institution.id,
+            account_name="Active Other",
+            account_type_id=other_account_type.id,
             currency="USD",
             opening_balance=Decimal("-500.00"),
             current_user=test_user,
@@ -229,18 +264,20 @@ class TestAccountService:
             is_active=True,
         )
         assert len(active_accounts) == 1
-        assert active_accounts[0].account_name == "Active Credit"
+        assert active_accounts[0].account_name == "Active Other"
 
-        # Filter by account_type
-        credit_accounts = await service.list_accounts(
+        # Filter by account_type_id
+        other_accounts = await service.list_accounts(
             user_id=test_user.id,
             current_user=test_user,
-            account_type=AccountType.credit_card,
+            account_type_id=other_account_type.id,
         )
-        assert len(credit_accounts) == 1
-        assert credit_accounts[0].account_name == "Active Credit"
+        assert len(other_accounts) == 1
+        assert other_accounts[0].account_name == "Active Other"
 
-    async def test_list_accounts_pagination(self, db_session, test_user):
+    async def test_list_accounts_pagination(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test pagination for list_accounts."""
         service = AccountService(db_session, EncryptionService())
 
@@ -248,8 +285,9 @@ class TestAccountService:
         for i in range(5):
             await service.create_account(
                 user_id=test_user.id,
+                financial_institution_id=test_financial_institution.id,
                 account_name=f"Account {i}",
-                account_type=AccountType.savings,
+                account_type_id=savings_account_type.id,
                 currency="USD",
                 opening_balance=Decimal("100.00"),
                 current_user=test_user,
@@ -273,15 +311,18 @@ class TestAccountService:
         )
         assert len(page2) == 2
 
-    async def test_list_accounts_limit_enforced(self, db_session, test_user):
+    async def test_list_accounts_limit_enforced(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test that limit is capped at 100."""
         service = AccountService(db_session, EncryptionService())
 
         # Create 1 account
         await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Test",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("100.00"),
             current_user=test_user,
@@ -297,15 +338,18 @@ class TestAccountService:
         # Should still work, just capped
         assert len(accounts) == 1
 
-    async def test_update_account_name(self, db_session, test_user):
+    async def test_update_account_name(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test updating account name."""
         service = AccountService(db_session, EncryptionService())
 
         # Create account
         account = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Old Name",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -321,15 +365,18 @@ class TestAccountService:
         assert updated.account_name == "New Name"
         assert updated.updated_by == test_user.id
 
-    async def test_update_account_is_active(self, db_session, test_user):
+    async def test_update_account_is_active(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test updating account is_active status."""
         service = AccountService(db_session, EncryptionService())
 
         # Create account
         account = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Test",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -346,15 +393,18 @@ class TestAccountService:
 
         assert updated.is_active is False
 
-    async def test_update_account_duplicate_name(self, db_session, test_user):
+    async def test_update_account_duplicate_name(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test that updating to duplicate name fails."""
         service = AccountService(db_session, EncryptionService())
 
         # Create two accounts
         account1 = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Account One",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -362,8 +412,9 @@ class TestAccountService:
 
         await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Account Two",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("2000.00"),
             current_user=test_user,
@@ -377,15 +428,18 @@ class TestAccountService:
                 account_name="Account Two",
             )
 
-    async def test_update_account_no_changes(self, db_session, test_user):
+    async def test_update_account_no_changes(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test updating account with no changes."""
         service = AccountService(db_session, EncryptionService())
 
         # Create account
         account = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Test",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -401,15 +455,18 @@ class TestAccountService:
         assert updated.id == account.id
         assert updated.account_name == account.account_name
 
-    async def test_delete_account(self, db_session, test_user):
+    async def test_delete_account(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test soft deleting account."""
         service = AccountService(db_session, EncryptionService())
 
         # Create account
         account = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="To Delete",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -435,15 +492,23 @@ class TestAccountService:
         )
         assert len(accounts) == 0
 
-    async def test_delete_account_not_owner(self, db_session, test_user, admin_user):
+    async def test_delete_account_not_owner(
+        self,
+        db_session,
+        test_user,
+        admin_user,
+        test_financial_institution,
+        savings_account_type,
+    ):
         """Test that non-owner cannot delete account."""
         service = AccountService(db_session, EncryptionService())
 
         # Create account for test_user
         account = await service.create_account(
             user_id=test_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Test",
-            account_type=AccountType.savings,
+            account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_user=test_user,
@@ -456,7 +521,9 @@ class TestAccountService:
                 current_user=admin_user,
             )
 
-    async def test_count_user_accounts(self, db_session, test_user):
+    async def test_count_user_accounts(
+        self, db_session, test_user, test_financial_institution, savings_account_type
+    ):
         """Test counting user's accounts."""
         service = AccountService(db_session, EncryptionService())
 
@@ -471,8 +538,9 @@ class TestAccountService:
         for i in range(3):
             await service.create_account(
                 user_id=test_user.id,
+                financial_institution_id=test_financial_institution.id,
                 account_name=f"Account {i}",
-                account_type=AccountType.savings,
+                account_type_id=savings_account_type.id,
                 currency="USD",
                 opening_balance=Decimal("100.00"),
                 current_user=test_user,

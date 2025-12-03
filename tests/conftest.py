@@ -76,6 +76,54 @@ async def test_engine(event_loop):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    # Seed account_types table with system types (from migration ec9ccafe4320)
+    from src.models.account_type import AccountType
+
+    async_session_factory = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    async with async_session_factory() as session:
+        # Check if seed data already exists
+        result = await session.execute(text("SELECT COUNT(*) FROM account_types"))
+        count = result.scalar()
+
+        if count == 0:
+            # Seed 4 default system account types
+            system_types = [
+                AccountType(
+                    key="checking",
+                    name="Checking",
+                    description="Standard checking account for daily transactions and bill payments",
+                    is_active=True,
+                    sort_order=1,
+                ),
+                AccountType(
+                    key="savings",
+                    name="Savings",
+                    description="Savings account for storing money and earning interest",
+                    is_active=True,
+                    sort_order=2,
+                ),
+                AccountType(
+                    key="investment",
+                    name="Investment",
+                    description="Investment account for stocks, bonds, mutual funds, and other securities",
+                    is_active=True,
+                    sort_order=3,
+                ),
+                AccountType(
+                    key="other",
+                    name="Other",
+                    description="Other account types (credit cards, loans, etc.)",
+                    is_active=True,
+                    sort_order=4,
+                ),
+            ]
+            session.add_all(system_types)
+            await session.commit()
+
     yield engine
 
     # Drop all tables after tests
@@ -192,6 +240,7 @@ async def async_client(test_engine) -> AsyncGenerator[AsyncClient, None]:
             await session.execute(text("SET session_replication_role = 'replica'"))
 
             # Truncate all tables (order doesn't matter with FK checks disabled)
+            # Note: account_types and financial_institutions are NOT truncated (master data tables)
             await session.execute(
                 text(
                     "TRUNCATE TABLE account_shares, accounts, audit_logs, refresh_tokens, users RESTART IDENTITY CASCADE"
@@ -426,7 +475,150 @@ async def test_financial_institution(test_engine):
 
 
 @pytest_asyncio.fixture
-async def test_account(test_engine, test_user, test_financial_institution):
+async def savings_account_type(test_engine):
+    """
+    Get the 'savings' account type from the database.
+
+    Returns:
+        AccountType instance for the 'savings' system type
+    """
+    from src.models.account_type import AccountType
+    from sqlalchemy import select
+
+    async_session_factory = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(AccountType).where(AccountType.key == "savings")
+        )
+        account_type = result.scalar_one()
+        return account_type
+
+
+@pytest_asyncio.fixture
+async def checking_account_type(test_engine):
+    """
+    Get the 'checking' account type from the database.
+
+    Returns:
+        AccountType instance for the 'checking' system type
+    """
+    from src.models.account_type import AccountType
+    from sqlalchemy import select
+
+    async_session_factory = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(AccountType).where(AccountType.key == "checking")
+        )
+        account_type = result.scalar_one()
+        return account_type
+
+
+@pytest_asyncio.fixture
+async def investment_account_type(test_engine):
+    """
+    Get the 'investment' account type from the database.
+
+    Returns:
+        AccountType instance for the 'investment' system type
+    """
+    from src.models.account_type import AccountType
+    from sqlalchemy import select
+
+    async_session_factory = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(AccountType).where(AccountType.key == "investment")
+        )
+        account_type = result.scalar_one()
+        return account_type
+
+
+@pytest_asyncio.fixture
+async def other_account_type(test_engine):
+    """
+    Get the 'other' account type from the database.
+
+    Returns:
+        AccountType instance for the 'other' system type
+    """
+    from src.models.account_type import AccountType
+    from sqlalchemy import select
+
+    async_session_factory = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(AccountType).where(AccountType.key == "other")
+        )
+        account_type = result.scalar_one()
+        return account_type
+
+
+@pytest_asyncio.fixture
+async def inactive_account_type(test_engine):
+    """
+    Get or create an inactive account type for testing validation.
+
+    Returns:
+        AccountType instance that is inactive
+    """
+    from src.models.account_type import AccountType
+    from sqlalchemy import select
+
+    async_session_factory = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_factory() as session:
+        # Check if inactive test type already exists
+        result = await session.execute(
+            select(AccountType).where(AccountType.key == "inactive_test_type")
+        )
+        account_type = result.scalar_one_or_none()
+
+        if account_type is None:
+            # Create if doesn't exist
+            account_type = AccountType(
+                key="inactive_test_type",
+                name="Inactive Test Type",
+                description="Inactive account type for testing validation",
+                is_active=False,
+                sort_order=999,
+            )
+
+            session.add(account_type)
+            await session.commit()
+            await session.refresh(account_type)
+
+        return account_type
+
+
+@pytest_asyncio.fixture
+async def test_account(
+    test_engine, test_user, test_financial_institution, savings_account_type
+):
     """
     Create a test account in the database.
 
@@ -437,7 +629,6 @@ async def test_account(test_engine, test_user, test_financial_institution):
     """
     from decimal import Decimal
     from src.models.account import Account
-    from src.models.enums import AccountType
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -449,8 +640,8 @@ async def test_account(test_engine, test_user, test_financial_institution):
         account = Account(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
+            account_type_id=savings_account_type.id,
             account_name="Test Checking",
-            account_type=AccountType.savings,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),

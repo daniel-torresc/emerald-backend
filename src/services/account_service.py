@@ -25,10 +25,11 @@ from src.exceptions import (
 )
 from src.models.account import Account, AccountShare
 from src.models.audit_log import AuditAction
-from src.models.enums import AccountType, PermissionLevel
+from src.models.enums import PermissionLevel
 from src.models.user import User
 from src.repositories.account_repository import AccountRepository
 from src.repositories.account_share_repository import AccountShareRepository
+from src.repositories.account_type_repository import AccountTypeRepository
 from src.repositories.user_repository import UserRepository
 from src.services.audit_service import AuditService
 from src.services.encryption_service import EncryptionService
@@ -62,6 +63,7 @@ class AccountService:
         """
         self.session = session
         self.account_repo = AccountRepository(session)
+        self.account_type_repo = AccountTypeRepository(session)
         self.share_repo = AccountShareRepository(session)
         self.user_repo = UserRepository(session)
         self.permission_service = PermissionService(session)
@@ -72,7 +74,7 @@ class AccountService:
         self,
         user_id: uuid.UUID,
         account_name: str,
-        account_type: AccountType,
+        account_type_id: uuid.UUID,
         currency: str,
         opening_balance: Decimal,
         financial_institution_id: uuid.UUID,
@@ -95,7 +97,7 @@ class AccountService:
         Args:
             user_id: ID of user who will own the account
             account_name: Descriptive account name (1-100 characters, unique per user)
-            account_type: Type of account (savings, credit_card, etc.)
+            account_type_id: Account type ID (must reference active account type)
             currency: ISO 4217 currency code (3 uppercase letters)
             opening_balance: Initial account balance (can be negative for loans)
             financial_institution_id: Financial institution ID (REQUIRED, must be active)
@@ -113,14 +115,15 @@ class AccountService:
 
         Raises:
             AlreadyExistsError: If account name already exists for user
-            NotFoundError: If user_id does not exist (foreign key constraint)
-            ValidationError: If institution not found or is not active
+            NotFoundError: If user_id does not exist or account type not found
+            ValidationError: If account type is inactive or institution not found or is not active
+            AuthorizationError: If user cannot access the account type (custom type owned by another user)
 
         Example:
             account = await account_service.create_account(
                 user_id=user.id,
                 account_name="Chase Checking",
-                account_type=AccountType.SAVINGS,
+                account_type_id=checking_type_id,
                 currency="USD",
                 opening_balance=Decimal("1000.00"),
                 financial_institution_id=chase_id,
@@ -135,6 +138,28 @@ class AccountService:
             raise AlreadyExistsError(
                 f"Account name '{account_name}' already exists. Please choose a different name."
             )
+
+        # Validate account type exists and is active
+        account_type = await self.account_type_repo.get_by_id(account_type_id)
+        if not account_type:
+            logger.warning(
+                f"User {user_id} attempted to create account with non-existent "
+                f"account type: {account_type_id}"
+            )
+            raise NotFoundError("Account type not found")
+
+        if not account_type.is_active:
+            logger.warning(
+                f"User {user_id} attempted to create account with inactive "
+                f"account type: {account_type_id} ({account_type.name})"
+            )
+            raise ValidationError(
+                f"Account type '{account_type.name}' is not active. "
+                "Please select a different account type."
+            )
+
+        # Note: All account types are system-wide and accessible to all users
+        # No per-user custom types - all types are managed globally
 
         # Validate currency format (ISO 4217: 3 uppercase letters)
         if not (len(currency) == 3 and currency.isalpha() and currency.isupper()):
@@ -179,7 +204,7 @@ class AccountService:
             user_id=user_id,
             financial_institution_id=financial_institution_id,
             account_name=account_name,
-            account_type=account_type,
+            account_type_id=account_type_id,
             currency=currency,
             opening_balance=opening_balance,
             current_balance=opening_balance,  # Initially same as opening balance
@@ -203,10 +228,12 @@ class AccountService:
             action=AuditAction.CREATE,
             entity_type="account",
             entity_id=account.id,
-            description=f"Created account '{account.account_name}' at {account.financial_institution.short_name} ({account.account_type.value}, {account.currency})",
+            description=f"Created account '{account.account_name}' at {account.financial_institution.short_name} ({account.account_type.name}, {account.currency})",
             extra_metadata={
                 "account_name": account.account_name,
-                "account_type": account.account_type.value,
+                "account_type_id": str(account_type_id),
+                "account_type_key": account.account_type.key,
+                "account_type_name": account.account_type.name,
                 "currency": account.currency,
                 "opening_balance": str(opening_balance),
                 "financial_institution_id": str(financial_institution_id),
@@ -270,7 +297,7 @@ class AccountService:
         skip: int = 0,
         limit: int = 20,
         is_active: bool | None = None,
-        account_type: AccountType | None = None,
+        account_type_id: uuid.UUID | None = None,
         financial_institution_id: uuid.UUID | None = None,
     ) -> list[Account]:
         """
@@ -284,7 +311,7 @@ class AccountService:
             skip: Number of records to skip (pagination)
             limit: Maximum number of records to return (max 100)
             is_active: Filter by active status (None = all)
-            account_type: Filter by account type (None = all types)
+            account_type_id: Filter by account type ID (None = all types)
             financial_institution_id: Filter by institution (None = all)
 
         Returns:
@@ -298,6 +325,7 @@ class AccountService:
                 user_id=user.id,
                 current_user=user,
                 is_active=True,
+                account_type_id=checking_type_id,
                 financial_institution_id=chase_id,
                 limit=20
             )
@@ -319,7 +347,7 @@ class AccountService:
             skip=0,
             limit=100,  # Get all owned accounts (up to 100)
             is_active=is_active,
-            account_type=account_type,
+            account_type_id=account_type_id,
             financial_institution_id=financial_institution_id,
         )
 
@@ -327,7 +355,7 @@ class AccountService:
         shared_accounts = await self.account_repo.get_shared_with_user(
             user_id=user_id,
             is_active=is_active,
-            account_type=account_type,
+            account_type_id=account_type_id,
             financial_institution_id=financial_institution_id,
         )
 
@@ -351,6 +379,7 @@ class AccountService:
         current_user: User,
         account_name: str | None = None,
         is_active: bool | None = None,
+        account_type_id: uuid.UUID | None = None,
         financial_institution_id: uuid.UUID | None = None,
         color_hex: str | None = None,
         icon_url: HttpUrl | None = None,
@@ -362,8 +391,8 @@ class AccountService:
         """
         Update account details.
 
-        Updateable fields: account_name, is_active, financial_institution_id, color_hex, icon_url, notes
-        Immutable fields: currency, balances, account_type, iban
+        Updateable fields: account_name, is_active, account_type_id, financial_institution_id, color_hex, icon_url, notes
+        Immutable fields: currency, balances, iban
 
         Phase 2A: Only owner can update.
         Phase 2B: Owner and editor can update (owner can change is_active).
@@ -373,6 +402,7 @@ class AccountService:
             current_user: Currently authenticated user
             account_name: New account name (optional, validates uniqueness)
             is_active: New active status (optional)
+            account_type_id: New account type ID (optional, validates exists, active, and accessible)
             financial_institution_id: New institution (optional, validates exists and active)
             color_hex: New color hex (optional)
             icon_url: New icon URL (optional)
@@ -385,15 +415,17 @@ class AccountService:
             Updated Account instance
 
         Raises:
-            NotFoundError: If account not found or user has no access
+            NotFoundError: If account or account type not found or user has no access
             AlreadyExistsError: If new account name already exists for user
-            ValidationError: If new institution not found or is not active
+            ValidationError: If account type is inactive or institution not found or is not active
+            AuthorizationError: If user cannot access the account type (custom type owned by another user)
 
         Example:
             account = await account_service.update_account(
                 account_id=account.id,
                 current_user=user,
                 account_name="New Name",
+                account_type_id=new_type_id,
                 financial_institution_id=new_institution_id,
                 is_active=True
             )
@@ -434,6 +466,36 @@ class AccountService:
         if is_active is not None and is_active != account.is_active:
             changes["is_active"] = {"old": account.is_active, "new": is_active}
             account.is_active = is_active
+
+        # Update account type if provided
+        if account_type_id is not None and account_type_id != account.account_type_id:
+            # Validate account type exists and is active
+            account_type = await self.account_type_repo.get_by_id(account_type_id)
+            if not account_type:
+                logger.warning(
+                    f"User {current_user.id} attempted to update account {account_id} "
+                    f"with non-existent account type: {account_type_id}"
+                )
+                raise NotFoundError("Account type not found")
+
+            if not account_type.is_active:
+                logger.warning(
+                    f"User {current_user.id} attempted to update account {account_id} "
+                    f"with inactive account type: {account_type_id} ({account_type.name})"
+                )
+                raise ValidationError(
+                    f"Account type '{account_type.name}' is not active. "
+                    "Please select a different account type."
+                )
+
+            # Note: All account types are system-wide and accessible to all users
+            # No per-user custom types - all types are managed globally
+
+            changes["account_type_id"] = {
+                "old": str(account.account_type_id),
+                "new": str(account_type_id),
+            }
+            account.account_type_id = account_type_id
 
         # Update financial institution if provided
         if (
@@ -556,7 +618,9 @@ class AccountService:
             description=f"Deleted account '{account.account_name}'",
             extra_metadata={
                 "account_name": account.account_name,
-                "account_type": account.account_type.value,
+                "account_type_id": str(account.account_type_id),
+                "account_type_key": account.account_type.key,
+                "account_type_name": account.account_type.name,
                 "currency": account.currency,
                 "final_balance": str(account.current_balance),
             },

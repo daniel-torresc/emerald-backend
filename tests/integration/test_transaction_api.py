@@ -814,12 +814,15 @@ async def test_cannot_create_transaction_in_non_member_account(
     async_client: AsyncClient,
     test_user: User,
     test_engine,
+    test_financial_institution,
 ):
     """Test: Cannot create transaction in account where user is not a member."""
     from src.models.account import Account, AccountShare
-    from src.models.enums import AccountType, PermissionLevel
+    from src.models.account_type import AccountType
+    from src.models.enums import PermissionLevel
     from src.core.security import hash_password
     from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    from sqlalchemy import select
 
     # Create another user with their own account
     async_session_factory = async_sessionmaker(
@@ -829,6 +832,12 @@ async def test_cannot_create_transaction_in_non_member_account(
     )
 
     async with async_session_factory() as session:
+        # Get savings account type
+        result = await session.execute(
+            select(AccountType).where(AccountType.key == "savings")
+        )
+        savings_type = result.scalar_one()
+
         other_user = User(
             email="other@example.com",
             username="other",
@@ -841,8 +850,9 @@ async def test_cannot_create_transaction_in_non_member_account(
 
         other_account = Account(
             user_id=other_user.id,
+            financial_institution_id=test_financial_institution.id,
             account_name="Other Account",
-            account_type=AccountType.savings,
+            account_type_id=savings_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
