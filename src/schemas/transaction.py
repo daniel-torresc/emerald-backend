@@ -110,6 +110,7 @@ class TransactionCreate(TransactionBase):
         merchant: Merchant name (optional, 1-100 chars)
         value_date: Date transaction value applied (optional)
         user_notes: User comments (optional, max 1000 chars)
+        card_id: Card used for transaction (optional)
         tags: List of tags (optional)
     """
 
@@ -119,6 +120,11 @@ class TransactionCreate(TransactionBase):
         max_length=100,
         description="Merchant name",
         examples=["Whole Foods", "Shell Gas Station", "Amazon"],
+    )
+
+    card_id: uuid.UUID | None = Field(
+        default=None,
+        description="UUID of the card used for this transaction (optional)",
     )
 
     value_date: date | None = Field(
@@ -190,11 +196,17 @@ class TransactionUpdate(BaseModel):
         transaction_type: New type (optional)
         user_notes: New notes (optional)
         value_date: New value date (optional)
+        card_id: Card used for transaction (optional)
     """
 
     transaction_date: date | None = Field(
         default=None,
         description="New transaction date",
+    )
+
+    card_id: uuid.UUID | None = Field(
+        default=None,
+        description="UUID of the card used for this transaction (optional)",
     )
 
     amount: Decimal | None = Field(
@@ -285,6 +297,7 @@ class TransactionResponse(TransactionBase):
     Attributes:
         id: Transaction UUID
         account_id: Account UUID
+        card_id: Card UUID if card was used
         transaction_date: Transaction date
         value_date: Value date
         amount: Transaction amount
@@ -306,6 +319,11 @@ class TransactionResponse(TransactionBase):
     id: uuid.UUID = Field(description="Transaction UUID")
 
     account_id: uuid.UUID = Field(description="Account UUID")
+
+    card_id: uuid.UUID | None = Field(
+        default=None,
+        description="Card UUID if card was used for this transaction",
+    )
 
     merchant: str | None = Field(
         default=None,

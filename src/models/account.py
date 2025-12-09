@@ -240,6 +240,14 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         cascade="all, delete-orphan",
     )
 
+    cards: Mapped[list["Card"]] = relationship(  # type: ignore
+        "Card",
+        back_populates="account",
+        foreign_keys="Card.account_id",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
+
     # Table-level constraints
     __table_args__ = (
         # Currency must be valid ISO 4217 code (3 uppercase letters)

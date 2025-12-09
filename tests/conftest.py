@@ -655,3 +655,81 @@ async def test_account(
         await session.refresh(account)
 
         return account
+
+
+# ============================================================================
+# Card Fixtures
+# ============================================================================
+@pytest_asyncio.fixture
+async def test_card(test_engine, test_account, test_user) -> "Card":
+    """
+    Create a test card for the test user.
+
+    Returns:
+        Card instance linked to test_account
+    """
+    from src.models.card import Card
+    from src.models.enums import CardType
+    from decimal import Decimal
+
+    async_session_factory = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_factory() as session:
+        card = Card(
+            account_id=test_account.id,
+            card_type=CardType.credit_card,
+            name="Test Credit Card",
+            last_four_digits="4242",
+            card_network="Visa",
+            expiry_month=12,
+            expiry_year=2027,
+            credit_limit=Decimal("10000.00"),
+            notes="Test card for integration tests",
+            created_by=test_user.id,
+            updated_by=test_user.id,
+        )
+
+        session.add(card)
+        await session.commit()
+        await session.refresh(card)
+
+        return card
+
+
+@pytest_asyncio.fixture
+async def test_financial_institution_for_cards(test_engine):
+    """Get or create a test financial institution for cards."""
+    from src.models.financial_institution import FinancialInstitution
+
+    async_session_factory = async_sessionmaker(
+        test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_factory() as session:
+        # Try to get existing institution
+        result = await session.execute(
+            text("SELECT * FROM financial_institutions WHERE is_active = true LIMIT 1")
+        )
+        row = result.first()
+
+        if row:
+            institution = await session.get(FinancialInstitution, row[0])
+            return institution
+
+        # Create new one if none exist
+        institution = FinancialInstitution(
+            name="Test Bank",
+            institution_type="bank",
+            is_active=True,
+        )
+        session.add(institution)
+        await session.commit()
+        await session.refresh(institution)
+
+        return institution

@@ -404,6 +404,30 @@ def get_account_type_service(db: AsyncSession = Depends(get_db)):
     return AccountTypeService(db)
 
 
+def get_card_service(db: AsyncSession = Depends(get_db)):
+    """
+    Dependency to get CardService instance.
+
+    This dependency provides a CardService with an active database session.
+
+    Args:
+        db: Database session
+
+    Returns:
+        CardService instance
+
+    Usage:
+        @app.post("/api/v1/cards")
+        async def create_card(
+            service: CardService = Depends(get_card_service)
+        ):
+            return await service.create_card(...)
+    """
+    from src.services.card_service import CardService
+
+    return CardService(db)
+
+
 # Convenience type aliases for common dependencies
 CurrentUser = Annotated[User, Depends(get_current_user)]
 ActiveUser = Annotated[User, Depends(require_active_user)]

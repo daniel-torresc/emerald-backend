@@ -13,6 +13,7 @@ This migration:
 6. Drops old account_type enum column
 7. Drops AccountType enum type
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -21,8 +22,8 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'e0bbd77c8b16'
-down_revision: Union[str, Sequence[str], None] = 'a2abdbb7e119'
+revision: str = "e0bbd77c8b16"
+down_revision: Union[str, Sequence[str], None] = "a2abdbb7e119"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -32,31 +33,27 @@ def upgrade() -> None:
 
     # Step 1: Add account_type_id column (nullable initially for migration)
     op.add_column(
-        'accounts',
+        "accounts",
         sa.Column(
-            'account_type_id',
+            "account_type_id",
             postgresql.UUID(as_uuid=True),
             nullable=True,
-            comment='Foreign key to account_types table'
-        )
+            comment="Foreign key to account_types table",
+        ),
     )
 
     # Step 2: Create foreign key constraint (with ON DELETE RESTRICT)
     op.create_foreign_key(
-        'fk_accounts_account_type_id',
-        'accounts',
-        'account_types',
-        ['account_type_id'],
-        ['id'],
-        ondelete='RESTRICT'
+        "fk_accounts_account_type_id",
+        "accounts",
+        "account_types",
+        ["account_type_id"],
+        ["id"],
+        ondelete="RESTRICT",
     )
 
     # Step 3: Create index on account_type_id for query performance
-    op.create_index(
-        'ix_accounts_account_type_id',
-        'accounts',
-        ['account_type_id']
-    )
+    op.create_index("ix_accounts_account_type_id", "accounts", ["account_type_id"])
 
     # Step 4: Migrate data - map enum values to account_types records
     # This SQL maps:
@@ -94,14 +91,14 @@ def upgrade() -> None:
 
     # Step 6: Make account_type_id NOT NULL (now that all data is migrated)
     op.alter_column(
-        'accounts',
-        'account_type_id',
+        "accounts",
+        "account_type_id",
         existing_type=postgresql.UUID(as_uuid=True),
-        nullable=False
+        nullable=False,
     )
 
     # Step 7: Drop old account_type enum column
-    op.drop_column('accounts', 'account_type')
+    op.drop_column("accounts", "account_type")
 
     # Step 8: Drop AccountType enum type from database
     # Note: This will fail if any other tables/columns use this enum
@@ -123,12 +120,14 @@ def downgrade() -> None:
 
     # Step 2: Add account_type enum column (nullable initially)
     op.add_column(
-        'accounts',
+        "accounts",
         sa.Column(
-            'account_type',
-            postgresql.ENUM('checking', 'savings', 'investment', 'other', name='accounttype'),
-            nullable=True
-        )
+            "account_type",
+            postgresql.ENUM(
+                "checking", "savings", "investment", "other", name="accounttype"
+            ),
+            nullable=True,
+        ),
     )
 
     # Step 3: Restore data - map account_type.key back to enum
@@ -141,17 +140,19 @@ def downgrade() -> None:
 
     # Step 4: Make account_type NOT NULL
     op.alter_column(
-        'accounts',
-        'account_type',
-        existing_type=postgresql.ENUM('checking', 'savings', 'investment', 'other', name='accounttype'),
-        nullable=False
+        "accounts",
+        "account_type",
+        existing_type=postgresql.ENUM(
+            "checking", "savings", "investment", "other", name="accounttype"
+        ),
+        nullable=False,
     )
 
     # Step 5: Drop account_type_id foreign key
-    op.drop_constraint('fk_accounts_account_type_id', 'accounts', type_='foreignkey')
+    op.drop_constraint("fk_accounts_account_type_id", "accounts", type_="foreignkey")
 
     # Step 6: Drop account_type_id index
-    op.drop_index('ix_accounts_account_type_id', 'accounts')
+    op.drop_index("ix_accounts_account_type_id", "accounts")
 
     # Step 7: Drop account_type_id column
-    op.drop_column('accounts', 'account_type_id')
+    op.drop_column("accounts", "account_type_id")

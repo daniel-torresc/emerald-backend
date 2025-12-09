@@ -299,7 +299,7 @@ class TestAccountTypeRoutes:
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
 
-        create_response = await async_client.post(
+        await async_client.post(
             "/api/v1/account-types",
             json={
                 "key": "inactive_type",

@@ -5,8 +5,9 @@ This module defines:
 - PermissionLevel: Permission levels for account sharing (owner, editor, viewer)
 - TransactionType: Types of financial transactions (debit, credit, transfer, etc.)
 - InstitutionType: Types of financial institutions (bank, credit_union, brokerage, fintech, other)
+- CardType: Types of cards (credit_card, debit_card)
 
-These enums are used by the AccountShare, Transaction, and FinancialInstitution models
+These enums are used by the AccountShare, Transaction, FinancialInstitution, and Card models
 and are also created as PostgreSQL ENUM types in the database for type safety.
 
 Note: AccountType is no longer an enum. Account types are now stored in the account_types
@@ -204,6 +205,64 @@ class InstitutionType(str, enum.Enum):
                 {"key": "brokerage", "label": "Brokerage"},
                 {"key": "fintech", "label": "Fintech"},
                 {"key": "other", "label": "Other"}
+            ]
+        """
+        return [
+            {"key": item.value, "label": item.value.replace("_", " ").title()}
+            for item in cls
+        ]
+
+
+class CardType(str, enum.Enum):
+    """
+    Card type classification.
+
+    Supported card types for the platform. Used to differentiate between
+    credit and debit cards for proper account linking and spending analysis.
+
+    Attributes:
+        credit_card: Credit cards issued by financial institutions
+            - Linked to credit card accounts
+            - Have credit limits
+            - Monthly billing cycles
+            - Examples: Chase Sapphire Reserve, American Express Platinum,
+            Citi Double Cash, Capital One Venture
+
+        debit_card: Debit cards linked to checking or savings accounts
+            - Draw funds directly from account balance
+            - No credit limit (limited by account balance)
+            - Immediate transaction settlement
+            - Examples: Chase Checking Debit, Bank of America Debit,
+            Wells Fargo Debit
+
+    Usage:
+        card = Card(
+            name="Chase Sapphire Reserve",
+            card_type=CardType.credit_card,
+            account_id=account.id,
+            ...
+        )
+
+    Note:
+        Card type affects which accounts can be linked (credit cards must link
+        to credit accounts, debit cards to checking/savings accounts).
+    """
+
+    credit_card = "credit_card"
+    debit_card = "debit_card"
+
+    @classmethod
+    def to_dict_list(cls) -> list[dict[str, str]]:
+        """
+        Return list of dicts with 'key' and 'label' for API responses.
+
+        Returns:
+            List of dictionaries with 'key' (enum value) and 'label' (display name)
+
+        Example:
+            [
+                {"key": "credit_card", "label": "Credit Card"},
+                {"key": "debit_card", "label": "Debit Card"}
             ]
         """
         return [
