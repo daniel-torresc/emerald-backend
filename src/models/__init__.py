@@ -9,7 +9,8 @@ from src.models.account import Account, AccountShare
 from src.models.account_type import AccountType
 from src.models.audit_log import AuditAction, AuditLog, AuditStatus
 from src.models.base import Base
-from src.models.enums import PermissionLevel
+from src.models.card import Card
+from src.models.enums import CardType, PermissionLevel
 from src.models.financial_institution import FinancialInstitution
 from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 from src.models.refresh_token import RefreshToken
@@ -35,6 +36,9 @@ __all__ = [
     "AccountShare",
     "AccountType",  # Master data table (replaces enum)
     "PermissionLevel",
+    # Card models
+    "Card",
+    "CardType",
     # Master data models
     "FinancialInstitution",
 ]

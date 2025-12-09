@@ -27,6 +27,7 @@ from src.api.routes import (
     accounts,
     audit_logs,
     auth,
+    cards,
     financial_institutions,
     health,
     metadata,
@@ -288,6 +289,7 @@ v1_router.include_router(financial_institutions.router)
 v1_router.include_router(account_types.router)
 v1_router.include_router(accounts.router)
 v1_router.include_router(account_shares.router)
+v1_router.include_router(cards.router)
 v1_router.include_router(transactions.router)
 
 # Create API Router

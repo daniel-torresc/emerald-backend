@@ -7,10 +7,17 @@ This module defines:
 
 Architecture:
 - Each transaction belongs to one account (via account_id foreign key)
+- Transactions can optionally reference a card (via card_id foreign key)
 - Transactions support parent-child relationships for splitting (via parent_transaction_id)
 - Each transaction can have multiple tags (one-to-many via TransactionTag)
 - Soft delete support for audit trail and regulatory compliance
 - Balance tracking integrated with account current_balance
+
+Transaction-Card Relationship:
+- Transactions can optionally reference which card was used (card_id foreign key)
+- card_id is nullable - not all transactions use cards (cash, bank transfer, etc.)
+- If card is soft-deleted, card_id is set to NULL (preserve transaction, clear card reference)
+- Enables spending analysis by card
 
 Transaction Splitting:
 - Parent transactions can be split into multiple child transactions
@@ -62,6 +69,7 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     Attributes:
         id: UUID primary key
         account_id: Account this transaction belongs to (foreign key to accounts)
+        card_id: Card used for this transaction (foreign key to cards, optional)
         parent_transaction_id: Parent transaction if this is a split (foreign key to transactions)
         date: Transaction date (when transaction occurred)
         value_date: Date transaction value applied (can differ from date)
@@ -79,6 +87,7 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
 
     Relationships:
         account: Account object this transaction belongs to
+        card: Card object used for this transaction (optional)
         parent_transaction: Parent transaction if this is a split child
         child_transactions: List of child transactions if this is a split parent
         tags: List of TransactionTag objects for categorization
@@ -197,6 +206,13 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         index=True,
     )
 
+    card_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("cards.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Transaction Details
     transaction_date: Mapped[date] = mapped_column(
         Date,
@@ -243,6 +259,12 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     account: Mapped["Account"] = relationship(  # type: ignore
         "Account",
         foreign_keys=[account_id],
+        lazy="selectin",
+    )
+
+    card: Mapped[Optional["Card"]] = relationship(  # type: ignore
+        "Card",
+        foreign_keys=[card_id],
         lazy="selectin",
     )
 
