@@ -17,7 +17,8 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.models.enums import TransactionType
+from src.models.card import Card
+from src.models.enums import CardType, TransactionType
 from src.models.transaction import Transaction, TransactionTag
 from src.repositories.base import BaseRepository
 
@@ -77,7 +78,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         await self.session.flush()
         await self.session.refresh(
             transaction,
-            ["account", "parent_transaction", "child_transactions", "tags"],
+            ["account", "parent_transaction", "child_transactions", "tags", "card"],
         )
         return transaction
 
@@ -106,6 +107,7 @@ class TransactionRepository(BaseRepository[Transaction]):
                 selectinload(Transaction.parent_transaction),
                 selectinload(Transaction.child_transactions),
                 selectinload(Transaction.tags),
+                selectinload(Transaction.card),
             )
         )
         query = self._apply_soft_delete_filter(query)
@@ -131,7 +133,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         await self.session.flush()
         await self.session.refresh(
             transaction,
-            ["account", "parent_transaction", "child_transactions", "tags"],
+            ["account", "parent_transaction", "child_transactions", "tags", "card"],
         )
         return transaction
 
@@ -190,6 +192,7 @@ class TransactionRepository(BaseRepository[Transaction]):
             .options(
                 selectinload(Transaction.tags),
                 selectinload(Transaction.child_transactions),
+                selectinload(Transaction.card),
             )
             .order_by(
                 Transaction.transaction_date.desc(), Transaction.created_at.desc()
@@ -236,6 +239,8 @@ class TransactionRepository(BaseRepository[Transaction]):
         merchant: str | None = None,
         tags: list[str] | None = None,
         transaction_type: TransactionType | None = None,
+        card_id: uuid.UUID | None = None,
+        card_type: CardType | None = None,
         sort_by: str = "transaction_date",
         sort_order: str = "desc",
         skip: int = 0,
@@ -257,6 +262,8 @@ class TransactionRepository(BaseRepository[Transaction]):
             merchant: Fuzzy search on merchant (handles typos)
             tags: Filter by tags (transactions with ANY of these tags)
             transaction_type: Filter by transaction type
+            card_id: Filter by specific card UUID
+            card_type: Filter by card type (credit_card or debit_card)
             sort_by: Field to sort by (transaction_date, amount, description, created_at)
             sort_order: Sort order (asc or desc)
             skip: Number of records to skip (pagination)
@@ -286,6 +293,7 @@ class TransactionRepository(BaseRepository[Transaction]):
             .options(
                 selectinload(Transaction.tags),
                 selectinload(Transaction.child_transactions),
+                selectinload(Transaction.card),
             )
         )
         query = self._apply_soft_delete_filter(query)
@@ -308,6 +316,16 @@ class TransactionRepository(BaseRepository[Transaction]):
         # Transaction type filter
         if transaction_type:
             filters.append(Transaction.transaction_type == transaction_type)
+
+        # Card ID filter
+        if card_id is not None:
+            filters.append(Transaction.card_id == card_id)
+
+        # Card type filter (requires join with Card table)
+        if card_type is not None:
+            query = query.join(Card, Transaction.card_id == Card.id).where(
+                Card.card_type == card_type
+            )
 
         # Fuzzy text search on description (pg_trgm similarity)
         if description:

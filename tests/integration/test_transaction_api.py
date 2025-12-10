@@ -958,3 +958,375 @@ async def test_cannot_access_another_users_transaction(
     )
 
     assert response.status_code == 404  # Not found (or forbidden)
+
+
+@pytest.mark.asyncio
+class TestTransactionCardIntegration:
+    """Integration tests for card-transaction linking via API."""
+
+    async def test_create_transaction_with_card(
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        user_token: dict,
+        test_account,
+        test_card,
+    ):
+        """Test creating transaction with card_id via API."""
+        response = await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-75.50",
+                "currency": "USD",
+                "description": "Dinner at restaurant",
+                "transaction_type": "expense",
+                "card_id": str(test_card.id),
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["card_id"] == str(test_card.id)
+        assert data["card"] is not None
+        assert data["card"]["id"] == str(test_card.id)
+        assert data["card"]["name"] == test_card.name
+        assert data["card"]["card_type"] == test_card.card_type.value
+        assert "last_four_digits" in data["card"]
+
+    async def test_create_transaction_without_card(
+        self, async_client: AsyncClient, test_user: User, user_token: dict, test_account
+    ):
+        """Test creating transaction without card (cash payment)."""
+        response = await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-25.00",
+                "currency": "USD",
+                "description": "Cash payment",
+                "transaction_type": "expense",
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["card_id"] is None
+        assert data["card"] is None
+
+    async def test_create_transaction_invalid_card_returns_404(
+        self, async_client: AsyncClient, test_user: User, user_token: dict, test_account
+    ):
+        """Test that invalid card_id returns 404."""
+        import uuid
+
+        fake_card_id = str(uuid.uuid4())
+
+        response = await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-50.00",
+                "currency": "USD",
+                "description": "Test",
+                "transaction_type": "expense",
+                "card_id": fake_card_id,
+            },
+        )
+
+        assert response.status_code == 404
+
+    async def test_get_transaction_includes_card_details(
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        user_token: dict,
+        test_account,
+        test_card,
+    ):
+        """Test that GET transaction includes card details."""
+        # Create transaction with card
+        create_response = await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-100.00",
+                "currency": "USD",
+                "description": "Shopping",
+                "transaction_type": "expense",
+                "card_id": str(test_card.id),
+            },
+        )
+
+        transaction_id = create_response.json()["id"]
+
+        # Get transaction
+        response = await async_client.get(
+            f"/api/v1/transactions/{transaction_id}",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["card"] is not None
+        assert data["card"]["id"] == str(test_card.id)
+        assert data["card"]["name"] == test_card.name
+
+    async def test_update_transaction_add_card(
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        user_token: dict,
+        test_account,
+        test_card,
+    ):
+        """Test updating transaction to add card_id."""
+        # Create transaction without card
+        create_response = await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-50.00",
+                "currency": "USD",
+                "description": "Test",
+                "transaction_type": "expense",
+            },
+        )
+
+        transaction_id = create_response.json()["id"]
+        assert create_response.json()["card_id"] is None
+
+        # Update with card
+        response = await async_client.put(
+            f"/api/v1/transactions/{transaction_id}",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={"card_id": str(test_card.id)},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["card_id"] == str(test_card.id)
+        assert data["card"] is not None
+
+    async def test_update_transaction_clear_card(
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        user_token: dict,
+        test_account,
+        test_card,
+    ):
+        """Test updating transaction to clear card_id (set to null)."""
+        # Create transaction with card
+        create_response = await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-50.00",
+                "currency": "USD",
+                "description": "Test",
+                "transaction_type": "expense",
+                "card_id": str(test_card.id),
+            },
+        )
+
+        transaction_id = create_response.json()["id"]
+        assert create_response.json()["card_id"] == str(test_card.id)
+
+        # Clear card
+        response = await async_client.put(
+            f"/api/v1/transactions/{transaction_id}",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={"card_id": None},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["card_id"] is None
+        assert data["card"] is None
+
+    async def test_update_transaction_invalid_card_returns_404(
+        self, async_client: AsyncClient, test_user: User, user_token: dict, test_account
+    ):
+        """Test that updating with invalid card_id returns 404."""
+        import uuid
+
+        # Create transaction
+        create_response = await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-50.00",
+                "currency": "USD",
+                "description": "Test",
+                "transaction_type": "expense",
+            },
+        )
+
+        transaction_id = create_response.json()["id"]
+        fake_card_id = str(uuid.uuid4())
+
+        # Try to update with invalid card
+        response = await async_client.put(
+            f"/api/v1/transactions/{transaction_id}",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={"card_id": fake_card_id},
+        )
+
+        assert response.status_code == 404
+
+    async def test_list_transactions_filter_by_card_id(
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        user_token: dict,
+        test_account,
+        test_card,
+    ):
+        """Test filtering transactions by card_id."""
+        # Create transactions with and without cards
+        await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-100.00",
+                "currency": "USD",
+                "description": "With card 1",
+                "transaction_type": "expense",
+                "card_id": str(test_card.id),
+            },
+        )
+
+        await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-50.00",
+                "currency": "USD",
+                "description": "Cash payment",
+                "transaction_type": "expense",
+            },
+        )
+
+        await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-75.00",
+                "currency": "USD",
+                "description": "With card 2",
+                "transaction_type": "expense",
+                "card_id": str(test_card.id),
+            },
+        )
+
+        # Filter by card_id
+        response = await async_client.get(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            params={"card_id": str(test_card.id)},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] >= 2
+        # All returned transactions should have the specified card_id
+        for item in data["items"]:
+            assert item["card_id"] == str(test_card.id)
+
+    async def test_list_transactions_filter_by_card_type(
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        user_token: dict,
+        test_account,
+        test_card,
+    ):
+        """Test filtering transactions by card_type."""
+        # Create transactions with card
+        await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-100.00",
+                "currency": "USD",
+                "description": "Credit card purchase",
+                "transaction_type": "expense",
+                "card_id": str(test_card.id),
+            },
+        )
+
+        await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-50.00",
+                "currency": "USD",
+                "description": "Cash payment",
+                "transaction_type": "expense",
+            },
+        )
+
+        # Filter by card_type
+        response = await async_client.get(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            params={"card_type": test_card.card_type.value},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] >= 1
+        # All returned transactions should have cards of the specified type
+        for item in data["items"]:
+            assert item["card"] is not None
+            assert item["card"]["card_type"] == test_card.card_type.value
+
+    async def test_list_transactions_card_type_excludes_cash(
+        self,
+        async_client: AsyncClient,
+        test_user: User,
+        user_token: dict,
+        test_account,
+        test_card,
+    ):
+        """Test that card_type filter excludes transactions without cards."""
+        # Create cash transaction
+        await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-25.00",
+                "currency": "USD",
+                "description": "Cash only",
+                "transaction_type": "expense",
+            },
+        )
+
+        # Filter by card_type - should NOT return cash transactions
+        response = await async_client.get(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            params={"card_type": test_card.card_type.value},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        # Verify none of the results are cash transactions
+        for item in data["items"]:
+            assert item["card"] is not None, (
+                "card_type filter should exclude cash transactions"
+            )

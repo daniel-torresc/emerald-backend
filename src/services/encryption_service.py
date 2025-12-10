@@ -126,7 +126,3 @@ class EncryptionService:
         except Exception as e:
             logger.error(f"Decryption failed: {e}")
             raise EncryptionError("Failed to decrypt data") from e
-
-
-# Singleton instance for application-wide use
-encryption_service = EncryptionService()

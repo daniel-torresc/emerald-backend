@@ -114,7 +114,7 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             )
         )
         await self.session.flush()
-        return result.rowcount
+        return len(result.scalars().all())
 
     async def revoke_token_family(self, token_family_id: uuid.UUID) -> int:
         """
@@ -151,7 +151,7 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             )
         )
         await self.session.flush()
-        return result.rowcount
+        return len(result.scalars().all())
 
     async def delete_expired_tokens(self, before_date: datetime | None = None) -> int:
         """
@@ -183,7 +183,7 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             delete(RefreshToken).where(RefreshToken.expires_at < before_date)
         )
         await self.session.flush()
-        return result.rowcount
+        return len(result.scalars().all())
 
     async def get_user_active_tokens(self, user_id: uuid.UUID) -> list[RefreshToken]:
         """
@@ -241,7 +241,7 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             .select_from(RefreshToken)
             .where(
                 RefreshToken.user_id == user_id,
-                not RefreshToken.is_revoked,
+                ~RefreshToken.is_revoked,
                 RefreshToken.expires_at > datetime.now(UTC),
             )
         )

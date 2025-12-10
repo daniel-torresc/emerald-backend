@@ -22,6 +22,16 @@ from src.core.database import get_db
 from src.core.security import TOKEN_TYPE_ACCESS, decode_token, verify_token_type
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
+from src.services import (
+    AccountService,
+    AccountTypeService,
+    AuditService,
+    AuthService,
+    UserService,
+    CardService,
+    FinancialInstitutionService,
+    TransactionService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +220,7 @@ async def require_admin(
 # ============================================================================
 
 
-def get_auth_service(db: AsyncSession = Depends(get_db)):
+def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
     """
     Dependency to get AuthService instance.
 
@@ -229,12 +239,10 @@ def get_auth_service(db: AsyncSession = Depends(get_db)):
         ):
             user, tokens = await auth_service.login(...)
     """
-    from src.services.auth_service import AuthService
-
     return AuthService(db)
 
 
-def get_user_service(db: AsyncSession = Depends(get_db)):
+def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
     """
     Dependency to get UserService instance.
 
@@ -253,12 +261,10 @@ def get_user_service(db: AsyncSession = Depends(get_db)):
         ):
             return await user_service.get_user_profile(...)
     """
-    from src.services.user_service import UserService
-
     return UserService(db)
 
 
-def get_audit_service(db: AsyncSession = Depends(get_db)):
+def get_audit_service(db: AsyncSession = Depends(get_db)) -> AuditService:
     """
     Dependency to get AuditService instance.
 
@@ -277,12 +283,10 @@ def get_audit_service(db: AsyncSession = Depends(get_db)):
         ):
             await audit_service.log_event(...)
     """
-    from src.services.audit_service import AuditService
-
     return AuditService(db)
 
 
-def get_account_service(db: AsyncSession = Depends(get_db)):
+def get_account_service(db: AsyncSession = Depends(get_db)) -> AccountService:
     """
     Dependency to get AccountService instance.
 
@@ -302,37 +306,10 @@ def get_account_service(db: AsyncSession = Depends(get_db)):
         ):
             return await account_service.create_account(...)
     """
-    from src.services.account_service import AccountService
-    from src.services.encryption_service import encryption_service
-
-    return AccountService(db, encryption_service)
+    return AccountService(db)
 
 
-def get_admin_service(db: AsyncSession = Depends(get_db)):
-    """
-    Dependency to get AdminService instance.
-
-    This dependency provides an AdminService with an active database session.
-
-    Args:
-        db: Database session
-
-    Returns:
-        AdminService instance
-
-    Usage:
-        @app.post("/api/v1/admin/users")
-        async def create_admin_user(
-            admin_service: AdminService = Depends(get_admin_service)
-        ):
-            return await admin_service.create_admin_user(...)
-    """
-    from src.services.admin_service import AdminService
-
-    return AdminService(db)
-
-
-def get_transaction_service(db: AsyncSession = Depends(get_db)):
+def get_transaction_service(db: AsyncSession = Depends(get_db)) -> TransactionService:
     """
     Dependency to get TransactionService instance.
 
@@ -351,12 +328,12 @@ def get_transaction_service(db: AsyncSession = Depends(get_db)):
         ):
             return await transaction_service.create_transaction(...)
     """
-    from src.services.transaction_service import TransactionService
-
     return TransactionService(db)
 
 
-def get_financial_institution_service(db: AsyncSession = Depends(get_db)):
+def get_financial_institution_service(
+    db: AsyncSession = Depends(get_db),
+) -> FinancialInstitutionService:
     """
     Dependency to get FinancialInstitutionService instance.
 
@@ -375,12 +352,10 @@ def get_financial_institution_service(db: AsyncSession = Depends(get_db)):
         ):
             return await service.create_institution(...)
     """
-    from src.services.financial_institution_service import FinancialInstitutionService
-
     return FinancialInstitutionService(db)
 
 
-def get_account_type_service(db: AsyncSession = Depends(get_db)):
+def get_account_type_service(db: AsyncSession = Depends(get_db)) -> AccountTypeService:
     """
     Dependency to get AccountTypeService instance.
 
@@ -399,12 +374,10 @@ def get_account_type_service(db: AsyncSession = Depends(get_db)):
         ):
             return await service.create_account_type(...)
     """
-    from src.services.account_type_service import AccountTypeService
-
     return AccountTypeService(db)
 
 
-def get_card_service(db: AsyncSession = Depends(get_db)):
+def get_card_service(db: AsyncSession = Depends(get_db)) -> CardService:
     """
     Dependency to get CardService instance.
 
@@ -423,8 +396,6 @@ def get_card_service(db: AsyncSession = Depends(get_db)):
         ):
             return await service.create_card(...)
     """
-    from src.services.card_service import CardService
-
     return CardService(db)
 
 

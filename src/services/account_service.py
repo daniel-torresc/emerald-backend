@@ -53,13 +53,12 @@ class AccountService:
     Audit logging is performed for all mutating operations.
     """
 
-    def __init__(self, session: AsyncSession, encryption_service: EncryptionService):
+    def __init__(self, session: AsyncSession):
         """
         Initialize AccountService with database session and encryption service.
 
         Args:
             session: Async database session
-            encryption_service: Service for encrypting sensitive data (IBAN)
         """
         self.session = session
         self.account_repo = AccountRepository(session)
@@ -68,7 +67,7 @@ class AccountService:
         self.user_repo = UserRepository(session)
         self.permission_service = PermissionService(session)
         self.audit_service = AuditService(session)
-        self.encryption_service = encryption_service
+        self.encryption_service = EncryptionService()
 
     async def create_account(
         self,

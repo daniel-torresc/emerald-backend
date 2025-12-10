@@ -152,10 +152,10 @@ class UserRepository(BaseRepository[User]):
 
         # Apply status filters
         if is_active is not None:
-            query = query.where(User.is_active == is_active)
+            query = query.where(User.is_active.is_(is_active))
 
         if is_admin is not None:
-            query = query.where(User.is_admin == is_admin)
+            query = query.where(User.is_admin.is_(is_admin))
 
         # Apply pagination
         query = query.offset(skip).limit(limit)
@@ -210,10 +210,10 @@ class UserRepository(BaseRepository[User]):
 
         # Apply status filters
         if is_active is not None:
-            query = query.where(User.is_active == is_active)
+            query = query.where(User.is_active.is_(is_active))
 
         if is_admin is not None:
-            query = query.where(User.is_admin == is_admin)
+            query = query.where(User.is_admin.is_(is_admin))
 
         result = await self.session.execute(query)
         return result.scalar_one()
@@ -305,7 +305,7 @@ class UserRepository(BaseRepository[User]):
 
         query = select(func.count()).select_from(User)
         query = self._apply_soft_delete_filter(query)
-        query = query.where(User.is_admin == True)  # noqa: E712
+        query = query.where(User.is_admin.is_(True))
 
         result = await self.session.execute(query)
         return result.scalar_one()

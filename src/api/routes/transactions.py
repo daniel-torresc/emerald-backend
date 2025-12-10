@@ -32,7 +32,7 @@ from src.schemas.transaction import (
     TransactionSplitRequest,
     TransactionUpdate,
 )
-from src.services.transaction_service import TransactionService
+from src.services.transaction_service import TransactionService, UNSET
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +99,7 @@ async def create_transaction(
         description=transaction_data.description,
         transaction_type=transaction_data.transaction_type,
         merchant=transaction_data.merchant,
+        card_id=transaction_data.card_id,
         value_date=transaction_data.value_date,
         user_notes=transaction_data.user_notes,
         tags=transaction_data.tags,
@@ -178,6 +179,8 @@ async def list_transactions(
         merchant=search_params.merchant,
         tags=search_params.tags,
         transaction_type=search_params.transaction_type,
+        card_id=search_params.card_id,
+        card_type=search_params.card_type,
         sort_by=search_params.sort_by,
         sort_order=search_params.sort_order,
         skip=search_params.skip,
@@ -271,6 +274,7 @@ async def update_transaction(
         - amount: New amount (non-zero)
         - description: New description
         - merchant: New merchant
+        - card_id: New card (or null to clear)
         - transaction_type: New type
         - user_notes: New notes
         - value_date: New value date
@@ -282,6 +286,11 @@ async def update_transaction(
         - Valid access token
         - Creator, OWNER permission, or Admin role
     """
+    # Check if card_id was in the request body to distinguish
+    # "not provided" (UNSET) from "explicitly null" (None)
+    request_body = await request.json()
+    card_id_param = transaction_data.card_id if "card_id" in request_body else UNSET
+
     transaction = await transaction_service.update_transaction(
         transaction_id=transaction_id,
         current_user=current_user,
@@ -289,6 +298,7 @@ async def update_transaction(
         amount=transaction_data.amount,
         description=transaction_data.description,
         merchant=transaction_data.merchant,
+        card_id=card_id_param,
         transaction_type=transaction_data.transaction_type,
         user_notes=transaction_data.user_notes,
         value_date=transaction_data.value_date,
