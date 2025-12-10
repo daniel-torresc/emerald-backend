@@ -721,3 +721,208 @@ class TestTransactionServiceTags:
         # Try to add tag as different user
         with pytest.raises(AuthorizationError):
             await service.add_tag(transaction.id, "hacked", admin_user)
+
+
+@pytest.mark.asyncio
+class TestTransactionServiceCardValidation:
+    """Test suite for card validation in transaction operations."""
+
+    async def test_create_transaction_with_valid_card(
+        self, db_session, test_user, test_account, test_card
+    ):
+        """Test creating transaction with valid card_id."""
+        service = TransactionService(db_session)
+
+        transaction = await service.create_transaction(
+            account_id=test_account.id,
+            transaction_date=date.today(),
+            amount=Decimal("-50.25"),
+            currency="USD",
+            description="Grocery shopping",
+            transaction_type=TransactionType.expense,
+            card_id=test_card.id,
+            current_user=test_user,
+        )
+
+        assert transaction.card_id == test_card.id
+        assert transaction.card is not None
+        assert transaction.card.id == test_card.id
+        assert transaction.card.name == test_card.name
+
+    async def test_create_transaction_without_card(
+        self, db_session, test_user, test_account
+    ):
+        """Test creating transaction without card (cash transaction)."""
+        service = TransactionService(db_session)
+
+        transaction = await service.create_transaction(
+            account_id=test_account.id,
+            transaction_date=date.today(),
+            amount=Decimal("-50.25"),
+            currency="USD",
+            description="Cash payment",
+            transaction_type=TransactionType.expense,
+            card_id=None,
+            current_user=test_user,
+        )
+
+        assert transaction.card_id is None
+        assert transaction.card is None
+
+    async def test_create_transaction_with_invalid_card_raises_not_found(
+        self, db_session, test_user, test_account
+    ):
+        """Test that invalid card_id raises NotFoundError."""
+        service = TransactionService(db_session)
+        import uuid
+
+        fake_card_id = uuid.uuid4()
+
+        with pytest.raises(NotFoundError) as exc_info:
+            await service.create_transaction(
+                account_id=test_account.id,
+                transaction_date=date.today(),
+                amount=Decimal("-50.25"),
+                currency="USD",
+                description="Test",
+                transaction_type=TransactionType.expense,
+                card_id=fake_card_id,
+                current_user=test_user,
+            )
+
+        assert "card" in str(exc_info.value).lower()
+
+    async def test_create_transaction_with_other_users_card_raises_not_found(
+        self, db_session, test_user, test_account, admin_user
+    ):
+        """Test that using another user's card raises NotFoundError."""
+        from src.models.card import Card
+        from src.models.enums import CardType
+        from src.repositories.card_repository import CardRepository
+
+        # Create card for admin user
+        admin_account = await AccountRepository(db_session).create(
+            account_name="Admin Account",
+            currency="USD",
+            opening_balance=Decimal("0"),
+            user_id=admin_user.id,
+            account_type_id=test_account.account_type_id,
+            financial_institution_id=test_account.financial_institution_id,
+        )
+
+        admin_card = Card(
+            account_id=admin_account.id,
+            name="Admin Card",
+            card_type=CardType.credit_card,
+            created_by=admin_user.id,
+            updated_by=admin_user.id,
+        )
+        await db_session.flush()
+        db_session.add(admin_card)
+        await db_session.flush()
+
+        service = TransactionService(db_session)
+
+        # Try to create transaction with admin's card as test_user
+        with pytest.raises(NotFoundError) as exc_info:
+            await service.create_transaction(
+                account_id=test_account.id,
+                transaction_date=date.today(),
+                amount=Decimal("-50.25"),
+                currency="USD",
+                description="Test",
+                transaction_type=TransactionType.expense,
+                card_id=admin_card.id,
+                current_user=test_user,
+            )
+
+        assert "card" in str(exc_info.value).lower()
+
+    async def test_update_transaction_card_id(
+        self, db_session, test_user, test_account, test_card
+    ):
+        """Test updating transaction card_id to valid card."""
+        service = TransactionService(db_session)
+
+        # Create transaction without card
+        transaction = await service.create_transaction(
+            account_id=test_account.id,
+            transaction_date=date.today(),
+            amount=Decimal("-50.00"),
+            currency="USD",
+            description="Test",
+            transaction_type=TransactionType.expense,
+            current_user=test_user,
+        )
+
+        assert transaction.card_id is None
+
+        # Update with card
+        updated = await service.update_transaction(
+            transaction_id=transaction.id,
+            current_user=test_user,
+            card_id=test_card.id,
+        )
+
+        assert updated.card_id == test_card.id
+        assert updated.card is not None
+
+    async def test_update_transaction_clear_card(
+        self, db_session, test_user, test_account, test_card
+    ):
+        """Test updating transaction card_id to None (clearing card)."""
+        service = TransactionService(db_session)
+
+        # Create transaction with card
+        transaction = await service.create_transaction(
+            account_id=test_account.id,
+            transaction_date=date.today(),
+            amount=Decimal("-50.00"),
+            currency="USD",
+            description="Test",
+            transaction_type=TransactionType.expense,
+            card_id=test_card.id,
+            current_user=test_user,
+        )
+
+        assert transaction.card_id == test_card.id
+
+        # Clear card
+        updated = await service.update_transaction(
+            transaction_id=transaction.id,
+            current_user=test_user,
+            card_id=None,
+        )
+
+        assert updated.card_id is None
+        assert updated.card is None
+
+    async def test_update_transaction_invalid_card_raises_not_found(
+        self, db_session, test_user, test_account
+    ):
+        """Test that updating with invalid card_id raises NotFoundError."""
+        service = TransactionService(db_session)
+        import uuid
+
+        # Create transaction
+        transaction = await service.create_transaction(
+            account_id=test_account.id,
+            transaction_date=date.today(),
+            amount=Decimal("-50.00"),
+            currency="USD",
+            description="Test",
+            transaction_type=TransactionType.expense,
+            current_user=test_user,
+        )
+
+        fake_card_id = uuid.uuid4()
+
+        # Try to update with invalid card
+        with pytest.raises(NotFoundError) as exc_info:
+            await service.update_transaction(
+                transaction_id=transaction.id,
+                current_user=test_user,
+                card_id=fake_card_id,
+            )
+
+        assert "card" in str(exc_info.value).lower()
