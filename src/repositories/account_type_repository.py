@@ -5,7 +5,7 @@ This module provides database operations for the AccountType model,
 including lookups by key, filtering by active status, and ordered retrieval.
 """
 
-from sqlalchemy import Select, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.account_type import AccountType
@@ -130,26 +130,10 @@ class AccountTypeRepository(BaseRepository[AccountType]):
 
         # Apply active status filter (if specified)
         if is_active is not None:
-            query = query.where(AccountType.is_active == is_active)
+            query = query.where(AccountType.is_active.is_(is_active))
 
         # Order by sort_order, then name
         query = query.order_by(AccountType.sort_order, AccountType.name)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
-
-    def _apply_soft_delete_filter(self, query: Select) -> Select:
-        """
-        Override base method - AccountType uses is_active, not soft delete.
-
-        This method is intentionally a no-op because AccountType
-        does not use the SoftDeleteMixin pattern. Instead, account types
-        are deactivated using the is_active flag.
-
-        Args:
-            query: SQLAlchemy select statement
-
-        Returns:
-            Original query unchanged
-        """
-        return query

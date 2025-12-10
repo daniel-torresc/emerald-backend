@@ -191,33 +191,6 @@ class AccountCreate(AccountBase):
             return None
         return str(value)
 
-    @field_validator("account_type_id")
-    @classmethod
-    def validate_account_type_id(cls, value: uuid.UUID) -> uuid.UUID:
-        """
-        Validate account type ID is a valid UUID.
-
-        Business validation (exists, is_active, is_accessible) happens in service layer.
-        """
-        # Ensure not nil UUID
-        if value == uuid.UUID("00000000-0000-0000-0000-000000000000"):
-            raise ValueError("Account type ID cannot be nil UUID")
-        return value
-
-    @field_validator("financial_institution_id")
-    @classmethod
-    def validate_financial_institution_id(cls, value: uuid.UUID) -> uuid.UUID:
-        """
-        Validate financial institution ID is a valid UUID.
-
-        Business validation (exists, is_active) happens in service layer.
-        """
-        # UUID validation is automatic from type hint
-        # Just ensure it's not nil UUID
-        if value == uuid.UUID("00000000-0000-0000-0000-000000000000"):
-            raise ValueError("Financial institution ID cannot be nil UUID")
-        return value
-
 
 class AccountUpdate(BaseModel):
     """

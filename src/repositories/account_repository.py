@@ -85,7 +85,7 @@ class AccountRepository(BaseRepository[Account]):
 
         # Apply filters
         if is_active is not None:
-            query = query.where(Account.is_active == is_active)
+            query = query.where(Account.is_active.is_(is_active))
 
         if account_type_id is not None:
             query = query.where(Account.account_type_id == account_type_id)
@@ -151,7 +151,7 @@ class AccountRepository(BaseRepository[Account]):
 
         # Apply filters
         if is_active is not None:
-            query = query.where(Account.is_active == is_active)
+            query = query.where(Account.is_active.is_(is_active))
 
         if account_type_id is not None:
             query = query.where(Account.account_type_id == account_type_id)
@@ -270,7 +270,7 @@ class AccountRepository(BaseRepository[Account]):
         query = self._apply_soft_delete_filter(query)
 
         if is_active is not None:
-            query = query.where(Account.is_active == is_active)
+            query = query.where(Account.is_active.is_(is_active))
 
         result = await self.session.execute(query)
         return result.scalar_one()

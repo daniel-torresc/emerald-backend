@@ -5,7 +5,7 @@ This module provides database operations for the FinancialInstitution model,
 including searches by SWIFT code, routing number, and filtering by country/type.
 """
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.financial_institution import FinancialInstitution
@@ -152,7 +152,7 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
 
         # Apply active status filter (if provided)
         if is_active is not None:
-            query = query.where(FinancialInstitution.is_active == is_active)
+            query = query.where(FinancialInstitution.is_active.is_(is_active))
 
         # Order by short_name alphabetically
         query = query.order_by(FinancialInstitution.short_name)
@@ -216,7 +216,7 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
 
         # Apply active status filter (if provided)
         if is_active is not None:
-            query = query.where(FinancialInstitution.is_active == is_active)
+            query = query.where(FinancialInstitution.is_active.is_(is_active))
 
         # Execute count query
         result = await self.session.execute(query)
@@ -287,18 +287,3 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None
-
-    def _apply_soft_delete_filter(self, query: Select) -> Select:
-        """
-        Override base method - FinancialInstitution uses is_active, not soft delete.
-
-        This method is intentionally a no-op because FinancialInstitution
-        does not use the SoftDeleteMixin pattern.
-
-        Args:
-            query: SQLAlchemy select statement
-
-        Returns:
-            Original query unchanged
-        """
-        return query

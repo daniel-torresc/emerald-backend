@@ -14,6 +14,7 @@ This module provides:
 
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
@@ -25,16 +26,26 @@ from src.exceptions import (
     ValidationError,
 )
 from src.models.audit_log import AuditAction
-from src.models.enums import PermissionLevel, TransactionType
+from src.models.enums import CardType, PermissionLevel, TransactionType
 from src.models.transaction import Transaction
 from src.models.user import User
 from src.repositories.account_repository import AccountRepository
+from src.repositories.card_repository import CardRepository
 from src.repositories.transaction_repository import TransactionRepository
 from src.repositories.transaction_tag_repository import TransactionTagRepository
 from src.services.audit_service import AuditService
 from src.services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
+
+
+# Sentinel value to distinguish "not provided" from "explicitly None"
+@dataclass
+class _UNSET:
+    pass
+
+
+UNSET = _UNSET()
 
 
 class TransactionService:
@@ -63,6 +74,7 @@ class TransactionService:
         self.transaction_repo = TransactionRepository(session)
         self.tag_repo = TransactionTagRepository(session)
         self.account_repo = AccountRepository(session)
+        self.card_repo = CardRepository(session)
         self.permission_service = PermissionService(session)
         self.audit_service = AuditService(session)
 
@@ -76,6 +88,7 @@ class TransactionService:
         transaction_type: TransactionType,
         current_user: User,
         merchant: str | None = None,
+        card_id: uuid.UUID | None = None,
         value_date: date | None = None,
         user_notes: str | None = None,
         tags: list[str] | None = None,
@@ -105,6 +118,7 @@ class TransactionService:
             transaction_type: Type of transaction (debit, credit, etc.)
             current_user: Currently authenticated user
             merchant: Merchant name (optional, 1-100 chars)
+            card_id: Card used for transaction (optional)
             value_date: Date transaction value applied (optional)
             user_notes: User comments (optional, max 1000 chars)
             tags: List of tags to add (optional)
@@ -167,6 +181,18 @@ class TransactionService:
         if amount == 0:
             raise ValidationError("Transaction amount cannot be zero")
 
+        # Validate card if provided
+        if card_id is not None:
+            card = await self.card_repo.get_by_id_for_user(
+                card_id=card_id,
+                user_id=current_user.id,
+            )
+            if card is None:
+                logger.warning(
+                    f"Card {card_id} not found or unauthorized for user {current_user.id}"
+                )
+                raise NotFoundError("Card")
+
         # Use database transaction for atomicity
         # Transaction managed by caller
         # Create transaction
@@ -177,6 +203,7 @@ class TransactionService:
             currency=currency,
             description=description,
             merchant=merchant,
+            card_id=card_id,
             transaction_type=transaction_type,
             user_notes=user_notes,
             value_date=value_date,
@@ -217,6 +244,7 @@ class TransactionService:
                 "currency": currency,
                 "description": description,
                 "merchant": merchant,
+                "card_id": str(card_id) if card_id else None,
                 "transaction_type": transaction_type.value,
                 "tags": tags,
             },
@@ -230,8 +258,8 @@ class TransactionService:
             request_id=request_id,
         )
 
-        # Refresh to get tags relationship
-        await self.session.refresh(created, ["tags"])
+        # Refresh to get tags and card relationships
+        await self.session.refresh(created, ["tags", "card"])
         return created
 
     async def get_transaction(
@@ -294,6 +322,8 @@ class TransactionService:
         merchant: str | None = None,
         tags: list[str] | None = None,
         transaction_type: TransactionType | None = None,
+        card_id: uuid.UUID | None = None,
+        card_type: CardType | None = None,
         sort_by: str = "transaction_date",
         sort_order: str = "desc",
         skip: int = 0,
@@ -313,6 +343,8 @@ class TransactionService:
             merchant: Fuzzy search on merchant
             tags: Filter by tags (ANY match)
             transaction_type: Filter by type
+            card_id: Filter by specific card UUID
+            card_type: Filter by card type (credit_card or debit_card)
             sort_by: Sort field (transaction_date, amount, description, created_at)
             sort_order: Sort order (asc or desc)
             skip: Number of records to skip
@@ -362,6 +394,8 @@ class TransactionService:
             merchant=merchant,
             tags=tags,
             transaction_type=transaction_type,
+            card_id=card_id,
+            card_type=card_type,
             sort_by=sort_by,
             sort_order=sort_order,
             skip=skip,
@@ -376,6 +410,7 @@ class TransactionService:
         amount: Decimal | None = None,
         description: str | None = None,
         merchant: str | None = None,
+        card_id: uuid.UUID | None | _UNSET = UNSET,
         transaction_type: TransactionType | None = None,
         user_notes: str | None = None,
         value_date: date | None = None,
@@ -401,6 +436,7 @@ class TransactionService:
             amount: New amount (optional)
             description: New description (optional)
             merchant: New merchant (optional)
+            card_id: New card_id (optional, can be None to clear)
             transaction_type: New type (optional)
             user_notes: New notes (optional)
             value_date: New value date (optional)
@@ -451,6 +487,24 @@ class TransactionService:
         if amount is not None and amount == 0:
             raise ValidationError("Transaction amount cannot be zero")
 
+        # Validate card if being updated
+        # card_id can be:
+        #   - UNSET: don't update card (leave as is)
+        #   - UUID: validate and set to this card
+        #   - None: clear the card (set to NULL)
+        if not isinstance(card_id, _UNSET):
+            if card_id is not None:  # UUID provided, validate it
+                card = await self.card_repo.get_by_id_for_user(
+                    card_id=card_id,
+                    user_id=current_user.id,
+                )
+                if card is None:
+                    logger.warning(
+                        f"Card {card_id} not found or unauthorized for user {current_user.id}"
+                    )
+                    raise NotFoundError("Card")
+            # If card_id is None, we allow it (clearing the card)
+
         # Calculate balance delta
         old_amount = existing.amount
         new_amount = amount if amount is not None else old_amount
@@ -482,6 +536,12 @@ class TransactionService:
             old_values["merchant"] = existing.merchant
             new_values["merchant"] = merchant
             existing.merchant = merchant
+
+        # Update card_id if provided (UNSET means don't change)
+        if not isinstance(card_id, _UNSET):
+            old_values["card_id"] = str(existing.card_id) if existing.card_id else None
+            new_values["card_id"] = str(card_id) if card_id else None
+            existing.card_id = card_id
 
         if transaction_type is not None:
             old_values["transaction_type"] = existing.transaction_type.value

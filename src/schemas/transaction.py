@@ -15,7 +15,38 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.models.enums import TransactionType
+from src.models.enums import CardType, TransactionType
+
+
+class CardEmbedded(BaseModel):
+    """
+    Minimal card representation embedded in transaction responses.
+
+    This schema provides essential card details without requiring
+    a separate API call. Used in transaction responses to show
+    which card was used for payment.
+
+    Attributes:
+        id: Card UUID
+        name: Card display name
+        card_type: Type of card (credit_card or debit_card)
+        last_four_digits: Last 4 digits of card number
+        card_network: Card network (Visa, Mastercard, etc.)
+    """
+
+    id: uuid.UUID = Field(description="Card UUID")
+    name: str = Field(description="Card display name")
+    card_type: CardType = Field(description="Type of card")
+    last_four_digits: str | None = Field(
+        default=None,
+        description="Last 4 digits of card number",
+    )
+    card_network: str | None = Field(
+        default=None,
+        description="Card network (Visa, Mastercard, Amex, etc.)",
+    )
+
+    model_config = {"from_attributes": True}
 
 
 class TransactionBase(BaseModel):
@@ -325,6 +356,11 @@ class TransactionResponse(TransactionBase):
         description="Card UUID if card was used for this transaction",
     )
 
+    card: CardEmbedded | None = Field(
+        default=None,
+        description="Card details if card was used for this transaction",
+    )
+
     merchant: str | None = Field(
         default=None,
         description="Merchant name",
@@ -383,6 +419,21 @@ class TransactionResponse(TransactionBase):
         # Handle SQLAlchemy relationship returning TransactionTag objects
         return [tag.tag if hasattr(tag, "tag") else tag for tag in tags]
 
+    @field_validator("card", mode="before")
+    @classmethod
+    def convert_card(cls, card) -> CardEmbedded | None:
+        """
+        Convert Card model to CardEmbedded or None.
+
+        Handles the card relationship from SQLAlchemy, converting
+        the Card model object to the CardEmbedded schema for API responses.
+        """
+        if card is None:
+            return None
+        if hasattr(card, "id"):  # SQLAlchemy model
+            return CardEmbedded.model_validate(card)
+        return card
+
     model_config = {"from_attributes": True}
 
 
@@ -399,6 +450,7 @@ class TransactionListItem(BaseModel):
         currency: Currency code
         description: Description
         merchant: Merchant name
+        card: Card details if card was used
         transaction_type: Transaction type
         tags: List of tags
         is_split_parent: Whether has children
@@ -411,10 +463,21 @@ class TransactionListItem(BaseModel):
     currency: str
     description: str
     merchant: str | None = None
+    card: CardEmbedded | None = None
     transaction_type: TransactionType
     tags: list[str] = Field(default_factory=list)
     is_split_parent: bool = False
     is_split_child: bool = False
+
+    @field_validator("card", mode="before")
+    @classmethod
+    def convert_card(cls, card) -> CardEmbedded | None:
+        """Convert Card model to CardEmbedded or None."""
+        if card is None:
+            return None
+        if hasattr(card, "id"):  # SQLAlchemy model
+            return CardEmbedded.model_validate(card)
+        return card
 
     model_config = {"from_attributes": True}
 
@@ -562,6 +625,8 @@ class TransactionSearchParams(BaseModel):
         merchant: Fuzzy search on merchant
         tags: Filter by tags (ANY match)
         transaction_type: Filter by type
+        card_id: Filter by specific card UUID
+        card_type: Filter by card type (credit_card or debit_card)
         sort_by: Sort field (transaction_date, amount, description, created_at)
         sort_order: Sort order (asc or desc)
         skip: Number of records to skip
@@ -608,6 +673,16 @@ class TransactionSearchParams(BaseModel):
     transaction_type: TransactionType | None = Field(
         default=None,
         description="Filter by transaction type",
+    )
+
+    card_id: uuid.UUID | None = Field(
+        default=None,
+        description="Filter by specific card UUID",
+    )
+
+    card_type: CardType | None = Field(
+        default=None,
+        description="Filter by card type (credit_card or debit_card)",
     )
 
     sort_by: str = Field(
