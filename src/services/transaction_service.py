@@ -34,6 +34,7 @@ from src.repositories.card_repository import CardRepository
 from src.repositories.transaction_repository import TransactionRepository
 from src.repositories.transaction_tag_repository import TransactionTagRepository
 from src.services.audit_service import AuditService
+from src.services.currency_service import CurrencyService
 from src.services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class TransactionService:
         self.account_repo = AccountRepository(session)
         self.card_repo = CardRepository(session)
         self.permission_service = PermissionService(session)
+        self.currency_service = CurrencyService(session)
         self.audit_service = AuditService(session)
 
     async def create_transaction(
@@ -167,6 +169,17 @@ class TransactionService:
         if account is None:
             logger.warning(f"Account {account_id} not found")
             raise NotFoundError("Account")
+
+        # Validate currency is supported
+        if not self.currency_service.is_supported(currency):
+            supported_codes = ", ".join(self.currency_service.get_supported_codes())
+            logger.warning(
+                f"User {current_user.id} attempted to create transaction with unsupported currency: {currency}"
+            )
+            raise ValidationError(
+                f"Unsupported currency code '{currency}'. "
+                f"Supported currencies: {supported_codes}"
+            )
 
         # Validate currency matches account
         if currency != account.currency:

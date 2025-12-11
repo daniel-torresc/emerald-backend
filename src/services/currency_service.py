@@ -2,66 +2,42 @@
 Currency service for ISO 4217 currency data.
 
 This module provides:
-- Currency Pydantic model for type-safe currency representation
-- CurrencyService singleton for managing currency list
-- Helper function for easy service access
+- CurrencyService for managing currency list
+- Injectable service that follows FastAPI dependency patterns
 """
 
-from typing import ClassVar
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from pydantic import BaseModel, Field
-
-
-class Currency(BaseModel):
-    """
-    ISO 4217 currency representation.
-
-    Immutable Pydantic model for currency data with validation.
-    """
-
-    code: str = Field(min_length=3, max_length=3, description="ISO 4217 currency code")
-    symbol: str = Field(min_length=1, description="Currency symbol")
-    name: str = Field(min_length=1, description="Full currency name")
-
-    model_config = {"frozen": True}  # Immutable for thread safety
-
-    @classmethod
-    def create(cls, code: str, symbol: str, name: str) -> "Currency":
-        """
-        Factory method for creating currency instances.
-
-        Args:
-            code: ISO 4217 code (converted to uppercase)
-            symbol: Currency symbol
-            name: Full currency name
-
-        Returns:
-            Currency instance
-        """
-        return cls(code=code.upper(), symbol=symbol, name=name)
+from src.schemas.currency import Currency
 
 
 class CurrencyService:
     """
     Currency service providing ISO 4217 currency data.
 
-    Singleton pattern ensures single instance of currency list in memory.
-    Thread-safe due to Python's __new__ implementation and immutable currencies.
+    Injectable service that provides currency lookup and validation.
+    Thread-safe due to immutable Currency models.
     """
 
-    _instance: ClassVar["CurrencyService | None"] = None
-    _currencies: list[Currency]
+    def __init__(self, session: AsyncSession | None = None):
+        """
+        Initialize CurrencyService.
 
-    def __new__(cls) -> "CurrencyService":
-        """Create or return singleton instance."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialize_currencies()
-        return cls._instance
+        Args:
+            session: Optional database session (for future use or
+                     pattern consistency when used inside other services)
+        """
+        self.session = session
+        self._currencies = self._initialize_currencies()
 
-    def _initialize_currencies(self) -> None:
-        """Initialize currency list. Called once on first instantiation."""
-        self._currencies = [
+    def _initialize_currencies(self) -> list[Currency]:
+        """
+        Initialize currency list.
+
+        Returns:
+            List of supported currencies
+        """
+        return [
             # North America
             Currency.create("USD", "$", "US Dollar"),
             # Europe
@@ -107,14 +83,11 @@ class CurrencyService:
         """
         return self.get_by_code(code) is not None
 
+    def get_supported_codes(self) -> list[str]:
+        """
+        Get list of supported currency codes.
 
-def get_currency_service() -> CurrencyService:
-    """
-    Get singleton instance of CurrencyService.
-
-    Convenience function for easy access to currency service.
-
-    Returns:
-        CurrencyService singleton instance
-    """
-    return CurrencyService()
+        Returns:
+            List of ISO 4217 currency codes
+        """
+        return [c.code for c in self._currencies]

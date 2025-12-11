@@ -153,6 +153,37 @@ class TestAccountRoutes:
 
             assert response.status_code == 422  # Validation error
 
+    async def test_create_account_unsupported_currency(
+        self,
+        async_client: AsyncClient,
+        user_token: dict,
+        test_financial_institution,
+        savings_account_type,
+    ):
+        """Test that unsupported currency codes fail validation."""
+        # Valid format (3 uppercase letters) but not in supported list
+        unsupported_currencies = ["ZZZ", "ABC", "XYZ", "QQQ"]
+
+        for currency in unsupported_currencies:
+            response = await async_client.post(
+                "/api/v1/accounts",
+                json={
+                    "account_name": f"Account {currency}",
+                    "account_type_id": str(savings_account_type.id),
+                    "currency": currency,
+                    "opening_balance": "1000.00",
+                    "financial_institution_id": str(test_financial_institution.id),
+                },
+                headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            )
+
+            assert response.status_code == 422  # Validation error
+            error_data = response.json()
+            assert "error" in error_data
+            # Error message should mention unsupported currency
+            error_message = str(error_data["error"]["message"]).lower()
+            assert "unsupported" in error_message and "currency" in error_message
+
     async def test_create_account_unauthenticated(
         self,
         async_client: AsyncClient,

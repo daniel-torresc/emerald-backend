@@ -537,8 +537,8 @@ tests/
    from src.schemas.metadata import (
        AccountTypesResponse,
        CurrenciesResponse,
-       TransactionTypesResponse,
-   )
+          )
+from src.schemas.transaction_type import TransactionTypesResponse
 
    logger = logging.getLogger(__name__)
 
