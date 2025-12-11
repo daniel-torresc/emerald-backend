@@ -196,14 +196,13 @@ class AccountUpdate(BaseModel):
     """
     Schema for updating account information.
 
-    Updateable fields: account_name, is_active, account_type_id, financial_institution_id, color_hex, icon_url, notes
+    Updateable fields: account_name, account_type_id, financial_institution_id, color_hex, icon_url, notes
     Immutable fields: currency, balances, iban
 
     All fields are optional to support partial updates (PATCH).
 
     Attributes:
         account_name: New account name (optional)
-        is_active: New active status (optional)
         account_type_id: New account type ID (optional, must be active and accessible)
         financial_institution_id: New institution ID (optional, must be active)
         color_hex: New hex color code (optional)
@@ -217,12 +216,6 @@ class AccountUpdate(BaseModel):
         max_length=100,
         description="New account name",
         examples=["Renamed Account"],
-    )
-
-    is_active: bool | None = Field(
-        default=None,
-        description="Active status (inactive accounts hidden by default)",
-        examples=[True, False],
     )
 
     account_type_id: uuid.UUID | None = Field(
@@ -329,7 +322,6 @@ class AccountResponse(AccountBase):
         notes: User notes
         opening_balance: Initial balance
         current_balance: Current calculated balance
-        is_active: Active status
         color_hex: Hex color code
         icon_url: Icon URL
         iban_last_four: Last 4 digits of IBAN (for display)
@@ -353,10 +345,6 @@ class AccountResponse(AccountBase):
     opening_balance: Decimal = Field(description="Initial account balance")
     current_balance: Decimal = Field(
         description="Current account balance (calculated from transactions in Phase 3)"
-    )
-
-    is_active: bool = Field(
-        description="Whether account is active (inactive accounts hidden by default)"
     )
 
     # Metadata fields
@@ -386,7 +374,6 @@ class AccountListItem(BaseModel):
         account_type: Account type details
         currency: Currency code
         current_balance: Current balance
-        is_active: Active status
         color_hex: Hex color code
         icon_url: Icon URL
         financial_institution_id: Institution ID
@@ -400,7 +387,6 @@ class AccountListItem(BaseModel):
     account_type: AccountTypeListItem
     currency: str
     current_balance: Decimal
-    is_active: bool
     color_hex: str
     icon_url: str | None
     financial_institution_id: uuid.UUID
@@ -417,15 +403,9 @@ class AccountFilterParams(BaseModel):
     Used for query parameters in list endpoints.
 
     Attributes:
-        is_active: Filter by active status (None = all)
         account_type_id: Filter by account type ID (None = all types)
         financial_institution_id: Filter by institution (None = all)
     """
-
-    is_active: bool | None = Field(
-        default=None,
-        description="Filter by active status (true=active, false=inactive, null=all)",
-    )
 
     account_type_id: uuid.UUID | None = Field(
         default=None,

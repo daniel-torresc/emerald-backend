@@ -58,7 +58,6 @@ router = APIRouter(prefix="/accounts", tags=["Accounts"])
                         "currency": "USD",
                         "opening_balance": "1000.00",
                         "current_balance": "1000.00",
-                        "is_active": True,
                         "created_at": "2025-11-04T00:00:00Z",
                         "updated_at": "2025-11-04T00:00:00Z",
                     }
@@ -146,7 +145,6 @@ async def create_account(
                             "account_type": "savings",
                             "currency": "USD",
                             "current_balance": "1234.56",
-                            "is_active": True,
                             "created_at": "2025-11-04T00:00:00Z",
                         }
                     ]
@@ -164,12 +162,6 @@ async def list_accounts(
     limit: Annotated[
         int, Query(ge=1, le=100, description="Maximum number of records to return")
     ] = 20,
-    is_active: Annotated[
-        bool | None,
-        Query(
-            description="Filter by active status (true=active, false=inactive, null=all)"
-        ),
-    ] = None,
     account_type_id: Annotated[
         uuid.UUID | None, Query(description="Filter by account type ID")
     ] = None,
@@ -199,7 +191,6 @@ async def list_accounts(
         current_user=current_user,
         skip=skip,
         limit=limit,
-        is_active=is_active,
         account_type_id=account_type_id,
         financial_institution_id=financial_institution_id,
     )
@@ -232,7 +223,6 @@ async def list_accounts(
                         "currency": "USD",
                         "opening_balance": "1000.00",
                         "current_balance": "1234.56",
-                        "is_active": True,
                         "created_at": "2025-11-04T00:00:00Z",
                         "updated_at": "2025-11-04T00:00:00Z",
                     }
@@ -282,11 +272,11 @@ async def get_account(
     description="""
     Update account details.
 
-    Updateable fields: account_name, is_active, account_type_id, financial_institution_id, color_hex, icon_url, notes
+    Updateable fields: account_name, account_type_id, financial_institution_id, color_hex, icon_url, notes
     Immutable fields: currency, balances, iban
 
     **Phase 2A:** Only owner can update.
-    **Phase 2B:** Owner and editors can update (only owner can change is_active).
+    **Phase 2B:** Owner and editors can update.
 
     **Permission:** Account owner
 
@@ -315,9 +305,8 @@ async def update_account(
 
     Request body:
         - account_name: New name (optional, validates uniqueness)
-        - is_active: New active status (optional)
-        - account_type_id: New account type ID (optional, must be active and accessible)
-        - financial_institution_id: New institution (optional, must be active)
+        - account_type_id: New account type ID (optional, must be accessible)
+        - financial_institution_id: New institution (optional)
         - color_hex: New hex color (optional)
         - icon_url: New icon URL (optional)
         - notes: New notes (optional)
@@ -342,7 +331,6 @@ async def update_account(
         account_id=account_id,
         current_user=current_user,
         account_name=update_data.account_name,
-        is_active=update_data.is_active,
         account_type_id=update_data.account_type_id,
         financial_institution_id=update_data.financial_institution_id,
         color_hex=update_data.color_hex,

@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.models.account import Account
+from src.models.account import Account, AccountShare
 from src.repositories.base import BaseRepository
 
 
@@ -43,7 +43,6 @@ class AccountRepository(BaseRepository[Account]):
         user_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100,
-        is_active: bool | None = None,
         account_type_id: uuid.UUID | None = None,
         financial_institution_id: uuid.UUID | None = None,
     ) -> list[Account]:
@@ -51,13 +50,12 @@ class AccountRepository(BaseRepository[Account]):
         Get all accounts for a specific user.
 
         Includes eager loading of financial_institution and account_type relationships
-        to prevent N+1 queries.
+        to prevent N+1 queries. Automatically excludes soft-deleted accounts via BaseRepository.
 
         Args:
             user_id: ID of the user who owns the accounts
             skip: Number of records to skip (pagination)
             limit: Maximum number of records to return (max 100)
-            is_active: Filter by active status (None = all)
             account_type_id: Filter by account type ID (None = all types)
             financial_institution_id: Filter by financial institution (None = all)
 
@@ -65,10 +63,9 @@ class AccountRepository(BaseRepository[Account]):
             List of Account instances with eager-loaded institution and account type
 
         Example:
-            # Get all active checking accounts for user at specific institution
+            # Get all checking accounts for user at specific institution
             accounts = await account_repo.get_by_user(
                 user_id=user.id,
-                is_active=True,
                 account_type_id=checking_type_id,
                 financial_institution_id=chase_id
             )
@@ -84,9 +81,6 @@ class AccountRepository(BaseRepository[Account]):
         query = self._apply_soft_delete_filter(query)
 
         # Apply filters
-        if is_active is not None:
-            query = query.where(Account.is_active.is_(is_active))
-
         if account_type_id is not None:
             query = query.where(Account.account_type_id == account_type_id)
 
@@ -107,7 +101,6 @@ class AccountRepository(BaseRepository[Account]):
     async def get_shared_with_user(
         self,
         user_id: uuid.UUID,
-        is_active: bool | None = None,
         account_type_id: uuid.UUID | None = None,
         financial_institution_id: uuid.UUID | None = None,
     ) -> list[Account]:
@@ -116,10 +109,10 @@ class AccountRepository(BaseRepository[Account]):
 
         Returns accounts where the user has been granted access via AccountShare.
         Includes eager loading of financial_institution and account_type relationships.
+        Automatically excludes soft-deleted accounts via BaseRepository.
 
         Args:
             user_id: ID of the user who has been granted access
-            is_active: Filter by active status (None = all)
             account_type_id: Filter by account type ID (None = all types)
             financial_institution_id: Filter by institution (None = all)
 
@@ -127,16 +120,13 @@ class AccountRepository(BaseRepository[Account]):
             List of Account instances shared with the user
 
         Example:
-            # Get all active checking accounts shared with user at specific institution
+            # Get all checking accounts shared with user at specific institution
             shared_accounts = await account_repo.get_shared_with_user(
                 user_id=user.id,
-                is_active=True,
                 account_type_id=checking_type_id,
                 financial_institution_id=chase_id
             )
         """
-        from src.models.account import AccountShare
-
         # Join Account with AccountShare to find accounts shared with this user
         query = (
             select(Account)
@@ -150,9 +140,6 @@ class AccountRepository(BaseRepository[Account]):
         query = self._apply_soft_delete_filter(query)
 
         # Apply filters
-        if is_active is not None:
-            query = query.where(Account.is_active.is_(is_active))
-
         if account_type_id is not None:
             query = query.where(Account.account_type_id == account_type_id)
 
@@ -246,31 +233,25 @@ class AccountRepository(BaseRepository[Account]):
     async def count_user_accounts(
         self,
         user_id: uuid.UUID,
-        is_active: bool | None = None,
     ) -> int:
         """
         Count total accounts for a user.
 
+        Automatically excludes soft-deleted accounts via BaseRepository.
+
         Args:
             user_id: ID of the user
-            is_active: Filter by active status (None = all)
 
         Returns:
-            Total count of accounts
+            Total count of active (non-deleted) accounts
 
         Example:
             total = await account_repo.count_user_accounts(user.id)
-            active_count = await account_repo.count_user_accounts(
-                user.id, is_active=True
-            )
         """
         query = (
             select(func.count()).select_from(Account).where(Account.user_id == user_id)
         )
         query = self._apply_soft_delete_filter(query)
-
-        if is_active is not None:
-            query = query.where(Account.is_active.is_(is_active))
 
         result = await self.session.execute(query)
         return result.scalar_one()
@@ -317,37 +298,3 @@ class AccountRepository(BaseRepository[Account]):
 
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
-
-    async def validate_institution_active(
-        self,
-        institution_id: uuid.UUID,
-    ) -> bool:
-        """
-        Check if financial institution exists and is active.
-
-        Used for validating institution before creating/updating accounts.
-        This is a business validation query - called by service layer.
-
-        Args:
-            institution_id: Institution ID to validate
-
-        Returns:
-            True if institution exists and is_active=True, False otherwise
-
-        Example:
-            # Before creating account
-            is_valid = await account_repo.validate_institution_active(institution_id)
-            if not is_valid:
-                raise ValidationError("Institution not found or is not active")
-        """
-        from src.models.financial_institution import FinancialInstitution
-
-        query = select(FinancialInstitution.is_active).where(
-            FinancialInstitution.id == institution_id
-        )
-
-        result = await self.session.execute(query)
-        is_active = result.scalar_one_or_none()
-
-        # Returns None if not found, False if found but inactive, True if active
-        return is_active is True

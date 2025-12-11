@@ -36,7 +36,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -47,7 +46,7 @@ class TestAccountRepository:
         assert account.currency == "USD"
         assert account.opening_balance == Decimal("1000.00")
         assert account.current_balance == Decimal("1000.00")
-        assert account.is_active is True
+        
         assert account.deleted_at is None
 
     async def test_get_by_id(
@@ -65,7 +64,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("500.00"),
             current_balance=Decimal("500.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -97,7 +95,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -110,7 +107,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("-500.00"),
             current_balance=Decimal("-500.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -141,7 +137,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -154,7 +149,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("500.00"),
             current_balance=Decimal("500.00"),
-            is_active=False,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -167,15 +161,13 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("-200.00"),
             current_balance=Decimal("-200.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
 
-        # Filter by is_active=True
-        active_accounts = await repo.get_by_user(user_id=test_user.id, is_active=True)
+        active_accounts = await repo.get_by_user(user_id=test_user.id)
         assert len(active_accounts) == 2
-        assert all(acc.is_active for acc in active_accounts)
+        
 
         # Filter by account_type_id
         savings_accounts = await repo.get_by_user(
@@ -189,7 +181,6 @@ class TestAccountRepository:
         # Filter by both
         active_savings = await repo.get_by_user(
             user_id=test_user.id,
-            is_active=True,
             account_type_id=savings_account_type.id,
         )
         assert len(active_savings) == 1
@@ -211,7 +202,6 @@ class TestAccountRepository:
                 currency="USD",
                 opening_balance=Decimal("100.00"),
                 current_balance=Decimal("100.00"),
-                is_active=True,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -243,7 +233,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -283,7 +272,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -321,7 +309,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -334,7 +321,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("2000.00"),
             current_balance=Decimal("2000.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -371,7 +357,6 @@ class TestAccountRepository:
                 currency="USD",
                 opening_balance=Decimal("100.00"),
                 current_balance=Decimal("100.00"),
-                is_active=True,
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
@@ -385,7 +370,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("100.00"),
             current_balance=Decimal("100.00"),
-            is_active=False,
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -395,11 +379,11 @@ class TestAccountRepository:
         assert count == 4
 
         # Count only active
-        count = await repo.count_user_accounts(user_id=test_user.id, is_active=True)
+        count = await repo.count_user_accounts(user_id=test_user.id)
         assert count == 3
 
         # Count only inactive
-        count = await repo.count_user_accounts(user_id=test_user.id, is_active=False)
+        count = await repo.count_user_accounts(user_id=test_user.id)
         assert count == 1
 
     async def test_soft_delete_filtering(
@@ -417,7 +401,6 @@ class TestAccountRepository:
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
             created_by=test_user.id,
             updated_by=test_user.id,
         )

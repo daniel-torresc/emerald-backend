@@ -58,7 +58,6 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         currency: ISO 4217 currency code (3 uppercase letters, immutable)
         opening_balance: Initial account balance (can be negative for loans)
         current_balance: Current account balance (cached, calculated from transactions)
-        is_active: Whether account is active (inactive accounts hidden by default)
         created_at: When account was created
         updated_at: When account was last updated
         deleted_at: When account was soft-deleted (NULL if active)
@@ -102,8 +101,8 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         Defined in migration for performance:
         - user_id (for listing user's accounts)
         - account_type_id (for filtering by type)
-        - is_active (for filtering active/inactive)
         - currency (for filtering by currency)
+        - deleted_at (for soft delete filtering)
         - Partial unique index on (user_id, LOWER(account_name)) WHERE deleted_at IS NULL
 
     Example:
@@ -115,7 +114,6 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
             created_by=user.id,
             updated_by=user.id,
         )
@@ -171,13 +169,6 @@ class Account(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     current_balance: Mapped[Decimal] = mapped_column(
         Numeric(15, 2),
         nullable=False,
-    )
-
-    # Status
-    is_active: Mapped[bool] = mapped_column(
-        nullable=False,
-        default=True,
-        index=True,
     )
 
     # Account Metadata (Visual Customization & Bank Information)

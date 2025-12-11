@@ -239,7 +239,7 @@ class UserService:
 
         Args:
             pagination: Pagination parameters (page, page_size)
-            filters: Filter parameters (is_active, is_superuser, search)
+            filters: Filter parameters (is_superuser, search)
             current_user: Currently authenticated user (must be admin)
             request_id: Request ID for audit logging
             ip_address: Client IP address
@@ -247,6 +247,8 @@ class UserService:
 
         Returns:
             PaginatedResponse with list of users and pagination metadata
+
+        Note: Soft-deleted users are automatically excluded by repository layer.
 
         Raises:
             InsufficientPermissionsError: If user is not admin
@@ -262,7 +264,6 @@ class UserService:
 
         # Get filtered users
         users = await self.user_repo.filter_users(
-            is_active=filters.is_active,
             is_admin=filters.is_superuser,
             search=filters.search,
             skip=(pagination.page - 1) * pagination.page_size,
@@ -271,7 +272,6 @@ class UserService:
 
         # Get total count
         total_count = await self.user_repo.count_filtered(
-            is_active=filters.is_active,
             is_admin=filters.is_superuser,
             search=filters.search,
         )
@@ -317,14 +317,14 @@ class UserService:
         user_agent: str | None = None,
     ) -> None:
         """
-        Deactivate a user (set is_active = False).
+        Deactivate a user (soft delete).
 
         Permission: Admin only
 
         When a user is deactivated:
-        - is_active set to False
+        - deleted_at timestamp is set (soft delete)
         - All refresh tokens are revoked
-        - User cannot log in
+        - User cannot log in (filtered by repository)
 
         Args:
             user_id: User ID to deactivate
@@ -353,10 +353,8 @@ class UserService:
             logger.warning(f"User {user_id} not found")
             raise NotFoundError(f"User with ID {user_id}")
 
-        # Update user to inactive
-        old_values = {"is_active": user.is_active}
-        await self.user_repo.update(user, is_active=False)
-        new_values = {"is_active": False}
+        # Soft delete the user
+        await self.user_repo.delete(user)
 
         # Revoke all refresh tokens
         await self.token_repo.revoke_user_tokens(user_id)
@@ -364,12 +362,12 @@ class UserService:
         # Log audit event
         await self.audit_service.log_data_change(
             user_id=current_user.id,
-            action=AuditAction.UPDATE,
+            action=AuditAction.DELETE,
             entity_type="user",
             entity_id=user_id,
-            old_values=old_values,
-            new_values=new_values,
-            description=f"Admin {current_user.username} deactivated user {user.username}",
+            old_values={},
+            new_values={},
+            description=f"Admin {current_user.username} deactivated (soft deleted) user {user.username}",
             ip_address=ip_address,
             user_agent=user_agent,
             request_id=request_id,

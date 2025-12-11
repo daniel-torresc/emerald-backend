@@ -24,7 +24,6 @@ class AccountTypeBase(BaseModel):
         name: Display name shown to users
         description: Detailed description of the account type
         icon_url: URL to icon image for UI display
-        is_active: Whether the type is available for selection
         sort_order: Integer for controlling display order
     """
 
@@ -55,11 +54,6 @@ class AccountTypeBase(BaseModel):
         max_length=500,
         description="URL to icon image for UI display",
         examples=["https://example.com/icons/checking.svg"],
-    )
-
-    is_active: bool = Field(
-        default=True,
-        description="Whether the type is available for selection",
     )
 
     sort_order: int = Field(
@@ -163,7 +157,6 @@ class AccountTypeUpdate(BaseModel):
         name: New display name
         description: New description
         icon_url: New icon URL
-        is_active: New active status
         sort_order: New sort order
     """
 
@@ -184,11 +177,6 @@ class AccountTypeUpdate(BaseModel):
         default=None,
         max_length=500,
         description="URL to icon image for UI display",
-    )
-
-    is_active: bool | None = Field(
-        default=None,
-        description="Whether the type is available for selection",
     )
 
     sort_order: int | None = Field(
@@ -242,7 +230,6 @@ class AccountTypeListItem(BaseModel):
         key: Unique key identifier
         name: Display name
         icon_url: Icon URL (optional)
-        is_active: Active status
         sort_order: Display order
     """
 
@@ -250,7 +237,6 @@ class AccountTypeListItem(BaseModel):
     key: str = Field(description="Unique key identifier")
     name: str = Field(description="Display name")
     icon_url: str | None = Field(description="Icon URL")
-    is_active: bool = Field(description="Active status")
     sort_order: int = Field(description="Display order")
 
     model_config = {"from_attributes": True}

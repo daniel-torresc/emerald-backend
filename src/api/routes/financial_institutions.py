@@ -8,7 +8,7 @@ This module provides:
 - GET /api/v1/financial-institutions/swift/{code} - Get by SWIFT code
 - GET /api/v1/financial-institutions/routing/{number} - Get by routing number
 - PATCH /api/v1/financial-institutions/{id} - Update institution (admin only)
-- POST /api/v1/financial-institutions/{id}/deactivate - Deactivate institution (admin only)
+- DELETE /api/v1/financial-institutions/{id} - Delete institution (admin only)
 """
 
 import logging
@@ -62,7 +62,6 @@ async def create_institution(
         - institution_type: Institution type (required)
         - logo_url: Logo URL (optional)
         - website_url: Website URL (optional)
-        - is_active: Active status (default: true)
 
     Returns:
         FinancialInstitutionResponse with created institution data
@@ -270,29 +269,26 @@ async def update_institution(
     )
 
 
-@router.post(
-    "/{institution_id}/deactivate",
-    response_model=FinancialInstitutionResponse,
-    summary="Deactivate financial institution",
-    description="Deactivate institution (admin only) - sets is_active to false",
+@router.delete(
+    "/{institution_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete financial institution",
+    description="Delete institution (admin only) - soft deletes via deleted_at timestamp",
 )
-async def deactivate_institution(
+async def delete_institution(
     request: Request,
     institution_id: uuid.UUID,
     current_user: User = Depends(require_admin),
     service: FinancialInstitutionService = Depends(get_financial_institution_service),
-) -> FinancialInstitutionResponse:
+) -> None:
     """
-    Deactivate financial institution.
+    Delete financial institution (soft delete).
 
-    Sets is_active = False. Institution remains in database for
-    historical references but won't appear in default listings.
+    Soft deletes by setting deleted_at timestamp. Institution remains in database for
+    historical references but is filtered from queries.
 
     Path parameters:
-        - institution_id: UUID of the institution to deactivate
-
-    Returns:
-        FinancialInstitutionResponse with deactivated institution data
+        - institution_id: UUID of the institution to delete
 
     Requires:
         - Valid access token
@@ -301,7 +297,7 @@ async def deactivate_institution(
     Raises:
         - 404 Not Found: If institution not found
     """
-    return await service.deactivate_institution(
+    await service.delete_institution(
         institution_id=institution_id,
         current_user=current_user,
         request_id=getattr(request.state, "request_id", None),

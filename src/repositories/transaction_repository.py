@@ -114,53 +114,6 @@ class TransactionRepository(BaseRepository[Transaction]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def update(self, transaction: Transaction) -> Transaction:
-        """
-        Update an existing transaction.
-
-        Args:
-            transaction: Transaction instance with updated fields
-
-        Returns:
-            Updated transaction instance
-
-        Example:
-            transaction.amount = Decimal("-60.00")
-            transaction.description = "Updated description"
-            updated = await repo.update(transaction)
-        """
-        await self.session.flush()
-        await self.session.refresh(
-            transaction,
-            ["account", "parent_transaction", "child_transactions", "card"],
-        )
-        return transaction
-
-    async def soft_delete(self, transaction_id: uuid.UUID) -> bool:
-        """
-        Soft delete a transaction (set deleted_at timestamp).
-
-        Args:
-            transaction_id: UUID of the transaction to delete
-
-        Returns:
-            True if deleted, False if not found
-
-        Example:
-            deleted = await repo.soft_delete(transaction_id)
-            if not deleted:
-                raise NotFoundError("Transaction not found")
-        """
-        transaction = await self.get_by_id(transaction_id)
-        if transaction is None:
-            return False
-
-        from datetime import UTC, datetime
-
-        transaction.deleted_at = datetime.now(UTC)
-        await self.session.flush()
-        return True
-
     async def get_by_account_id(
         self,
         account_id: uuid.UUID,

@@ -56,7 +56,6 @@ class TestAccountRoutes:
         assert data["currency"] == "USD"
         assert data["opening_balance"] == "1500.50"
         assert data["current_balance"] == "1500.50"
-        assert data["is_active"] is True
         assert data["user_id"] == str(test_user.id)
         assert "id" in data
         assert "created_at" in data
@@ -307,12 +306,12 @@ class TestAccountRoutes:
         test_financial_institution,
         savings_account_type,
     ):
-        """Test filtering accounts by active status."""
-        # Create active account
+        """Test that deleted accounts are not returned in list."""
+        # Create first account
         create_response = await async_client.post(
             "/api/v1/accounts",
             json={
-                "account_name": "Active",
+                "account_name": "To Be Deleted",
                 "account_type_id": str(savings_account_type.id),
                 "currency": "USD",
                 "opening_balance": "1000.00",
@@ -322,14 +321,13 @@ class TestAccountRoutes:
         )
         account_id = create_response.json()["id"]
 
-        # Deactivate it
-        await async_client.put(
+        # Delete it (soft delete)
+        await async_client.delete(
             f"/api/v1/accounts/{account_id}",
-            json={"is_active": False},
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
-        # Create another active account
+        # Create another account
         await async_client.post(
             "/api/v1/accounts",
             json={
@@ -342,16 +340,17 @@ class TestAccountRoutes:
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
-        # Filter by is_active=true
+        # List accounts - should only return non-deleted accounts
         response = await async_client.get(
-            "/api/v1/accounts?is_active=true",
+            "/api/v1/accounts",
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
         assert response.status_code == 200
         data = response.json()
+        # Should only have the "Still Active" account, not the deleted one
         assert len(data) == 1
-        assert data[0]["is_active"] is True
+        assert data[0]["account_name"] == "Still Active"
 
     async def test_list_accounts_pagination(
         self,
@@ -516,40 +515,6 @@ class TestAccountRoutes:
         assert response.status_code == 200
         data = response.json()
         assert data["account_name"] == "New Name"
-
-    async def test_update_account_is_active(
-        self,
-        async_client: AsyncClient,
-        user_token: dict,
-        test_financial_institution,
-        savings_account_type,
-    ):
-        """Test updating account active status."""
-        # Create account
-        create_response = await async_client.post(
-            "/api/v1/accounts",
-            json={
-                "account_name": "Test",
-                "account_type_id": str(savings_account_type.id),
-                "currency": "USD",
-                "opening_balance": "1000.00",
-                "financial_institution_id": str(test_financial_institution.id),
-            },
-            headers={"Authorization": f"Bearer {user_token['access_token']}"},
-        )
-
-        account_id = create_response.json()["id"]
-
-        # Deactivate
-        response = await async_client.put(
-            f"/api/v1/accounts/{account_id}",
-            json={"is_active": False},
-            headers={"Authorization": f"Bearer {user_token['access_token']}"},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["is_active"] is False
 
     async def test_update_account_duplicate_name(
         self,

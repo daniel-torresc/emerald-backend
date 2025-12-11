@@ -13,7 +13,7 @@ Architecture:
 
 from typing import Optional
 
-from sqlalchemy import Boolean, Integer, String
+from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.base import Base
@@ -34,7 +34,6 @@ class AccountType(Base, TimestampMixin):
         name: Display name shown to users (max 100 chars)
         description: Detailed description of the account type (max 500 chars, optional)
         icon_url: URL to icon image for UI display (max 500 chars, optional)
-        is_active: Whether the type is available for selection (default: True)
         sort_order: Integer for controlling display order (lower = first, default: 0)
         created_at: When the account type was created (auto-set)
         updated_at: When the account type was last updated (auto-updated)
@@ -47,21 +46,20 @@ class AccountType(Base, TimestampMixin):
 
     Indexes:
         - key (unique index from constraint)
-        - is_active (for filtering active types)
         - sort_order (for ordering)
 
     Business Rules:
         - Only administrators can create, update, or delete account types
         - All users can view and select from available account types
         - Keys are immutable once created
-        - Inactive types are hidden from selection but remain in database
+        - Account types can be hard-deleted if no accounts reference them
 
     Note:
-        This model does NOT use SoftDeleteMixin. Instead, obsolete types
-        are marked with is_active=False. This is because:
+        This model does NOT use SoftDeleteMixin. Account types use hard delete
+        (permanent removal from database). This is because:
         - Account type data is master data, not transactional data
-        - Historical references to types must remain valid
-        - Deactivated types should still be viewable in historical contexts
+        - Hard delete is appropriate for cleanup of unused types
+        - Foreign key constraints prevent deletion of types in use
     """
 
     __tablename__ = "account_types"
@@ -93,15 +91,7 @@ class AccountType(Base, TimestampMixin):
         comment="URL to icon image for UI display",
     )
 
-    # Status and ordering
-    is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=True,
-        index=True,  # Index for filtering active types
-        comment="Whether the type is available for selection",
-    )
-
+    # Ordering
     sort_order: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -116,9 +106,4 @@ class AccountType(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         """String representation of AccountType."""
-        return (
-            f"AccountType(id={self.id}, "
-            f"key={self.key}, "
-            f"name={self.name}, "
-            f"is_active={self.is_active})"
-        )
+        return f"AccountType(id={self.id}, key={self.key}, name={self.name})"

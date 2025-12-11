@@ -127,7 +127,6 @@ class AuthService:
             email=user_data.email,
             username=user_data.username,
             password_hash=password_hash,
-            is_active=True,  # Users are active by default
             is_admin=False,  # Regular user by default
         )
         await self.session.commit()
@@ -151,10 +150,11 @@ class AuthService:
 
         This method:
         1. Validates credentials (email + password)
-        2. Checks if user account is active
-        3. Updates last login timestamp
-        4. Generates access and refresh tokens
-        5. Stores refresh token hash in database
+        2. Updates last login timestamp
+        3. Generates access and refresh tokens
+        4. Stores refresh token hash in database
+
+        Note: Soft-deleted users are automatically filtered by repository layer.
 
         Args:
             email: User's email address
@@ -167,7 +167,6 @@ class AuthService:
 
         Raises:
             InvalidCredentialsError: If email or password is incorrect
-            AuthenticationError: If user account is inactive
 
         Example:
             user, tokens = await auth_service.login(
@@ -176,7 +175,7 @@ class AuthService:
                 ip_address="192.168.1.1"
             )
         """
-        # Get user by email
+        # Get user by email (soft-deleted users are automatically excluded)
         user = await self.user_repo.get_by_email(email)
         if not user:
             logger.warning(f"Login failed: user not found with email {email}")
@@ -186,14 +185,6 @@ class AuthService:
         if not verify_password(password, user.password_hash):
             logger.warning(f"Login failed: invalid password for user {user.id}")
             raise InvalidCredentialsError()
-
-        # Check if user is active
-        if not user.is_active:
-            logger.warning(f"Login failed: inactive account for user {user.id}")
-            raise AuthenticationError(
-                message="Account is inactive. Please contact support.",
-                error_code="INACTIVE_ACCOUNT",
-            )
 
         # Update last login timestamp
         await self.user_repo.update_last_login(user.id)
@@ -285,19 +276,13 @@ class AuthService:
             )
             raise InvalidTokenError("Refresh token has expired")
 
-        # Get user
+        # Get user (soft-deleted users are automatically excluded by repository)
         user = await self.user_repo.get_by_id(db_token.user_id)
         if not user:
-            logger.error(f"Token refresh failed: user not found {db_token.user_id}")
-            raise InvalidTokenError("User not found")
-
-        # Check if user is active
-        if not user.is_active:
-            logger.warning(f"Token refresh failed: inactive user {user.id}")
-            raise AuthenticationError(
-                message="Account is inactive",
-                error_code="INACTIVE_ACCOUNT",
+            logger.error(
+                f"Token refresh failed: user not found or deleted {db_token.user_id}"
             )
+            raise InvalidTokenError("User not found")
 
         # Revoke old refresh token
         await self.token_repo.revoke_token(db_token.id)

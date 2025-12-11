@@ -32,7 +32,6 @@ class FinancialInstitutionBase(BaseModel):
         institution_type: Type of institution
         logo_url: URL to institution's logo image (optional)
         website_url: Official website URL (optional)
-        is_active: Whether the institution is operational
     """
 
     name: str = Field(
@@ -84,11 +83,6 @@ class FinancialInstitutionBase(BaseModel):
         default=None,
         description="Official website URL",
         examples=["https://www.santander.com"],
-    )
-
-    is_active: bool = Field(
-        default=True,
-        description="Whether the institution is operational",
     )
 
     @field_validator("swift_code")
@@ -211,7 +205,6 @@ class FinancialInstitutionUpdate(BaseModel):
         institution_type: New institution type
         logo_url: New logo URL
         website_url: New website URL
-        is_active: New active status
     """
 
     name: str | None = Field(
@@ -259,11 +252,6 @@ class FinancialInstitutionUpdate(BaseModel):
     website_url: HttpUrl | None = Field(
         default=None,
         description="Official website URL",
-    )
-
-    is_active: bool | None = Field(
-        default=None,
-        description="Whether the institution is operational",
     )
 
     @field_validator("swift_code")
@@ -354,7 +342,6 @@ class FinancialInstitutionListItem(BaseModel):
         country_code: Country code
         institution_type: Institution type
         logo_url: Logo URL (optional)
-        is_active: Active status
     """
 
     id: uuid.UUID = Field(description="Unique identifier")
@@ -364,7 +351,6 @@ class FinancialInstitutionListItem(BaseModel):
     country_code: str = Field(description="ISO 3166-1 alpha-2 country code")
     institution_type: InstitutionType = Field(description="Institution type")
     logo_url: str | None = Field(description="Logo URL")
-    is_active: bool = Field(description="Active status")
 
     model_config = {"from_attributes": True}
 
@@ -378,7 +364,6 @@ class FinancialInstitutionFilterParams(BaseModel):
     Attributes:
         country_code: Filter by country (2-letter ISO code)
         institution_type: Filter by institution type
-        is_active: Filter by active status (default: active only)
         search: Search in name and short_name fields
     """
 
@@ -390,11 +375,6 @@ class FinancialInstitutionFilterParams(BaseModel):
     institution_type: InstitutionType | None = Field(
         default=None,
         description="Filter by institution type",
-    )
-
-    is_active: bool | None = Field(
-        default=True,
-        description="Filter by active status (default: True - active only)",
     )
 
     search: str | None = Field(

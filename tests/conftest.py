@@ -34,6 +34,7 @@ from src.core.config import settings
 from src.core.database import get_db
 from src.main import app
 from src.models.base import Base
+from src.models.card import Card
 from src.models.user import User
 from src.core.security import hash_password
 
@@ -96,28 +97,24 @@ async def test_engine(event_loop):
                     key="checking",
                     name="Checking",
                     description="Standard checking account for daily transactions and bill payments",
-                    is_active=True,
                     sort_order=1,
                 ),
                 AccountType(
                     key="savings",
                     name="Savings",
                     description="Savings account for storing money and earning interest",
-                    is_active=True,
                     sort_order=2,
                 ),
                 AccountType(
                     key="investment",
                     name="Investment",
                     description="Investment account for stocks, bonds, mutual funds, and other securities",
-                    is_active=True,
                     sort_order=3,
                 ),
                 AccountType(
                     key="other",
                     name="Other",
                     description="Other account types (credit cards, loans, etc.)",
-                    is_active=True,
                     sort_order=4,
                 ),
             ]
@@ -304,7 +301,6 @@ async def test_user(test_engine) -> User:
             email="testuser@example.com",
             username="testuser",
             password_hash=hash_password("TestPass123!"),
-            is_active=True,
             is_admin=False,
         )
 
@@ -349,7 +345,6 @@ async def admin_user(test_engine) -> User:
             email="admin@example.com",
             username="adminuser",
             password_hash=hash_password("AdminPass123!"),
-            is_active=True,
             is_admin=True,
         )
 
@@ -391,13 +386,15 @@ async def inactive_user(test_engine) -> User:
         if existing_user:
             return existing_user
 
-        # Create new user if doesn't exist
+        # Create new user if doesn't exist (soft deleted to make it "inactive")
+        from datetime import datetime, timezone
+
         user = User(
             email="inactive@example.com",
             username="inactiveuser",
             password_hash=hash_password("InactivePass123!"),
-            is_active=False,
             is_admin=False,
+            deleted_at=datetime.now(timezone.utc),  # Soft delete to make inactive
         )
 
         session.add(user)
@@ -502,7 +499,7 @@ async def test_financial_institution(test_engine):
             institution_type=InstitutionType.bank,
             logo_url="https://example.com/chase-logo.png",
             website_url="https://www.chase.com",
-            is_active=True,
+            
         )
 
         session.add(institution)
@@ -638,11 +635,11 @@ async def inactive_account_type(test_engine):
 
         if account_type is None:
             # Create if doesn't exist
+            # Note: AccountType no longer has is_active field - uses hard delete only
             account_type = AccountType(
                 key="inactive_test_type",
                 name="Inactive Test Type",
                 description="Inactive account type for testing validation",
-                is_active=False,
                 sort_order=999,
             )
 
@@ -683,7 +680,7 @@ async def test_account(
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
+            
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -750,9 +747,9 @@ async def test_financial_institution_for_cards(test_engine):
     )
 
     async with async_session_factory() as session:
-        # Try to get existing institution
+        # Try to get existing institution (not soft deleted)
         result = await session.execute(
-            text("SELECT * FROM financial_institutions WHERE is_active = true LIMIT 1")
+            text("SELECT * FROM financial_institutions WHERE deleted_at IS NULL LIMIT 1")
         )
         row = result.first()
 
@@ -764,7 +761,7 @@ async def test_financial_institution_for_cards(test_engine):
         institution = FinancialInstitution(
             name="Test Bank",
             institution_type="bank",
-            is_active=True,
+            
         )
         session.add(institution)
         await session.commit()

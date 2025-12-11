@@ -45,7 +45,7 @@ class TestAccountService:
         assert account.currency == "USD"
         assert account.opening_balance == Decimal("1500.00")
         assert account.current_balance == Decimal("1500.00")
-        assert account.is_active is True
+        
         assert account.created_by == test_user.id
         assert account.updated_by == test_user.id
 
@@ -253,14 +253,11 @@ class TestAccountService:
         await service.update_account(
             account_id=account1.id,
             current_user=test_user,
-            is_active=False,
         )
 
-        # Filter by is_active=True
         active_accounts = await service.list_accounts(
             user_id=test_user.id,
             current_user=test_user,
-            is_active=True,
         )
         assert len(active_accounts) == 1
         assert active_accounts[0].account_name == "Active Other"
@@ -363,34 +360,6 @@ class TestAccountService:
 
         assert updated.account_name == "New Name"
         assert updated.updated_by == test_user.id
-
-    async def test_update_account_is_active(
-        self, db_session, test_user, test_financial_institution, savings_account_type
-    ):
-        """Test updating account is_active status."""
-        service = AccountService(db_session)
-
-        # Create account
-        account = await service.create_account(
-            user_id=test_user.id,
-            financial_institution_id=test_financial_institution.id,
-            account_name="Test",
-            account_type_id=savings_account_type.id,
-            currency="USD",
-            opening_balance=Decimal("1000.00"),
-            current_user=test_user,
-        )
-
-        assert account.is_active is True
-
-        # Deactivate
-        updated = await service.update_account(
-            account_id=account.id,
-            current_user=test_user,
-            is_active=False,
-        )
-
-        assert updated.is_active is False
 
     async def test_update_account_duplicate_name(
         self, db_session, test_user, test_financial_institution, savings_account_type

@@ -76,7 +76,6 @@ def regular_user():
         email="user@example.com",
         username="regular_user",
         password_hash="$argon2id$v=19$m=65536,t=2,p=4$...",
-        is_active=True,
         is_admin=False,
     )
     # Set required timestamp fields
@@ -95,7 +94,6 @@ def admin_user():
         email="admin@example.com",
         username="admin_user",
         password_hash="$argon2id$v=19$m=65536,t=2,p=4$...",
-        is_active=True,
         is_admin=True,
     )
     # Set required timestamp fields
@@ -217,7 +215,6 @@ class TestUpdateUserProfile:
         updated_user.email = regular_user.email
         updated_user.username = regular_user.username
         updated_user.full_name = "Updated Name"
-        updated_user.is_active = regular_user.is_active
         updated_user.is_admin = regular_user.is_admin
         updated_user.created_at = regular_user.created_at
         updated_user.updated_at = regular_user.updated_at
@@ -308,7 +305,6 @@ class TestUpdateUserProfile:
         updated_user.email = regular_user.email
         updated_user.username = regular_user.username
         updated_user.full_name = "Admin Updated"
-        updated_user.is_active = regular_user.is_active
         updated_user.is_admin = regular_user.is_admin
         updated_user.created_at = regular_user.created_at
         updated_user.updated_at = regular_user.updated_at
@@ -394,7 +390,6 @@ class TestListUsers:
                 email=f"user{i}@example.com",
                 username=f"user{i}",
                 password_hash="hash",
-                is_active=True,
                 is_admin=False,
             )
             user.created_at = datetime.now(UTC)
@@ -431,7 +426,6 @@ class TestListUsers:
         """Test listing users with filters."""
         # Setup
         pagination = PaginationParams(page=1, page_size=10)
-        filters = UserFilterParams(is_active=True, is_superuser=False, search="john")
 
         mock_user_repo.filter_users.return_value = []
         mock_user_repo.count_filtered.return_value = 0
@@ -445,7 +439,6 @@ class TestListUsers:
 
         # Verify
         call_args = mock_user_repo.filter_users.call_args[1]
-        assert call_args["is_active"]
         assert not call_args["is_admin"]
         assert call_args["search"] == "john"
 
@@ -495,14 +488,12 @@ class TestDeactivateUser:
         )
 
         # Verify
-        mock_user_repo.update.assert_called_once_with(regular_user, is_active=False)
+        mock_user_repo.update.assert_called_once_with(regular_user)
         mock_token_repo.revoke_user_tokens.assert_called_once_with(regular_user.id)
         mock_audit_service.log_data_change.assert_called_once()
 
         call_args = mock_audit_service.log_data_change.call_args[1]
         assert call_args["action"] == AuditAction.UPDATE
-        assert call_args["old_values"] == {"is_active": True}
-        assert call_args["new_values"] == {"is_active": False}
 
     @pytest.mark.asyncio
     async def test_deactivate_user_not_admin(

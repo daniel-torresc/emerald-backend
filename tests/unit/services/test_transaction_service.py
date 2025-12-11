@@ -342,7 +342,6 @@ class TestTransactionServiceUpdate:
                 email="other@example.com",
                 username="otheruser",
                 password_hash=hash_password("OtherPass123!"),
-                is_active=True,
                 is_admin=False,
             )
             session.add(other_user)

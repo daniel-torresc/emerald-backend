@@ -91,7 +91,6 @@ class AccountTypeService:
                     key="hsa",
                     name="Health Savings Account",
                     description="Tax-advantaged medical savings account",
-                    is_active=True,
                     sort_order=4
                 ),
                 current_user=admin_user
@@ -113,7 +112,6 @@ class AccountTypeService:
             name=data.name,
             description=data.description,
             icon_url=data.icon_url,
-            is_active=data.is_active,
             sort_order=data.sort_order,
         )
 
@@ -133,7 +131,6 @@ class AccountTypeService:
             new_values={
                 "key": account_type.key,
                 "name": account_type.name,
-                "is_active": account_type.is_active,
                 "sort_order": account_type.sort_order,
             },
             request_id=request_id,
@@ -203,36 +200,21 @@ class AccountTypeService:
 
     async def list_account_types(
         self,
-        is_active: bool | None = True,
     ) -> list[AccountTypeListItem]:
         """
-        List account types with optional active status filtering.
+        List all account types.
 
         Available to all authenticated users.
-        Returns active account types by default, ordered by sort_order, then name.
-
-        Args:
-            is_active: Filter by active status (default: True)
-                - True: Only active types
-                - False: Only inactive types
-                - None: All types (active and inactive)
+        Returns all account types ordered by sort_order, then name.
 
         Returns:
             List of AccountTypeListItem instances
 
         Example:
-            # Get all active types (default)
-            active = await service.list_account_types()
-
-            # Get all inactive types
-            inactive = await service.list_account_types(is_active=False)
-
-            # Get all types (active and inactive)
-            all_types = await service.list_account_types(is_active=None)
+            # Get all types
+            types = await service.list_account_types()
         """
-        account_types = await self.account_type_repo.get_all_ordered(
-            is_active=is_active
-        )
+        account_types = await self.account_type_repo.get_all_ordered()
 
         return [
             AccountTypeListItem.model_validate(account_type)
@@ -301,13 +283,6 @@ class AccountTypeService:
             changes["icon_url"] = {"old": account_type.icon_url, "new": data.icon_url}
             account_type.icon_url = data.icon_url
 
-        if data.is_active is not None:
-            changes["is_active"] = {
-                "old": account_type.is_active,
-                "new": data.is_active,
-            }
-            account_type.is_active = data.is_active
-
         if data.sort_order is not None:
             changes["sort_order"] = {
                 "old": account_type.sort_order,
@@ -341,37 +316,34 @@ class AccountTypeService:
 
         return AccountTypeResponse.model_validate(account_type)
 
-    async def deactivate_account_type(
+    async def delete_account_type(
         self,
         account_type_id: uuid.UUID,
         current_user: User,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> AccountTypeResponse:
+    ) -> None:
         """
-        Deactivate account type (admin only).
+        Delete account type (admin only).
 
-        Sets is_active = False. Account type remains in database for
-        historical references but won't appear in active listings.
+        Hard deletes the account type from database. Can only delete if no accounts
+        reference this type (enforced by foreign key constraint).
 
-        Logs deactivation to audit trail.
+        Logs deletion to audit trail.
 
         Args:
-            account_type_id: Account type UUID to deactivate
+            account_type_id: Account type UUID to delete
             current_user: Currently authenticated user (must be admin)
             request_id: Request ID for audit logging
             ip_address: Client IP address
             user_agent: Client user agent
 
-        Returns:
-            AccountTypeResponse with deactivated account type data
-
         Raises:
             NotFoundError: If account type not found
 
         Example:
-            account_type = await service.deactivate_account_type(
+            await service.delete_account_type(
                 account_type_id=uuid.UUID("..."),
                 current_user=admin_user
             )
@@ -381,30 +353,31 @@ class AccountTypeService:
         if not account_type:
             raise NotFoundError(f"Account type with ID {account_type_id} not found")
 
-        # Deactivate
-        account_type.is_active = False
+        # Store details for audit log before deletion
+        account_type_key = account_type.key
+        account_type_name = account_type.name
+
+        # Hard delete
+        await self.account_type_repo.delete(account_type)
 
         # Commit transaction
         await self.session.commit()
-        await self.session.refresh(account_type)
 
         logger.info(
-            f"Account type deactivated: {account_type.id} ('{account_type.key}') by admin {current_user.id}"
+            f"Account type deleted: {account_type_id} ('{account_type_key}') by admin {current_user.id}"
         )
 
         # Log to audit trail
         await self.audit_service.log_event(
             user_id=current_user.id,
-            action=AuditAction.DEACTIVATE_ACCOUNT_TYPE,
+            action=AuditAction.DELETE,
             entity_type="account_type",
-            entity_id=account_type.id,
+            entity_id=account_type_id,
             extra_metadata={
-                "key": account_type.key,
-                "name": account_type.name,
+                "key": account_type_key,
+                "name": account_type_name,
             },
             request_id=request_id,
             ip_address=ip_address,
             user_agent=user_agent,
         )
-
-        return AccountTypeResponse.model_validate(account_type)

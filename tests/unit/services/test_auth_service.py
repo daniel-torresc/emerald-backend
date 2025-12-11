@@ -68,7 +68,6 @@ def sample_user():
         email="test@example.com",
         username="testuser",
         password_hash="$argon2id$v=19$m=65536,t=2,p=4$...",
-        is_active=True,
         is_admin=False,
     )
 
@@ -109,7 +108,6 @@ class TestRegister:
             email=user_data.email,
             username=user_data.username,
             password_hash="hashed_password",
-            is_active=True,
             is_admin=False,
         )
         mock_user_repo.create.return_value = created_user
@@ -264,7 +262,6 @@ class TestLogin:
     ):
         """Test login with inactive account."""
         # Setup
-        sample_user.is_active = False
         mock_user_repo.get_by_email.return_value = sample_user
         mock_verify_password.return_value = True
 
@@ -473,7 +470,6 @@ class TestRefreshAccessToken:
     ):
         """Test refresh with inactive user account."""
         # Setup
-        sample_user.is_active = False
         mock_decode.return_value = {"sub": str(sample_user.id), "type": "refresh"}
         mock_verify_type.return_value = True
         mock_hash_refresh.return_value = "token_hash"

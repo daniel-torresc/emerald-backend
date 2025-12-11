@@ -2,7 +2,7 @@
 Account type repository for database operations.
 
 This module provides database operations for the AccountType model,
-including lookups by key, filtering by active status, and ordered retrieval.
+including lookups by key and ordered retrieval.
 """
 
 from sqlalchemy import select
@@ -18,12 +18,11 @@ class AccountTypeRepository(BaseRepository[AccountType]):
 
     Extends BaseRepository with account-type-specific queries:
     - Key lookups (for uniqueness validation)
-    - Active status filtering (for dropdown menus)
     - Ordered retrieval by sort_order (for UI display)
 
     Note:
-        This repository does NOT use soft delete filtering because
-        AccountType uses is_active flag instead (same as FinancialInstitution).
+        AccountType uses hard delete (permanent removal from database).
+        No soft delete filtering is applied.
     """
 
     def __init__(self, session: AsyncSession):
@@ -77,63 +76,21 @@ class AccountTypeRepository(BaseRepository[AccountType]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None
 
-    async def get_all_active(self) -> list[AccountType]:
+    async def get_all_ordered(self) -> list[AccountType]:
         """
-        Get all active account types.
+        Get all account types ordered by sort_order, then by name.
 
         Ordered by sort_order (ascending), then by name (alphabetically).
         Useful for dropdown menus and selection lists in UI.
 
         Returns:
-            List of all active AccountType instances
+            List of all AccountType instances
 
         Example:
-            active_types = await repo.get_all_active()
+            types = await repo.get_all_ordered()
             # Returns: [Checking, Savings, Investment, ...]
         """
-        query = (
-            select(AccountType)
-            .where(AccountType.is_active)
-            .order_by(AccountType.sort_order, AccountType.name)
-        )
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
-
-    async def get_all_ordered(self, is_active: bool | None = True) -> list[AccountType]:
-        """
-        Get all account types with optional active status filtering.
-
-        Ordered by sort_order (ascending), then by name (alphabetically).
-        Allows retrieving both active and inactive types based on parameter.
-
-        Args:
-            is_active: Filter by active status (default: True)
-                - True: Only active types
-                - False: Only inactive types
-                - None: All types (active and inactive)
-
-        Returns:
-            List of AccountType instances matching filter
-
-        Example:
-            # Get all active types (default)
-            active = await repo.get_all_ordered()
-
-            # Get all inactive types
-            inactive = await repo.get_all_ordered(is_active=False)
-
-            # Get all types (active and inactive)
-            all_types = await repo.get_all_ordered(is_active=None)
-        """
-        query = select(AccountType)
-
-        # Apply active status filter (if specified)
-        if is_active is not None:
-            query = query.where(AccountType.is_active.is_(is_active))
-
-        # Order by sort_order, then name
-        query = query.order_by(AccountType.sort_order, AccountType.name)
+        query = select(AccountType).order_by(AccountType.sort_order, AccountType.name)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
