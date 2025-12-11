@@ -8,7 +8,7 @@ Target coverage: 100% for this critical security component.
 import pytest
 
 from src.exceptions import EncryptionError
-from src.services.encryption_service import EncryptionService
+from src.core.encryption import EncryptionService
 
 
 class TestEncryptionService:

@@ -25,6 +25,7 @@ from src.core.security import (
     verify_refresh_token_hash,
     verify_token_type,
 )
+from src.core.encryption import EncryptionService
 
 __all__ = [
     # Config
@@ -51,4 +52,6 @@ __all__ = [
     # Security - Refresh Token
     "hash_refresh_token",
     "verify_refresh_token_hash",
+    # Security - Encryption
+    "EncryptionService",
 ]
