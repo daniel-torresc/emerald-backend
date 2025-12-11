@@ -22,6 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from src.models.base import Base
 from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 
+
 # =============================================================================
 # User Model
 # =============================================================================

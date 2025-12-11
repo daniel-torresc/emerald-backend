@@ -13,14 +13,7 @@ import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import (
-    CheckConstraint,
-    ForeignKey,
-    Integer,
-    Numeric,
-    String,
-    Enum as SQLEnum,
-)
+from sqlalchemy import (CheckConstraint, Enum as SQLEnum, ForeignKey, Integer, Numeric, String)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
