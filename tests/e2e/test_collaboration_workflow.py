@@ -19,7 +19,9 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_account_sharing_collaboration_workflow(async_client: AsyncClient):
+async def test_account_sharing_collaboration_workflow(
+    async_client: AsyncClient, savings_account_type, test_financial_institution
+):
     """
     Test: Complete account sharing workflow between multiple users.
 
@@ -56,7 +58,8 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
         headers=headers_a,
         json={
             "account_name": "Shared Savings",
-            "account_type": "savings",
+            "account_type_id": str(savings_account_type.id),
+            "financial_institution_id": str(test_financial_institution.id),
             "currency": "USD",
             "opening_balance": "5000.00",
         },
@@ -211,7 +214,9 @@ async def test_account_sharing_collaboration_workflow(async_client: AsyncClient)
 
 
 @pytest.mark.asyncio
-async def test_permission_downgrade_workflow(async_client: AsyncClient):
+async def test_permission_downgrade_workflow(
+    async_client: AsyncClient, savings_account_type, test_financial_institution
+):
     """
     Test: User permission is downgraded from EDITOR to VIEWER.
     """
@@ -254,7 +259,8 @@ async def test_permission_downgrade_workflow(async_client: AsyncClient):
         headers=headers_owner,
         json={
             "account_name": "Downgrade Test",
-            "account_type": "savings",
+            "account_type_id": str(savings_account_type.id),
+            "financial_institution_id": str(test_financial_institution.id),
             "currency": "USD",
             "opening_balance": "1000.00",
         },
@@ -312,7 +318,9 @@ async def test_permission_downgrade_workflow(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_shared_account_transaction_visibility(async_client: AsyncClient):
+async def test_shared_account_transaction_visibility(
+    async_client: AsyncClient, savings_account_type, test_financial_institution
+):
     """
     Test: All users with access see the same transactions.
     """
@@ -355,7 +363,8 @@ async def test_shared_account_transaction_visibility(async_client: AsyncClient):
         headers=headers_sharer,
         json={
             "account_name": "Visibility Test",
-            "account_type": "savings",
+            "account_type_id": str(savings_account_type.id),
+            "financial_institution_id": str(test_financial_institution.id),
             "currency": "USD",
             "opening_balance": "1000.00",
         },
@@ -405,7 +414,9 @@ async def test_shared_account_transaction_visibility(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_share_list_visibility(async_client: AsyncClient):
+async def test_share_list_visibility(
+    async_client: AsyncClient, savings_account_type, test_financial_institution
+):
     """
     Test: Owner sees all shares, non-owners see only their own.
     """
@@ -443,7 +454,8 @@ async def test_share_list_visibility(async_client: AsyncClient):
         headers=headers_owner,
         json={
             "account_name": "Share List Test",
-            "account_type": "savings",
+            "account_type_id": str(savings_account_type.id),
+            "financial_institution_id": str(test_financial_institution.id),
             "currency": "USD",
             "opening_balance": "1000.00",
         },
@@ -490,7 +502,9 @@ async def test_share_list_visibility(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_cascading_share_revocation(async_client: AsyncClient):
+async def test_cascading_share_revocation(
+    async_client: AsyncClient, savings_account_type, test_financial_institution
+):
     """
     Test: When account is deleted, all shares are effectively revoked.
     """
@@ -533,7 +547,8 @@ async def test_cascading_share_revocation(async_client: AsyncClient):
         headers=headers_owner,
         json={
             "account_name": "To Delete",
-            "account_type": "savings",
+            "account_type_id": str(savings_account_type.id),
+            "financial_institution_id": str(test_financial_institution.id),
             "currency": "USD",
             "opening_balance": "1000.00",
         },

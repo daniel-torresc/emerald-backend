@@ -731,7 +731,9 @@ class TestAccountRoutes:
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
-        assert response.status_code == 422  # Validation error from schema
+        # Nil UUID validation only happens at account type creation, not when referencing
+        # So the API tries to look it up and returns 404 (not found)
+        assert response.status_code == 404
         response_data = response.json()
         assert "error" in response_data
 
