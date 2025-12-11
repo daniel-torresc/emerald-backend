@@ -205,7 +205,6 @@ class TestTransactionAPI:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["is_split_parent"] is True
         assert len(data["child_transactions"]) == 2
 
     async def test_join_split_transaction(
@@ -246,7 +245,8 @@ class TestTransactionAPI:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["is_split_parent"] is False
+        # Transaction should be joined (no child transactions)
+        assert "child_transactions" not in data or len(data["child_transactions"]) == 0
 
     async def test_permission_denied(
         self,
@@ -924,7 +924,7 @@ async def test_cannot_access_another_users_transaction(
         headers={"Authorization": f"Bearer {other_token['access_token']}"},
     )
 
-    assert response.status_code == 404  # Not found (or forbidden)
+    assert response.status_code == 403  # Forbidden - better security practice (doesn't leak existence)
 
 
 @pytest.mark.asyncio

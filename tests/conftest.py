@@ -281,6 +281,8 @@ async def test_user(test_engine) -> User:
     Returns:
         User instance with known credentials
     """
+    from sqlalchemy import select
+
     async_session_factory = async_sessionmaker(
         test_engine,
         class_=AsyncSession,
@@ -288,6 +290,16 @@ async def test_user(test_engine) -> User:
     )
 
     async with async_session_factory() as session:
+        # Check if user already exists (for test isolation issues)
+        result = await session.execute(
+            select(User).where(User.username == "testuser", User.deleted_at.is_(None))
+        )
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
+            return existing_user
+
+        # Create new user if doesn't exist
         user = User(
             email="testuser@example.com",
             username="testuser",
@@ -314,6 +326,8 @@ async def admin_user(test_engine) -> User:
     Returns:
         User instance with admin privileges
     """
+    from sqlalchemy import select
+
     async_session_factory = async_sessionmaker(
         test_engine,
         class_=AsyncSession,
@@ -321,6 +335,16 @@ async def admin_user(test_engine) -> User:
     )
 
     async with async_session_factory() as session:
+        # Check if user already exists (for test isolation issues)
+        result = await session.execute(
+            select(User).where(User.username == "adminuser", User.deleted_at.is_(None))
+        )
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
+            return existing_user
+
+        # Create new user if doesn't exist
         user = User(
             email="admin@example.com",
             username="adminuser",
@@ -347,6 +371,8 @@ async def inactive_user(test_engine) -> User:
     Returns:
         User instance that is deactivated
     """
+    from sqlalchemy import select
+
     async_session_factory = async_sessionmaker(
         test_engine,
         class_=AsyncSession,
@@ -354,6 +380,18 @@ async def inactive_user(test_engine) -> User:
     )
 
     async with async_session_factory() as session:
+        # Check if user already exists (for test isolation issues)
+        result = await session.execute(
+            select(User).where(
+                User.username == "inactiveuser", User.deleted_at.is_(None)
+            )
+        )
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
+            return existing_user
+
+        # Create new user if doesn't exist
         user = User(
             email="inactive@example.com",
             username="inactiveuser",

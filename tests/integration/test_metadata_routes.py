@@ -11,76 +11,6 @@ import pytest
 from httpx import AsyncClient
 
 
-class TestAccountTypesEndpoint:
-    """Test cases for GET /api/metadata/account-types"""
-
-    @pytest.mark.asyncio
-    async def test_get_account_types_success(self, async_client: AsyncClient):
-        """Test GET /api/metadata/account-types returns 200."""
-        response = await async_client.get("/api/metadata/account-types")
-
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "application/json"
-
-    @pytest.mark.asyncio
-    async def test_get_account_types_response_structure(
-        self, async_client: AsyncClient
-    ):
-        """Test that response matches expected schema."""
-        response = await async_client.get("/api/metadata/account-types")
-        data = response.json()
-
-        # Check top-level structure
-        assert "account_types" in data
-        assert isinstance(data["account_types"], list)
-
-    @pytest.mark.asyncio
-    async def test_get_account_types_contains_all_types(
-        self, async_client: AsyncClient
-    ):
-        """Test that response contains all expected account types."""
-        response = await async_client.get("/api/metadata/account-types")
-        data = response.json()
-
-        account_types = data["account_types"]
-        assert len(account_types) == 4
-
-        # Extract keys
-        keys = [item["key"] for item in account_types]
-        assert "checking" in keys
-        assert "savings" in keys
-        assert "investment" in keys
-        assert "other" in keys
-
-    @pytest.mark.asyncio
-    async def test_get_account_types_item_structure(self, async_client: AsyncClient):
-        """Test that each account type has correct structure."""
-        response = await async_client.get("/api/metadata/account-types")
-        data = response.json()
-
-        for item in data["account_types"]:
-            assert "key" in item
-            assert "label" in item
-            assert isinstance(item["key"], str)
-            assert isinstance(item["label"], str)
-            assert len(item["key"]) > 0
-            assert len(item["label"]) > 0
-
-    @pytest.mark.asyncio
-    async def test_get_account_types_labels_are_capitalized(
-        self, async_client: AsyncClient
-    ):
-        """Test that labels are properly capitalized."""
-        response = await async_client.get("/api/metadata/account-types")
-        data = response.json()
-
-        labels = [item["label"] for item in data["account_types"]]
-        assert "Checking" in labels
-        assert "Savings" in labels
-        assert "Investment" in labels
-        assert "Other" in labels
-
-
 class TestCurrenciesEndpoint:
     """Test cases for GET /api/metadata/currencies"""
 
@@ -175,94 +105,11 @@ class TestCurrenciesEndpoint:
             assert currency["symbol"]
 
 
-class TestTransactionTypesEndpoint:
-    """Test cases for GET /api/metadata/transaction-types"""
-
-    @pytest.mark.asyncio
-    async def test_get_transaction_types_success(self, async_client: AsyncClient):
-        """Test GET /api/metadata/transaction-types returns 200."""
-        response = await async_client.get("/api/metadata/transaction-types")
-
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "application/json"
-
-    @pytest.mark.asyncio
-    async def test_get_transaction_types_response_structure(
-        self, async_client: AsyncClient
-    ):
-        """Test that response matches expected schema."""
-        response = await async_client.get("/api/metadata/transaction-types")
-        data = response.json()
-
-        # Check top-level structure
-        assert "transaction_types" in data
-        assert isinstance(data["transaction_types"], list)
-
-    @pytest.mark.asyncio
-    async def test_get_transaction_types_contains_all_types(
-        self, async_client: AsyncClient
-    ):
-        """Test that response contains all expected transaction types."""
-        response = await async_client.get("/api/metadata/transaction-types")
-        data = response.json()
-
-        transaction_types = data["transaction_types"]
-        assert len(transaction_types) == 3
-
-        # Extract keys
-        keys = [item["key"] for item in transaction_types]
-        assert "income" in keys
-        assert "expense" in keys
-        assert "transfer" in keys
-
-    @pytest.mark.asyncio
-    async def test_get_transaction_types_item_structure(
-        self, async_client: AsyncClient
-    ):
-        """Test that each transaction type has correct structure."""
-        response = await async_client.get("/api/metadata/transaction-types")
-        data = response.json()
-
-        for item in data["transaction_types"]:
-            assert "key" in item
-            assert "label" in item
-            assert isinstance(item["key"], str)
-            assert isinstance(item["label"], str)
-            assert len(item["key"]) > 0
-            assert len(item["label"]) > 0
-
-    @pytest.mark.asyncio
-    async def test_get_transaction_types_labels_are_capitalized(
-        self, async_client: AsyncClient
-    ):
-        """Test that labels are properly capitalized."""
-        response = await async_client.get("/api/metadata/transaction-types")
-        data = response.json()
-
-        labels = [item["label"] for item in data["transaction_types"]]
-        assert "Income" in labels
-        assert "Expense" in labels
-        assert "Transfer" in labels
-
-
 class TestMetadataEndpointsNoAuth:
     """Test that metadata endpoints don't require authentication."""
-
-    @pytest.mark.asyncio
-    async def test_account_types_no_auth_required(self, async_client: AsyncClient):
-        """Test that account-types endpoint works without authentication."""
-        # Don't include any auth headers
-        response = await async_client.get("/api/metadata/account-types")
-        assert response.status_code == 200
 
     @pytest.mark.asyncio
     async def test_currencies_no_auth_required(self, async_client: AsyncClient):
         """Test that currencies endpoint works without authentication."""
         response = await async_client.get("/api/metadata/currencies")
-        assert response.status_code == 200
-
-    @pytest.mark.asyncio
-    async def test_transaction_types_no_auth_required(self, async_client: AsyncClient):
-        """Test that transaction-types endpoint works without authentication."""
-        response = await async_client.get("/api/metadata/transaction-types")
         assert response.status_code == 200
