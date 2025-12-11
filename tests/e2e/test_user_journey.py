@@ -32,8 +32,6 @@ async def test_complete_user_journey(async_client: AsyncClient):
     - Add income transaction
     - Add expense transaction
     - Split expense transaction
-    - Add tags to transactions
-    - Search transactions by tag
     - Update profile
     - Change password
     """

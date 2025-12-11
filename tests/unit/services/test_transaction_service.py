@@ -9,7 +9,6 @@ Tests:
 - Delete transaction with balance updates
 - Split transaction with validation
 - Join split transaction
-- Tag management
 - Permission enforcement
 """
 
@@ -46,7 +45,6 @@ class TestTransactionServiceCreate:
             description="Grocery shopping",
             transaction_type=TransactionType.expense,
             merchant="Whole Foods",
-            tags=["groceries", "food"],
             current_user=test_user,
         )
 
@@ -55,7 +53,6 @@ class TestTransactionServiceCreate:
         assert transaction.amount == Decimal("-50.25")
         assert transaction.description == "Grocery shopping"
         assert transaction.merchant == "Whole Foods"
-        assert len(transaction.tags) == 2
 
     async def test_create_transaction_updates_balance(
         self, db_session, test_user, test_account

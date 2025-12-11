@@ -5,7 +5,6 @@ Tests complete workflows through the REST API layer, including:
 - Transaction CRUD operations
 - Search and filtering
 - Transaction splitting and joining
-- Tag management
 - Permission enforcement
 """
 

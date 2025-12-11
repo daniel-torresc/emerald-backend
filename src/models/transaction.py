@@ -60,8 +60,7 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     Financial transaction model.
 
     Represents a single financial transaction (debit, credit, transfer, fee, etc.).
-    Supports parent-child relationships for splits, tags for categorization,
-    and soft delete for audit trail.
+    Supports parent-child relationships for splits, and soft delete for audit trail.
 
     Attributes:
         id: UUID primary key
@@ -117,7 +116,7 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         Child transaction:
             - Has parent_transaction_id set to parent.id
             - Inherits: account_id, currency, date, value_date
-            - Independent: amount, description, merchant, tags
+            - Independent: amount, description, merchant
             - Can be queried via transaction.parent_transaction
 
         Validation:

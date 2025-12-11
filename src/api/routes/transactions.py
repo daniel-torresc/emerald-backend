@@ -9,8 +9,6 @@ This module provides:
 - DELETE /api/v1/transactions/{transaction_id} - Delete transaction
 - POST /api/v1/transactions/{transaction_id}/split - Split transaction
 - POST /api/v1/transactions/{transaction_id}/join - Join split
-- POST /api/v1/transactions/{transaction_id}/tags - Add tag
-- DELETE /api/v1/transactions/{transaction_id}/tags/{tag} - Remove tag
 """
 
 import logging
@@ -81,7 +79,6 @@ async def create_transaction(
         - merchant: Optional merchant name (1-100 chars)
         - value_date: Optional value date
         - user_notes: Optional notes (max 1000 chars)
-        - tags: Optional list of tags
 
     Returns:
         TransactionResponse with created transaction details
@@ -121,7 +118,6 @@ async def create_transaction(
     - Date range filtering
     - Amount range filtering
     - Fuzzy text search (handles typos)
-    - Tag filtering
     - Transaction type filtering
     - Multiple sort options
     - Pagination
@@ -152,7 +148,6 @@ async def list_transactions(
         - amount_max: Maximum amount (inclusive)
         - description: Fuzzy search on description (handles typos)
         - merchant: Fuzzy search on merchant (handles typos)
-        - tags: Filter by tags (ANY match)
         - transaction_type: Filter by type
         - sort_by: Sort field (transaction_date, amount, description, created_at)
         - sort_order: Sort order (asc or desc)

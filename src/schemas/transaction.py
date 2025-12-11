@@ -6,7 +6,6 @@ This module provides:
 - Transaction response schemas
 - Transaction list and pagination schemas
 - Transaction split schemas
-- Transaction tag schemas
 """
 
 import uuid
@@ -142,7 +141,6 @@ class TransactionCreate(TransactionBase):
         value_date: Date transaction value applied (optional)
         user_notes: User comments (optional, max 1000 chars)
         card_id: Card used for transaction (optional)
-        tags: List of tags (optional)
     """
 
     merchant: str | None = Field(
@@ -317,7 +315,6 @@ class TransactionResponse(TransactionBase):
         merchant: Merchant name
         transaction_type: Transaction type
         user_notes: User notes
-        tags: List of tags
         parent_transaction_id: Parent UUID if split child
         is_split_parent: Whether transaction has children
         is_split_child: Whether transaction is a split child

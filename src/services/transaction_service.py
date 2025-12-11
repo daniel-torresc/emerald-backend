@@ -9,7 +9,6 @@ This module provides:
 - Delete transaction (soft delete) with balance updates
 - Split transaction into multiple parts
 - Join split transactions back together
-- Tag management (add/remove tags)
 """
 
 import logging
@@ -56,7 +55,6 @@ class TransactionService:
     - Transaction CRUD with permission checks
     - Balance calculations and updates
     - Transaction splitting and joining
-    - Tag management
     - Advanced search and filtering
 
     All methods require an active database session.
@@ -119,7 +117,6 @@ class TransactionService:
             card_id: Card used for transaction (optional)
             value_date: Date transaction value applied (optional)
             user_notes: User comments (optional, max 1000 chars)
-            tags: List of tags to add (optional)
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
@@ -141,7 +138,6 @@ class TransactionService:
                 description="Grocery Shopping",
                 transaction_type=TransactionType.DEBIT,
                 merchant="Whole Foods",
-                tags=["groceries", "food"],
                 current_user=user,
             )
         """
@@ -259,8 +255,8 @@ class TransactionService:
             request_id=request_id,
         )
 
-        # Refresh to get tags and card relationships
-        await self.session.refresh(created, ["tags", "card"])
+        # Refresh to get card relationships
+        await self.session.refresh(created, ["card"])
         return created
 
     async def get_transaction(
@@ -723,8 +719,7 @@ class TransactionService:
         1. Create child transactions with parent_transaction_id set
         2. Each child inherits: account_id, currency, transaction_date, value_date
         3. Each child has individual: amount, description, merchant
-        4. Tags are NOT inherited (each child tagged independently)
-        5. Balance update is net-zero (total in = total out)
+        4. Balance update is net-zero (total in = total out)
 
         Args:
             transaction_id: UUID of transaction to split
