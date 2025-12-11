@@ -321,7 +321,6 @@ class TransactionService:
         amount_max: Decimal | None = None,
         description: str | None = None,
         merchant: str | None = None,
-        tags: list[str] | None = None,
         transaction_type: TransactionType | None = None,
         card_id: uuid.UUID | None = None,
         card_type: CardType | None = None,
@@ -342,7 +341,6 @@ class TransactionService:
             amount_max: Maximum amount (inclusive)
             description: Fuzzy search on description
             merchant: Fuzzy search on merchant
-            tags: Filter by tags (ANY match)
             transaction_type: Filter by type
             card_id: Filter by specific card UUID
             card_type: Filter by card type (credit_card or debit_card)
@@ -364,7 +362,6 @@ class TransactionService:
                 description="grocery",
                 amount_min=Decimal("10.00"),
                 amount_max=Decimal("100.00"),
-                tags=["food"],
                 skip=0,
                 limit=20,
             )
@@ -393,7 +390,6 @@ class TransactionService:
             amount_max=amount_max,
             description=description,
             merchant=merchant,
-            tags=tags,
             transaction_type=transaction_type,
             card_id=card_id,
             card_type=card_type,
