@@ -16,6 +16,8 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from src.models.enums import CardType
+from src.schemas import FinancialInstitutionListItem
+from src.schemas.account import AccountListItem
 
 
 class CardBase(BaseModel):
@@ -206,10 +208,10 @@ class CardResponse(BaseModel):
     notes: str | None = Field(description="User's personal notes")
 
     # Relationships (always present for required FK, optional for nullable FK)
-    account: "AccountListItem" = Field(
+    account: AccountListItem = Field(
         description="Account this card is linked to (always present)"
     )
-    financial_institution: "FinancialInstitutionListItem | None" = Field(
+    financial_institution: FinancialInstitutionListItem | None = Field(
         description="Financial institution that issued the card (optional)"
     )
 
@@ -235,20 +237,9 @@ class CardListItem(BaseModel):
     card_network: str | None = Field(description="Payment network")
 
     # Simplified relationships
-    account: "AccountListItem" = Field(description="Account this card is linked to")
-    financial_institution: "FinancialInstitutionListItem | None" = Field(
+    account: AccountListItem = Field(description="Account this card is linked to")
+    financial_institution: FinancialInstitutionListItem | None = Field(
         description="Financial institution that issued the card"
     )
 
     model_config = ConfigDict(from_attributes=True)
-
-
-# Import at end to avoid circular imports
-from src.schemas.account import AccountListItem  # noqa: E402
-from src.schemas.financial_institution import (  # noqa: E402
-    FinancialInstitutionListItem,
-)
-
-# Update forward references
-CardResponse.model_rebuild()
-CardListItem.model_rebuild()
