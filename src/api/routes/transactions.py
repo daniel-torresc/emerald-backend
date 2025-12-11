@@ -24,7 +24,6 @@ from src.api.dependencies import (
 )
 from src.models.user import User
 from src.schemas.transaction import (
-    TagRequest,
     TransactionCreate,
     TransactionListResponse,
     TransactionResponse,
@@ -102,7 +101,6 @@ async def create_transaction(
         card_id=transaction_data.card_id,
         value_date=transaction_data.value_date,
         user_notes=transaction_data.user_notes,
-        tags=transaction_data.tags,
         current_user=current_user,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
@@ -177,7 +175,6 @@ async def list_transactions(
         amount_max=search_params.amount_max,
         description=search_params.description,
         merchant=search_params.merchant,
-        tags=search_params.tags,
         transaction_type=search_params.transaction_type,
         card_id=search_params.card_id,
         card_type=search_params.card_type,
@@ -465,92 +462,3 @@ async def join_split_transaction(
     )
 
     return TransactionResponse.model_validate(parent)
-
-
-@router.post(
-    "/transactions/{transaction_id}/tags",
-    response_model=TransactionResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Add tag to transaction",
-    description="""
-    Add a tag to a transaction.
-
-    Tags are normalized (lowercased and trimmed).
-    Duplicate tags are prevented by unique constraint.
-
-    **Permission:** EDITOR or higher
-    """,
-    responses={
-        200: {"description": "Tag added successfully"},
-        401: {"description": "Not authenticated"},
-        403: {"description": "Insufficient permissions"},
-        404: {"description": "Transaction not found"},
-        409: {"description": "Tag already exists"},
-    },
-)
-async def add_tag(
-    request: Request,
-    transaction_id: uuid.UUID = Path(description="Transaction UUID"),
-    tag_data: TagRequest = ...,
-    current_user: User = Depends(require_active_user),
-    transaction_service: TransactionService = Depends(get_transaction_service),
-) -> TransactionResponse:
-    """
-    Add tag to transaction.
-
-    Request body:
-        - tag: Tag text (1-50 chars, will be normalized)
-
-    Returns:
-        TransactionResponse with updated tags
-
-    Requires:
-        - Valid access token
-        - EDITOR or higher permission on account
-    """
-    transaction = await transaction_service.add_tag(
-        transaction_id=transaction_id,
-        tag=tag_data.tag,
-        current_user=current_user,
-    )
-
-    return TransactionResponse.model_validate(transaction)
-
-
-@router.delete(
-    "/transactions/{transaction_id}/tags/{tag}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Remove tag from transaction",
-    description="""
-    Remove a tag from a transaction.
-
-    Tags are normalized before lookup (lowercased and trimmed).
-
-    **Permission:** EDITOR or higher
-    """,
-    responses={
-        204: {"description": "Tag removed successfully"},
-        401: {"description": "Not authenticated"},
-        403: {"description": "Insufficient permissions"},
-        404: {"description": "Transaction or tag not found"},
-    },
-)
-async def remove_tag(
-    request: Request,
-    transaction_id: uuid.UUID = Path(description="Transaction UUID"),
-    tag: str = Path(description="Tag to remove"),
-    current_user: User = Depends(require_active_user),
-    transaction_service: TransactionService = Depends(get_transaction_service),
-) -> None:
-    """
-    Remove tag from transaction.
-
-    Requires:
-        - Valid access token
-        - EDITOR or higher permission on account
-    """
-    await transaction_service.remove_tag(
-        transaction_id=transaction_id,
-        tag=tag,
-        current_user=current_user,
-    )

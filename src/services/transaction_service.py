@@ -32,7 +32,6 @@ from src.models.user import User
 from src.repositories.account_repository import AccountRepository
 from src.repositories.card_repository import CardRepository
 from src.repositories.transaction_repository import TransactionRepository
-from src.repositories.transaction_tag_repository import TransactionTagRepository
 from src.services.audit_service import AuditService
 from src.services.currency_service import CurrencyService
 from src.services.permission_service import PermissionService
@@ -73,7 +72,6 @@ class TransactionService:
         """
         self.session = session
         self.transaction_repo = TransactionRepository(session)
-        self.tag_repo = TransactionTagRepository(session)
         self.account_repo = AccountRepository(session)
         self.card_repo = CardRepository(session)
         self.permission_service = PermissionService(session)
@@ -93,7 +91,6 @@ class TransactionService:
         card_id: uuid.UUID | None = None,
         value_date: date | None = None,
         user_notes: str | None = None,
-        tags: list[str] | None = None,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -106,9 +103,8 @@ class TransactionService:
         2. Get account and verify currency matches
         3. Verify account is not deleted and is active
         4. Create transaction in database
-        5. Add tags if provided
-        6. Update account balance (in same transaction)
-        7. Log audit entry
+        5. Update account balance (in same transaction)
+        6. Log audit entry
         8. Return created transaction
 
         Args:
@@ -226,13 +222,6 @@ class TransactionService:
 
         created = await self.transaction_repo.create(transaction)
 
-        # Add tags if provided
-        if tags:
-            for tag in tags:
-                tag_normalized = tag.lower().strip()
-                if tag_normalized:  # Skip empty tags
-                    await self.tag_repo.add_tag(created.id, tag_normalized)
-
         # Update account balance with row lock
         account = await self.account_repo.get_for_update(account_id)
         old_balance = account.current_balance
@@ -259,7 +248,6 @@ class TransactionService:
                 "merchant": merchant,
                 "card_id": str(card_id) if card_id else None,
                 "transaction_type": transaction_type.value,
-                "tags": tags,
             },
             extra_metadata={
                 "account_id": str(account_id),
@@ -953,119 +941,3 @@ class TransactionService:
         # Refresh to update children relationship
         await self.session.refresh(parent, ["child_transactions"])
         return parent
-
-    async def add_tag(
-        self,
-        transaction_id: uuid.UUID,
-        tag: str,
-        current_user: User,
-    ) -> Transaction:
-        """
-        Add a tag to a transaction.
-
-        Args:
-            transaction_id: UUID of the transaction
-            tag: Tag text (will be normalized)
-            current_user: Currently authenticated user
-
-        Returns:
-            Transaction with updated tags
-
-        Raises:
-            NotFoundError: If transaction not found
-            AuthorizationError: If user doesn't have permission
-
-        Example:
-            transaction = await transaction_service.add_tag(
-                transaction_id=transaction.id,
-                tag="groceries",
-                current_user=user,
-            )
-        """
-        # Get transaction
-        transaction = await self.transaction_repo.get_by_id(transaction_id)
-        if transaction is None:
-            logger.warning(f"Transaction {transaction_id} not found")
-            raise NotFoundError("Transaction")
-
-        # Permission check (EDITOR or higher can add tags)
-        has_permission = await self.permission_service.check_permission(
-            user_id=current_user.id,
-            account_id=transaction.account_id,
-            required_permission=PermissionLevel.editor,
-        )
-
-        if not has_permission:
-            logger.warning(
-                f"User {current_user.id} attempted to add tag to transaction {transaction_id} without permission"
-            )
-            raise AuthorizationError(
-                "You don't have permission to modify tags for this transaction"
-            )
-
-        # Add tag
-        await self.tag_repo.add_tag(transaction_id, tag)
-
-        # Refresh to get updated tags
-        await self.session.refresh(transaction, ["tags"])
-
-        logger.info(f"Added tag '{tag}' to transaction {transaction_id}")
-
-        return transaction
-
-    async def remove_tag(
-        self,
-        transaction_id: uuid.UUID,
-        tag: str,
-        current_user: User,
-    ) -> bool:
-        """
-        Remove a tag from a transaction.
-
-        Args:
-            transaction_id: UUID of the transaction
-            tag: Tag text to remove (will be normalized)
-            current_user: Currently authenticated user
-
-        Returns:
-            True if tag was removed, False if not found
-
-        Raises:
-            NotFoundError: If transaction not found
-            AuthorizationError: If user doesn't have permission
-
-        Example:
-            removed = await transaction_service.remove_tag(
-                transaction_id=transaction.id,
-                tag="groceries",
-                current_user=user,
-            )
-        """
-        # Get transaction
-        transaction = await self.transaction_repo.get_by_id(transaction_id)
-        if transaction is None:
-            logger.warning(f"Transaction {transaction_id} not found")
-            raise NotFoundError("Transaction")
-
-        # Permission check (EDITOR or higher can remove tags)
-        has_permission = await self.permission_service.check_permission(
-            user_id=current_user.id,
-            account_id=transaction.account_id,
-            required_permission=PermissionLevel.editor,
-        )
-
-        if not has_permission:
-            logger.warning(
-                f"User {current_user.id} attempted to remove tag from transaction {transaction_id} without permission"
-            )
-            raise AuthorizationError(
-                "You don't have permission to modify tags for this transaction"
-            )
-
-        # Remove tag
-        removed = await self.tag_repo.remove_tag(transaction_id, tag)
-
-        if removed:
-            logger.info(f"Removed tag '{tag}' from transaction {transaction_id}")
-
-        return removed

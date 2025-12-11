@@ -171,13 +171,6 @@ class TransactionCreate(TransactionBase):
         examples=["Split with roommate", "Business expense - reimbursable"],
     )
 
-    tags: list[str] | None = Field(
-        default=None,
-        max_items=20,
-        description="List of tags for categorization",
-        examples=[["groceries", "food"], ["business", "travel"]],
-    )
-
     @field_validator("merchant")
     @classmethod
     def validate_merchant(cls, value: str | None) -> str | None:
@@ -196,19 +189,6 @@ class TransactionCreate(TransactionBase):
             value = value.strip()
             if not value:
                 return None
-        return value
-
-    @field_validator("tags")
-    @classmethod
-    def validate_tags(cls, value: list[str] | None) -> list[str] | None:
-        """Normalize tags (lowercase, trim, remove empty)."""
-        if value is not None:
-            normalized = []
-            for tag in value:
-                tag_clean = tag.lower().strip()
-                if tag_clean and len(tag_clean) <= 50:  # Max tag length
-                    normalized.append(tag_clean)
-            return normalized if normalized else None
         return value
 
 
@@ -376,11 +356,6 @@ class TransactionResponse(TransactionBase):
         description="User comments",
     )
 
-    tags: list[str] = Field(
-        default_factory=list,
-        description="List of tags",
-    )
-
     parent_transaction_id: uuid.UUID | None = Field(
         default=None,
         description="Parent transaction UUID if this is a split child",
@@ -403,21 +378,6 @@ class TransactionResponse(TransactionBase):
     created_by: uuid.UUID = Field(description="User who created transaction")
 
     updated_by: uuid.UUID = Field(description="User who last updated transaction")
-
-    @field_validator("tags", mode="before")
-    @classmethod
-    def convert_tags(cls, tags) -> list[str]:
-        """
-        Convert TransactionTag objects to strings before validation.
-
-        The tags relationship returns TransactionTag model objects from SQLAlchemy,
-        but the API schema expects just the tag text strings.
-        This validator runs BEFORE validation, allowing us to transform the data.
-        """
-        if not tags:
-            return []
-        # Handle SQLAlchemy relationship returning TransactionTag objects
-        return [tag.tag if hasattr(tag, "tag") else tag for tag in tags]
 
     @field_validator("card", mode="before")
     @classmethod
@@ -452,7 +412,6 @@ class TransactionListItem(BaseModel):
         merchant: Merchant name
         card: Card details if card was used
         transaction_type: Transaction type
-        tags: List of tags
         is_split_parent: Whether has children
         is_split_child: Whether is split child
     """
@@ -465,7 +424,6 @@ class TransactionListItem(BaseModel):
     merchant: str | None = None
     card: CardEmbedded | None = None
     transaction_type: TransactionType
-    tags: list[str] = Field(default_factory=list)
     is_split_parent: bool = False
     is_split_child: bool = False
 
@@ -585,31 +543,6 @@ class TransactionSplitRequest(BaseModel):
         return value
 
 
-class TagRequest(BaseModel):
-    """
-    Schema for adding a tag to a transaction.
-
-    Attributes:
-        tag: Tag text (1-50 chars)
-    """
-
-    tag: str = Field(
-        min_length=1,
-        max_length=50,
-        description="Tag text",
-        examples=["groceries", "business", "vacation"],
-    )
-
-    @field_validator("tag")
-    @classmethod
-    def validate_tag(cls, value: str) -> str:
-        """Normalize tag (lowercase, trim)."""
-        value = value.lower().strip()
-        if not value:
-            raise ValueError("Tag cannot be empty or only whitespace")
-        return value
-
-
 class TransactionSearchParams(BaseModel):
     """
     Query parameters for transaction search/filtering.
@@ -623,7 +556,6 @@ class TransactionSearchParams(BaseModel):
         amount_max: Maximum amount (inclusive)
         description: Fuzzy search on description
         merchant: Fuzzy search on merchant
-        tags: Filter by tags (ANY match)
         transaction_type: Filter by type
         card_id: Filter by specific card UUID
         card_type: Filter by card type (credit_card or debit_card)
@@ -663,11 +595,6 @@ class TransactionSearchParams(BaseModel):
         default=None,
         max_length=100,
         description="Fuzzy search on merchant (handles typos)",
-    )
-
-    tags: list[str] | None = Field(
-        default=None,
-        description="Filter by tags (transactions with ANY of these tags)",
     )
 
     transaction_type: TransactionType | None = Field(

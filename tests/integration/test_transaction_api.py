@@ -36,7 +36,6 @@ class TestTransactionAPI:
                 "description": "Grocery shopping",
                 "merchant": "Whole Foods",
                 "transaction_type": "expense",
-                "tags": ["groceries", "food"],
             },
         )
 
@@ -45,7 +44,6 @@ class TestTransactionAPI:
         assert data["amount"] == "-50.25"
         assert data["description"] == "Grocery shopping"
         assert data["merchant"] == "Whole Foods"
-        assert len(data["tags"]) == 2
 
     async def test_list_transactions(
         self, async_client: AsyncClient, test_user: User, user_token: dict, test_account
@@ -250,66 +248,6 @@ class TestTransactionAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["is_split_parent"] is False
-
-    async def test_add_tag(
-        self, async_client: AsyncClient, test_user: User, user_token: dict, test_account
-    ):
-        """Test adding a tag to a transaction."""
-        # Create transaction
-        create_response = await async_client.post(
-            f"/api/v1/accounts/{test_account.id}/transactions",
-            headers={"Authorization": f"Bearer {user_token['access_token']}"},
-            json={
-                "transaction_date": str(date.today()),
-                "amount": "-25.00",
-                "currency": "USD",
-                "description": "Transaction",
-                "transaction_type": "expense",
-            },
-        )
-
-        transaction_id = create_response.json()["id"]
-
-        # Add tag
-        response = await async_client.post(
-            f"/api/v1/transactions/{transaction_id}/tags",
-            headers={"Authorization": f"Bearer {user_token['access_token']}"},
-            json={"tag": "groceries"},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "groceries" in [t["tag"] for t in data["tags"]]
-
-    async def test_remove_tag(
-        self, async_client: AsyncClient, test_user: User, user_token: dict, test_account
-    ):
-        """Test removing a tag from a transaction."""
-        # Create transaction with tag
-        create_response = await async_client.post(
-            f"/api/v1/accounts/{test_account.id}/transactions",
-            headers={"Authorization": f"Bearer {user_token['access_token']}"},
-            json={
-                "transaction_date": str(date.today()),
-                "amount": "-25.00",
-                "currency": "USD",
-                "description": "Transaction",
-                "transaction_type": "expense",
-                "tags": ["groceries"],
-            },
-        )
-
-        transaction_id = create_response.json()["id"]
-
-        # Remove tag
-        response = await async_client.delete(
-            f"/api/v1/transactions/{transaction_id}/tags/groceries",
-            headers={"Authorization": f"Bearer {user_token['access_token']}"},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data["tags"]) == 0
 
     async def test_permission_denied(
         self,

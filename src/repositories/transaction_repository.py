@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from src.models.card import Card
 from src.models.enums import CardType, TransactionType
-from src.models.transaction import Transaction, TransactionTag
+from src.models.transaction import Transaction
 from src.repositories.base import BaseRepository
 
 
@@ -78,7 +78,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         await self.session.flush()
         await self.session.refresh(
             transaction,
-            ["account", "parent_transaction", "child_transactions", "tags", "card"],
+            ["account", "parent_transaction", "child_transactions", "card"],
         )
         return transaction
 
@@ -106,7 +106,6 @@ class TransactionRepository(BaseRepository[Transaction]):
                 selectinload(Transaction.account),
                 selectinload(Transaction.parent_transaction),
                 selectinload(Transaction.child_transactions),
-                selectinload(Transaction.tags),
                 selectinload(Transaction.card),
             )
         )
@@ -133,7 +132,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         await self.session.flush()
         await self.session.refresh(
             transaction,
-            ["account", "parent_transaction", "child_transactions", "tags", "card"],
+            ["account", "parent_transaction", "child_transactions", "card"],
         )
         return transaction
 
@@ -190,7 +189,6 @@ class TransactionRepository(BaseRepository[Transaction]):
             select(Transaction)
             .where(Transaction.account_id == account_id)
             .options(
-                selectinload(Transaction.tags),
                 selectinload(Transaction.child_transactions),
                 selectinload(Transaction.card),
             )
@@ -237,7 +235,6 @@ class TransactionRepository(BaseRepository[Transaction]):
         amount_max: Decimal | None = None,
         description: str | None = None,
         merchant: str | None = None,
-        tags: list[str] | None = None,
         transaction_type: TransactionType | None = None,
         card_id: uuid.UUID | None = None,
         card_type: CardType | None = None,
@@ -260,7 +257,6 @@ class TransactionRepository(BaseRepository[Transaction]):
             amount_max: Maximum transaction amount (inclusive)
             description: Fuzzy search on description (handles typos)
             merchant: Fuzzy search on merchant (handles typos)
-            tags: Filter by tags (transactions with ANY of these tags)
             transaction_type: Filter by transaction type
             card_id: Filter by specific card UUID
             card_type: Filter by card type (credit_card or debit_card)
@@ -279,7 +275,6 @@ class TransactionRepository(BaseRepository[Transaction]):
                 description="groceris",  # Typo will still match "groceries"
                 amount_min=Decimal("10.00"),
                 amount_max=Decimal("100.00"),
-                tags=["food", "essentials"],
                 sort_by="transaction_date",
                 sort_order="desc",
                 skip=0,
@@ -291,7 +286,6 @@ class TransactionRepository(BaseRepository[Transaction]):
             select(Transaction)
             .where(Transaction.account_id == account_id)
             .options(
-                selectinload(Transaction.tags),
                 selectinload(Transaction.child_transactions),
                 selectinload(Transaction.card),
             )
@@ -335,13 +329,6 @@ class TransactionRepository(BaseRepository[Transaction]):
         # Fuzzy text search on merchant (pg_trgm similarity)
         if merchant:
             filters.append(func.similarity(Transaction.merchant, merchant) > 0.3)
-
-        # Tag filter (transactions with ANY of the specified tags)
-        if tags and len(tags) > 0:
-            # Join with transaction_tags and filter by tag
-            query = query.join(Transaction.tags).where(
-                TransactionTag.tag.in_([tag.lower().strip() for tag in tags])
-            )
 
         # Apply all filters
         if filters:
@@ -400,7 +387,6 @@ class TransactionRepository(BaseRepository[Transaction]):
         query = (
             select(Transaction)
             .where(Transaction.parent_transaction_id == parent_id)
-            .options(selectinload(Transaction.tags))
             .order_by(Transaction.amount.desc())
         )
         query = self._apply_soft_delete_filter(query)

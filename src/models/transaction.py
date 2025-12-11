@@ -1,15 +1,13 @@
 """
-Transaction and TransactionTag models.
+Transaction model.
 
 This module defines:
 - Transaction: Financial transaction model (debits, credits, transfers, fees, etc.)
-- TransactionTag: User-defined tags for categorizing transactions
 
 Architecture:
 - Each transaction belongs to one account (via account_id foreign key)
 - Transactions can optionally reference a card (via card_id foreign key)
 - Transactions support parent-child relationships for splitting (via parent_transaction_id)
-- Each transaction can have multiple tags (one-to-many via TransactionTag)
 - Soft delete support for audit trail and regulatory compliance
 - Balance tracking integrated with account current_balance
 
@@ -23,7 +21,6 @@ Transaction Splitting:
 - Parent transactions can be split into multiple child transactions
 - Child transactions have parent_transaction_id set to parent.id
 - Split amounts must sum to parent amount exactly
-- Each child transaction independently supports tags and categorization
 - Splits can be reversed (joined) to restore parent as standalone
 
 Balance Calculation:
@@ -90,7 +87,6 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         card: Card object used for this transaction (optional)
         parent_transaction: Parent transaction if this is a split child
         child_transactions: List of child transactions if this is a split parent
-        tags: List of TransactionTag objects for categorization
 
     Validation:
         - date: Valid date, configurable if future dates allowed
@@ -284,14 +280,6 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         cascade="all, delete-orphan",
     )
 
-    tags: Mapped[list["TransactionTag"]] = relationship(
-        "TransactionTag",
-        back_populates="transaction",
-        foreign_keys="TransactionTag.transaction_id",
-        lazy="selectin",
-        cascade="all, delete-orphan",
-    )
-
     # Table-level constraints
     __table_args__ = (
         # Currency must be valid ISO 4217 code (3 uppercase letters)
@@ -319,87 +307,3 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
             f"transaction_date={self.transaction_date}, amount={self.amount} {self.currency}, "
             f"type={self.transaction_type.value})"
         )
-
-
-# =============================================================================
-# TransactionTag Model
-# =============================================================================
-
-
-class TransactionTag(Base, TimestampMixin):
-    """
-    Transaction tag model.
-
-    Represents a user-defined tag for categorizing transactions.
-    Tags are free-form text labels (e.g., "groceries", "vacation", "business").
-    Each transaction can have multiple tags.
-
-    Attributes:
-        id: UUID primary key
-        transaction_id: Transaction this tag belongs to (foreign key to transactions)
-        tag: Tag text (1-50 chars, lowercased, indexed for filtering)
-        created_at: When tag was added
-
-    Relationships:
-        transaction: Transaction object this tag belongs to
-
-    Validation:
-        - tag: 1-50 characters, lowercased, no whitespace trimmed
-        - Unique constraint: (transaction_id, tag) prevents duplicates
-
-    Tag Normalization:
-        - Tags are lowercased for consistent filtering
-        - Whitespace trimmed before storage
-        - Empty tags rejected in service layer
-
-    Querying:
-        - Filter transactions by tag: WHERE tag IN ('groceries', 'business')
-        - Tag autocomplete: SELECT DISTINCT tag FROM transaction_tags
-        - Tag usage counts: SELECT tag, COUNT(*) GROUP BY tag
-
-    Indexes:
-        Defined in migration for performance:
-        - transaction_id (for listing transaction's tags)
-        - tag (for filtering by tag)
-        - Unique constraint: (transaction_id, tag)
-
-    Example:
-        # Add tags to transaction
-        tag1 = TransactionTag(
-            transaction_id=transaction.id,
-            tag="groceries",
-        )
-        tag2 = TransactionTag(
-            transaction_id=transaction.id,
-            tag="organic",
-        )
-    """
-
-    __tablename__ = "transaction_tags"
-
-    # Relationships
-    transaction_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("transactions.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    # Tag Data
-    tag: Mapped[str] = mapped_column(
-        String(50),
-        nullable=False,
-        index=True,
-    )
-
-    # Relationships
-    transaction: Mapped["Transaction"] = relationship(
-        "Transaction",
-        back_populates="tags",
-        foreign_keys=[transaction_id],
-        lazy="selectin",
-    )
-
-    def __repr__(self) -> str:
-        """String representation of TransactionTag."""
-        return f"TransactionTag(id={self.id}, transaction_id={self.transaction_id}, tag={self.tag})"
