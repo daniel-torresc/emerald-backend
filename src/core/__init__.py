@@ -11,6 +11,7 @@ from src.core.database import (
     create_database_engine,
     get_db,
 )
+from src.core.encryption import EncryptionService
 from src.core.logging import get_logger, setup_logging
 from src.core.security import (
     TOKEN_TYPE_ACCESS,
@@ -51,4 +52,6 @@ __all__ = [
     # Security - Refresh Token
     "hash_refresh_token",
     "verify_refresh_token_hash",
+    # Security - Encryption
+    "EncryptionService",
 ]

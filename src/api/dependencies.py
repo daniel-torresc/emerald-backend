@@ -22,16 +22,8 @@ from src.core.database import get_db
 from src.core.security import TOKEN_TYPE_ACCESS, decode_token, verify_token_type
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
-from src.services import (
-    AccountService,
-    AccountTypeService,
-    AuditService,
-    AuthService,
-    UserService,
-    CardService,
-    FinancialInstitutionService,
-    TransactionService,
-)
+from src.services import (AccountService, AccountTypeService, AuditService, AuthService,
+                          CardService, FinancialInstitutionService, TransactionService, UserService)
 
 logger = logging.getLogger(__name__)
 

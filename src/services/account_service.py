@@ -16,6 +16,7 @@ from decimal import Decimal
 from pydantic import HttpUrl
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.encryption import EncryptionService
 from src.exceptions import (
     AlreadyExistsError,
     AuthorizationError,
@@ -32,7 +33,6 @@ from src.repositories.account_share_repository import AccountShareRepository
 from src.repositories.account_type_repository import AccountTypeRepository
 from src.repositories.user_repository import UserRepository
 from src.services.audit_service import AuditService
-from src.services.encryption_service import EncryptionService
 from src.services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)

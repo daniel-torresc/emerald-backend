@@ -8,8 +8,8 @@ including searches by SWIFT code, routing number, and filtering by country/type.
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.financial_institution import FinancialInstitution
 from src.models.enums import InstitutionType
+from src.models.financial_institution import FinancialInstitution
 from src.repositories.base import BaseRepository
 
 
