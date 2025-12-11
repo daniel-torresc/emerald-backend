@@ -45,7 +45,6 @@ async def second_user(test_engine) -> User:
             email="user2@example.com",
             username="user2",
             password_hash=hash_password("User2Pass123!"),
-            is_active=True,
             is_admin=False,
         )
 
@@ -72,7 +71,6 @@ async def third_user(test_engine) -> User:
             email="user3@example.com",
             username="user3",
             password_hash=hash_password("User3Pass123!"),
-            is_active=True,
             is_admin=False,
         )
 

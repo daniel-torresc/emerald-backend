@@ -105,7 +105,6 @@ class UserRepository(BaseRepository[User]):
     async def filter_users(
         self,
         search: str | None = None,
-        is_active: bool | None = None,
         is_admin: bool | None = None,
         skip: int = 0,
         limit: int = 100,
@@ -114,11 +113,10 @@ class UserRepository(BaseRepository[User]):
         Filter users with multiple criteria and pagination.
 
         Used for admin user list view with search and filtering.
-        Automatically filters out soft-deleted users.
+        Automatically filters out soft-deleted users via BaseRepository.
 
         Args:
             search: Search term for username, email, or full_name
-            is_active: Filter by active status
             is_admin: Filter by admin status
             skip: Number of records to skip (pagination)
             limit: Maximum number of records to return
@@ -127,10 +125,9 @@ class UserRepository(BaseRepository[User]):
             List of User instances matching the criteria
 
         Example:
-            # Get active non-admin users with "john" in name/email
+            # Get non-admin users with "john" in name/email
             users = await user_repo.filter_users(
                 search="john",
-                is_active=True,
                 is_admin=False,
                 skip=0,
                 limit=20
@@ -150,10 +147,7 @@ class UserRepository(BaseRepository[User]):
                 )
             )
 
-        # Apply status filters
-        if is_active is not None:
-            query = query.where(User.is_active.is_(is_active))
-
+        # Apply admin filter
         if is_admin is not None:
             query = query.where(User.is_admin.is_(is_admin))
 
@@ -169,17 +163,16 @@ class UserRepository(BaseRepository[User]):
     async def count_filtered(
         self,
         search: str | None = None,
-        is_active: bool | None = None,
         is_admin: bool | None = None,
     ) -> int:
         """
         Count users matching filter criteria.
 
         Used for pagination metadata in admin user list.
+        Automatically excludes soft-deleted users via BaseRepository.
 
         Args:
             search: Search term for username, email, or full_name
-            is_active: Filter by active status
             is_admin: Filter by admin status
 
         Returns:
@@ -188,7 +181,7 @@ class UserRepository(BaseRepository[User]):
         Example:
             total = await user_repo.count_filtered(
                 search="john",
-                is_active=True
+                is_admin=False
             )
             total_pages = (total + limit - 1) // limit
         """
@@ -208,10 +201,7 @@ class UserRepository(BaseRepository[User]):
                 )
             )
 
-        # Apply status filters
-        if is_active is not None:
-            query = query.where(User.is_active.is_(is_active))
-
+        # Apply admin filter
         if is_admin is not None:
             query = query.where(User.is_admin.is_(is_admin))
 

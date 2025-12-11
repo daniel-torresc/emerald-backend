@@ -7,13 +7,13 @@ This module provides:
 - GET /api/v1/account-types/{id} - Get account type by ID
 - GET /api/v1/account-types/key/{key} - Get by key
 - PATCH /api/v1/account-types/{id} - Update account type (admin only)
-- POST /api/v1/account-types/{id}/deactivate - Deactivate account type (admin only)
+- DELETE /api/v1/account-types/{id} - Delete account type (admin only)
 """
 
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
 from src.api.dependencies import (
     get_account_type_service,
@@ -85,21 +85,11 @@ async def create_account_type(
     description="List account types with optional filtering by active status",
 )
 async def list_account_types(
-    is_active: bool | None = Query(
-        default=True,
-        description="Filter by active status (true=active only, false=inactive only, null=all)",
-    ),
     current_user: User = Depends(require_active_user),
     service: AccountTypeService = Depends(get_account_type_service),
 ) -> list[AccountTypeListItem]:
     """
-    List account types with optional active status filtering.
-
-    Query parameters:
-        - is_active: Filter by active status (default: true)
-          - true: Only active types
-          - false: Only inactive types
-          - null: All types (active and inactive)
+    List all account types.
 
     Returns:
         List of AccountTypeListItem instances ordered by sort_order, then name
@@ -107,10 +97,8 @@ async def list_account_types(
     Requires:
         - Valid access token
         - Active user account
-
-    Returns active account types by default.
     """
-    return await service.list_account_types(is_active=is_active)
+    return await service.list_account_types()
 
 
 @router.get(
@@ -224,29 +212,26 @@ async def update_account_type(
     )
 
 
-@router.post(
-    "/{account_type_id}/deactivate",
-    response_model=AccountTypeResponse,
-    summary="Deactivate account type",
-    description="Deactivate account type (admin only) - sets is_active to false",
+@router.delete(
+    "/{account_type_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete account type",
+    description="Delete account type (admin only) - hard deletes from database",
 )
-async def deactivate_account_type(
+async def delete_account_type(
     request: Request,
     account_type_id: uuid.UUID,
     current_user: User = Depends(require_admin),
     service: AccountTypeService = Depends(get_account_type_service),
-) -> AccountTypeResponse:
+) -> None:
     """
-    Deactivate account type.
+    Delete account type (hard delete).
 
-    Sets is_active = False. Account type remains in database for
-    historical references but won't appear in default listings.
+    Permanently removes account type from database. Can only delete if no accounts
+    reference this type (enforced by foreign key constraint).
 
     Path parameters:
-        - account_type_id: UUID of the account type to deactivate
-
-    Returns:
-        AccountTypeResponse with deactivated account type data
+        - account_type_id: UUID of the account type to delete
 
     Requires:
         - Valid access token
@@ -254,8 +239,9 @@ async def deactivate_account_type(
 
     Raises:
         - 404 Not Found: If account type not found
+        - 400 Bad Request: If accounts still reference this type
     """
-    return await service.deactivate_account_type(
+    await service.delete_account_type(
         account_type_id=account_type_id,
         current_user=current_user,
         request_id=getattr(request.state, "request_id", None),

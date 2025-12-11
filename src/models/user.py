@@ -38,7 +38,6 @@ class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         email: Unique email address
         password_hash: Argon2id hashed password
         full_name: User's full name
-        is_active: Whether the account is active (can login)
         is_admin: Admin flag for administrative privileges
         last_login_at: Timestamp of last successful login
         created_at: When the account was created
@@ -54,7 +53,7 @@ class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
 
     Security:
         - password_hash stores Argon2id hash (never store plain passwords)
-        - is_active controls login access (can be used for banning)
+        - deleted_at controls login access (deleted users cannot login)
         - last_login_at tracks user activity
     """
 
@@ -87,13 +86,6 @@ class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     )
 
     # Status flags
-    is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=True,
-        index=True,
-    )
-
     is_admin: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

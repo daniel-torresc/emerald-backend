@@ -42,7 +42,6 @@ class TestFinancialInstitutionRoutes:
                 "institution_type": "bank",
                 "logo_url": "https://logo.clearbit.com/bankofamerica.com",
                 "website_url": "https://www.bankofamerica.com",
-                "is_active": True,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
@@ -56,7 +55,6 @@ class TestFinancialInstitutionRoutes:
         assert data["routing_number"] == "026009593"
         assert data["country_code"] == "US"
         assert data["institution_type"] == "bank"
-        assert data["is_active"] is True
         assert "id" in data
         assert "created_at" in data
         assert "updated_at" in data
@@ -676,7 +674,6 @@ class TestFinancialInstitutionRoutes:
         )
 
         institution_id = create_response.json()["id"]
-        assert create_response.json()["is_active"] is True
 
         # Deactivate it
         response = await async_client.post(
@@ -687,7 +684,6 @@ class TestFinancialInstitutionRoutes:
         assert response.status_code == 200
         data = response.json()
 
-        assert data["is_active"] is False
 
     async def test_deactivate_institution_non_admin_forbidden(
         self, async_client: AsyncClient, user_token: dict, admin_token: dict

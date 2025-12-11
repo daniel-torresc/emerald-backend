@@ -24,8 +24,8 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
     - Search by name (for autocomplete)
 
     Note:
-        This repository does NOT use soft delete filtering because
-        FinancialInstitution uses is_active flag instead.
+        FinancialInstitution uses soft delete pattern via SoftDeleteMixin.
+        Soft-deleted institutions are automatically filtered out by BaseRepository.
     """
 
     def __init__(self, session: AsyncSession):
@@ -87,7 +87,6 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
         query_text: str | None = None,
         country_code: str | None = None,
         institution_type: InstitutionType | None = None,
-        is_active: bool | None = True,
         limit: int = 20,
         offset: int = 0,
     ) -> list[FinancialInstitution]:
@@ -98,14 +97,14 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
         - Text search in name and short_name (case-insensitive, partial match)
         - Country filtering
         - Institution type filtering
-        - Active status filtering (default: active only)
         - Pagination
+
+        Automatically excludes soft-deleted institutions via BaseRepository.
 
         Args:
             query_text: Search term for name/short_name (optional)
             country_code: ISO 3166-1 alpha-2 country code (optional)
             institution_type: Institution type filter (optional)
-            is_active: Active status filter (default: True)
             limit: Maximum number of results (default: 20, max: 100)
             offset: Number of results to skip (default: 0)
 
@@ -117,7 +116,6 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
             institutions = await repo.search(
                 country_code="ES",
                 institution_type=InstitutionType.bank,
-                is_active=True,
                 limit=10
             )
 
@@ -129,6 +127,7 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
         """
         # Start with base query
         query = select(FinancialInstitution)
+        query = self._apply_soft_delete_filter(query)
 
         # Apply text search (if provided)
         if query_text:
@@ -149,10 +148,6 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
             query = query.where(
                 FinancialInstitution.institution_type == institution_type
             )
-
-        # Apply active status filter (if provided)
-        if is_active is not None:
-            query = query.where(FinancialInstitution.is_active.is_(is_active))
 
         # Order by short_name alphabetically
         query = query.order_by(FinancialInstitution.short_name)
@@ -169,30 +164,29 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
         query_text: str | None = None,
         country_code: str | None = None,
         institution_type: InstitutionType | None = None,
-        is_active: bool | None = True,
     ) -> int:
         """
         Count institutions matching filters.
 
         Used for pagination metadata.
+        Automatically excludes soft-deleted institutions via BaseRepository.
 
         Args:
             query_text: Search term for name/short_name (optional)
             country_code: ISO 3166-1 alpha-2 country code (optional)
             institution_type: Institution type filter (optional)
-            is_active: Active status filter (default: True)
 
         Returns:
-            Total count of matching institutions
+            Total count of matching non-deleted institutions
 
         Example:
             total = await repo.count_filtered(
-                country_code="ES",
-                is_active=True
+                country_code="ES"
             )
         """
         # Start with base query
         query = select(func.count()).select_from(FinancialInstitution)
+        query = self._apply_soft_delete_filter(query)
 
         # Apply text search (if provided)
         if query_text:
@@ -214,32 +208,25 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
                 FinancialInstitution.institution_type == institution_type
             )
 
-        # Apply active status filter (if provided)
-        if is_active is not None:
-            query = query.where(FinancialInstitution.is_active.is_(is_active))
-
         # Execute count query
         result = await self.session.execute(query)
         return result.scalar_one()
 
-    async def get_all_active(self) -> list[FinancialInstitution]:
+    async def get_all_ordered(self) -> list[FinancialInstitution]:
         """
-        Get all active financial institutions.
+        Get all financial institutions ordered by short_name.
 
-        Ordered by short_name alphabetically.
+        Automatically excludes soft-deleted institutions via BaseRepository.
         Useful for dropdown menus and selection lists.
 
         Returns:
-            List of all active FinancialInstitution instances
+            List of all non-deleted FinancialInstitution instances
 
         Example:
-            institutions = await repo.get_all_active()
+            institutions = await repo.get_all_ordered()
         """
-        query = (
-            select(FinancialInstitution)
-            .where(FinancialInstitution.is_active)
-            .order_by(FinancialInstitution.short_name)
-        )
+        query = select(FinancialInstitution).order_by(FinancialInstitution.short_name)
+        query = self._apply_soft_delete_filter(query)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())

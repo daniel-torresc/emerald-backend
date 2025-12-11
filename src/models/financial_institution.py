@@ -8,20 +8,20 @@ Architecture:
 - Centralized repository of financial institutions
 - Used by accounts to link to standardized institution data
 - Supports SWIFT codes (international) and routing numbers (US)
-- Uses is_active flag instead of soft delete (institutions can be deactivated)
+- Uses soft delete pattern for preserving historical references
 """
 
 from typing import Optional
 
-from sqlalchemy import Boolean, Enum as SQLEnum, String
+from sqlalchemy import Enum as SQLEnum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
 from src.models.enums import InstitutionType
-from src.models.mixins import TimestampMixin
+from src.models.mixins import SoftDeleteMixin, TimestampMixin
 
 
-class FinancialInstitution(Base, TimestampMixin):
+class FinancialInstitution(Base, TimestampMixin, SoftDeleteMixin):
     """
     Financial institution model for master data management.
 
@@ -39,9 +39,9 @@ class FinancialInstitution(Base, TimestampMixin):
         institution_type: Type of institution (bank, credit_union, brokerage, fintech, other)
         logo_url: URL to institution's logo image (max 500 chars, optional)
         website_url: Official website URL (max 500 chars, optional)
-        is_active: Whether the institution is operational (default: True)
         created_at: When the institution record was created (auto-set)
         updated_at: When the institution record was last updated (auto-updated)
+        deleted_at: When the institution was soft-deleted (NULL if active)
 
     Unique Constraints:
         - swift_code must be unique (if provided) - enforced via partial unique index
@@ -54,14 +54,13 @@ class FinancialInstitution(Base, TimestampMixin):
         - routing_number (partial unique: WHERE routing_number IS NOT NULL)
         - country_code (for filtering by country)
         - institution_type (for filtering by type)
-        - is_active (for filtering active institutions)
+        - deleted_at (for soft delete filtering)
 
-    Note:
-        This model does NOT use SoftDeleteMixin. Instead, defunct institutions
-        are marked with is_active=False. This is because:
-        - Institution data is master data, not transactional data
-        - Historical references to institutions must remain valid
-        - Deactivated institutions should still be viewable in historical contexts
+    Soft Delete:
+        Defunct institutions have deleted_at set. This preserves:
+        - Historical references to institutions (accounts remain linked)
+        - Audit trail for institution lifecycle
+        - Compliance with data retention requirements
     """
 
     __tablename__ = "financial_institutions"
@@ -126,15 +125,6 @@ class FinancialInstitution(Base, TimestampMixin):
         String(500),
         nullable=True,
         comment="Official website URL",
-    )
-
-    # Status
-    is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=True,
-        index=True,  # Index for filtering active institutions
-        comment="Whether the institution is operational",
     )
 
     # Relationships

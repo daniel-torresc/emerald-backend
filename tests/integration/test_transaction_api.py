@@ -312,7 +312,6 @@ async def test_viewer_cannot_create_transaction(
             email="viewer@example.com",
             username="viewer",
             password_hash=hash_password("ViewerPass123!"),
-            is_active=True,
             is_admin=False,
         )
         session.add(viewer_user)
@@ -392,7 +391,6 @@ async def test_viewer_cannot_update_transaction(
             email="viewer2@example.com",
             username="viewer2",
             password_hash=hash_password("ViewerPass123!"),
-            is_active=True,
             is_admin=False,
         )
         session.add(viewer_user)
@@ -466,7 +464,6 @@ async def test_viewer_cannot_delete_transaction(
             email="viewer3@example.com",
             username="viewer3",
             password_hash=hash_password("ViewerPass123!"),
-            is_active=True,
             is_admin=False,
         )
         session.add(viewer_user)
@@ -524,7 +521,6 @@ async def test_editor_can_create_transaction(
             email="editor@example.com",
             username="editor",
             password_hash=hash_password("EditorPass123!"),
-            is_active=True,
             is_admin=False,
         )
         session.add(editor_user)
@@ -809,7 +805,6 @@ async def test_cannot_create_transaction_in_non_member_account(
             email="other@example.com",
             username="other",
             password_hash=hash_password("OtherPass123!"),
-            is_active=True,
             is_admin=False,
         )
         session.add(other_user)
@@ -823,7 +818,6 @@ async def test_cannot_create_transaction_in_non_member_account(
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            is_active=True,
             created_by=other_user.id,
             updated_by=other_user.id,
         )
@@ -905,7 +899,6 @@ async def test_cannot_access_another_users_transaction(
             email="other2@example.com",
             username="other2",
             password_hash=hash_password("OtherPass123!"),
-            is_active=True,
             is_admin=False,
         )
         session.add(other_user)
@@ -924,7 +917,9 @@ async def test_cannot_access_another_users_transaction(
         headers={"Authorization": f"Bearer {other_token['access_token']}"},
     )
 
-    assert response.status_code == 403  # Forbidden - better security practice (doesn't leak existence)
+    assert (
+        response.status_code == 403
+    )  # Forbidden - better security practice (doesn't leak existence)
 
 
 @pytest.mark.asyncio

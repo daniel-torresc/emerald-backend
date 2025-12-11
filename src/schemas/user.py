@@ -152,7 +152,6 @@ class UserResponse(BaseModel):
         email: User's email address
         username: User's username
         full_name: User's full name
-        is_active: Whether user account is active
         is_admin: Whether user has admin privileges
         created_at: Account creation timestamp
         updated_at: Last update timestamp
@@ -163,7 +162,6 @@ class UserResponse(BaseModel):
     email: str = Field(description="User's email address")
     username: str = Field(description="User's username")
     full_name: str | None = Field(default=None, description="User's full name")
-    is_active: bool = Field(description="Whether user account is active")
     is_admin: bool = Field(description="Whether user has admin privileges")
     created_at: datetime = Field(description="Account creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
@@ -185,14 +183,12 @@ class UserListItem(BaseModel):
         id: User's unique identifier
         email: User's email address
         username: User's username
-        is_active: Whether user account is active
         created_at: Account creation timestamp
     """
 
     id: uuid.UUID = Field(description="User's unique identifier (UUID)")
     email: str = Field(description="User's email address")
     username: str = Field(description="User's username")
-    is_active: bool = Field(description="Whether user account is active")
     created_at: datetime = Field(description="Account creation timestamp")
 
     model_config = {"from_attributes": True}
@@ -203,12 +199,10 @@ class UserFilterParams(BaseModel):
     Query parameters for filtering user lists.
 
     Attributes:
-        is_active: Filter by active status
         is_superuser: Filter by superuser status
         search: Search in email or username
     """
 
-    is_active: bool | None = Field(default=None, description="Filter by active status")
     is_superuser: bool | None = Field(
         default=None,
         description="Filter by superuser status",

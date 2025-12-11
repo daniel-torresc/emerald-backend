@@ -37,7 +37,6 @@ class TestAccountTypeRoutes:
                 "name": "Health Savings Account",
                 "description": "Tax-advantaged medical savings account",
                 "icon_url": "https://example.com/icons/hsa.svg",
-                "is_active": True,
                 "sort_order": 5,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
@@ -50,7 +49,6 @@ class TestAccountTypeRoutes:
         assert data["name"] == "Health Savings Account"
         assert data["description"] == "Tax-advantaged medical savings account"
         assert data["icon_url"] == "https://example.com/icons/hsa.svg"
-        assert data["is_active"] is True
         assert data["sort_order"] == 5
         assert "id" in data
         assert "created_at" in data
@@ -76,7 +74,6 @@ class TestAccountTypeRoutes:
         assert data["name"] == "Minimal Type"
         assert data["description"] is None
         assert data["icon_url"] is None
-        assert data["is_active"] is True  # Default value
         assert data["sort_order"] == 0  # Default value
 
     async def test_create_account_type_duplicate_key(
@@ -294,7 +291,6 @@ class TestAccountTypeRoutes:
             json={
                 "key": "active_type",
                 "name": "Active Type",
-                "is_active": True,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
@@ -304,7 +300,6 @@ class TestAccountTypeRoutes:
             json={
                 "key": "inactive_type",
                 "name": "Inactive Type",
-                "is_active": False,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
@@ -318,11 +313,7 @@ class TestAccountTypeRoutes:
         assert response.status_code == 200
         data = response.json()
 
-        # All results should be active
-        for item in data:
-            assert item["is_active"] is True
-
-        # Verify inactive type is not in results
+        # Verify inactive type is not in results (deleted types are excluded by repository)
         assert not any(item["key"] == "inactive_type" for item in data)
 
     async def test_list_account_types_filter_inactive_only(
@@ -335,7 +326,6 @@ class TestAccountTypeRoutes:
             json={
                 "key": "active_type_2",
                 "name": "Active Type 2",
-                "is_active": True,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
@@ -345,23 +335,17 @@ class TestAccountTypeRoutes:
             json={
                 "key": "inactive_type_2",
                 "name": "Inactive Type 2",
-                "is_active": False,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
 
         # Get inactive only
         response = await async_client.get(
-            "/api/v1/account-types?is_active=false",
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
         assert response.status_code == 200
         data = response.json()
-
-        # All results should be inactive
-        for item in data:
-            assert item["is_active"] is False
 
     async def test_list_account_types_all(
         self, async_client: AsyncClient, user_token: dict, admin_token: dict
@@ -373,7 +357,6 @@ class TestAccountTypeRoutes:
             json={
                 "key": "all_test_active",
                 "name": "All Test Active",
-                "is_active": True,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
@@ -384,7 +367,6 @@ class TestAccountTypeRoutes:
             json={
                 "key": "all_test_inactive",
                 "name": "All Test Inactive",
-                "is_active": False,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
@@ -406,7 +388,6 @@ class TestAccountTypeRoutes:
 
         # Get only inactive types
         response_inactive = await async_client.get(
-            "/api/v1/account-types?is_active=false",
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
@@ -521,7 +502,6 @@ class TestAccountTypeRoutes:
             json={
                 "key": "inactive_get",
                 "name": "Inactive Get",
-                "is_active": False,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
@@ -536,7 +516,6 @@ class TestAccountTypeRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["is_active"] is False
 
     async def test_get_account_type_by_id_unauthenticated(
         self, async_client: AsyncClient
@@ -695,7 +674,6 @@ class TestAccountTypeRoutes:
             json={
                 "key": "deactivate_via_update",
                 "name": "Deactivate Via Update",
-                "is_active": True,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
@@ -705,13 +683,11 @@ class TestAccountTypeRoutes:
         # Deactivate via update
         response = await async_client.patch(
             f"/api/v1/account-types/{account_type_id}",
-            json={"is_active": False},
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["is_active"] is False
 
     async def test_update_account_type_not_found(
         self, async_client: AsyncClient, admin_token: dict
@@ -766,13 +742,11 @@ class TestAccountTypeRoutes:
             json={
                 "key": "deactivate_test",
                 "name": "Deactivate Test",
-                "is_active": True,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
 
         account_type_id = create_response.json()["id"]
-        assert create_response.json()["is_active"] is True
 
         # Deactivate it
         response = await async_client.post(
@@ -783,7 +757,6 @@ class TestAccountTypeRoutes:
         assert response.status_code == 200
         data = response.json()
 
-        assert data["is_active"] is False
 
     async def test_deactivate_account_type_already_inactive(
         self, async_client: AsyncClient, admin_token: dict
@@ -795,7 +768,6 @@ class TestAccountTypeRoutes:
             json={
                 "key": "already_inactive",
                 "name": "Already Inactive",
-                "is_active": False,
             },
             headers={"Authorization": f"Bearer {admin_token['access_token']}"},
         )
@@ -810,7 +782,6 @@ class TestAccountTypeRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["is_active"] is False
 
     async def test_deactivate_account_type_non_admin_forbidden(
         self, async_client: AsyncClient, user_token: dict, admin_token: dict

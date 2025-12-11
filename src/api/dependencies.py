@@ -168,8 +168,9 @@ async def require_active_user(
             # Only active users can create transactions
             pass
     """
-    if not current_user.is_active:
-        logger.warning(f"Access denied: inactive user {current_user.id}")
+    # Check if user is soft-deleted (deleted_at is set)
+    if current_user.deleted_at is not None:
+        logger.warning(f"Access denied: deleted user {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive. Please contact support.",

@@ -162,7 +162,6 @@ async def list_users(
         le=100,
         description="Items per page (max 100)",
     ),
-    is_active: bool | None = Query(default=None, description="Filter by active status"),
     is_superuser: bool | None = Query(
         default=None,
         description="Filter by superuser status",
@@ -182,7 +181,6 @@ async def list_users(
     Query parameters:
         - page: Page number (default: 1)
         - page_size: Items per page (default: 20, max: 100)
-        - is_active: Filter by active status (optional)
         - is_superuser: Filter by superuser status (optional)
         - search: Search in email or username (optional)
 
@@ -200,7 +198,6 @@ async def list_users(
 
     pagination = PaginationParams(page=page, page_size=page_size)
     filters = UserFilterParams(
-        is_active=is_active,
         is_superuser=is_superuser,
         search=search,
     )
@@ -234,9 +231,9 @@ async def deactivate_user(
         - user_id: UUID of user to deactivate
 
     Effects:
-        - Sets is_active = False
+        - Soft deletes user (sets deleted_at timestamp)
         - Revokes all refresh tokens
-        - User cannot log in until reactivated
+        - User cannot log in (filtered by repository)
 
     Requires:
         - Valid access token

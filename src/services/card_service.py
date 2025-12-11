@@ -9,7 +9,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import AuthorizationError, NotFoundError, ValidationError
+from src.exceptions import AuthorizationError, NotFoundError
 from src.models.audit_log import AuditAction, AuditStatus
 from src.models.enums import CardType
 from src.models.user import User
@@ -96,9 +96,6 @@ class CardService:
             )
             if not institution:
                 raise NotFoundError("Financial institution")
-
-            if not institution.is_active:
-                raise ValidationError("Financial institution is inactive")
 
         # 3. Create card
         card = await self.card_repo.create(
@@ -268,9 +265,6 @@ class CardService:
             )
             if not institution:
                 raise NotFoundError("Financial institution")
-
-            if not institution.is_active:
-                raise ValidationError("Financial institution is inactive")
 
         # 3. Update only provided fields
         update_data = data.model_dump(exclude_unset=True)

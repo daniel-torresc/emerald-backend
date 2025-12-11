@@ -10,10 +10,11 @@ from src.models.account_type import AccountType
 from src.models.audit_log import AuditAction, AuditLog, AuditStatus
 from src.models.base import Base
 from src.models.card import Card
-from src.models.enums import CardType, PermissionLevel
+from src.models.enums import CardType, PermissionLevel, TransactionType
 from src.models.financial_institution import FinancialInstitution
 from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 from src.models.refresh_token import RefreshToken
+from src.models.transaction import Transaction
 from src.models.user import User
 
 __all__ = [
@@ -39,6 +40,9 @@ __all__ = [
     # Card models
     "Card",
     "CardType",
+    # Transaction models
+    "Transaction",
+    "TransactionType",
     # Master data models
     "FinancialInstitution",
 ]

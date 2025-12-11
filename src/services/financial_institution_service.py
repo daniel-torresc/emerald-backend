@@ -135,7 +135,6 @@ class FinancialInstitutionService:
             institution_type=data.institution_type,
             logo_url=str(data.logo_url) if data.logo_url else None,
             website_url=str(data.website_url) if data.website_url else None,
-            is_active=data.is_active,
         )
 
         # Commit transaction
@@ -266,7 +265,7 @@ class FinancialInstitutionService:
 
         Args:
             pagination: Pagination parameters (page, per_page)
-            filters: Filter parameters (country_code, institution_type, is_active, search)
+            filters: Filter parameters (country_code, institution_type, search)
 
         Returns:
             PaginatedResponse with list of institutions and metadata
@@ -277,8 +276,7 @@ class FinancialInstitutionService:
                 pagination=PaginationParams(page=1, per_page=20),
                 filters=FinancialInstitutionFilterParams(
                     country_code="ES",
-                    institution_type=InstitutionType.bank,
-                    is_active=True
+                    institution_type=InstitutionType.bank
                 )
             )
         """
@@ -290,7 +288,6 @@ class FinancialInstitutionService:
             query_text=filters.search,
             country_code=str(filters.country_code) if filters.country_code else None,
             institution_type=filters.institution_type,
-            is_active=filters.is_active,
             limit=pagination.page_size,
             offset=offset,
         )
@@ -300,7 +297,6 @@ class FinancialInstitutionService:
             query_text=filters.search,
             country_code=str(filters.country_code) if filters.country_code else None,
             institution_type=filters.institution_type,
-            is_active=filters.is_active,
         )
 
         # Convert to list items
@@ -442,10 +438,6 @@ class FinancialInstitutionService:
             }
             institution.website_url = str(data.website_url)
 
-        if data.is_active is not None:
-            changes["is_active"] = {"old": institution.is_active, "new": data.is_active}
-            institution.is_active = data.is_active
-
         # Commit transaction
         await self.session.commit()
         await self.session.refresh(institution)
@@ -471,37 +463,34 @@ class FinancialInstitutionService:
 
         return FinancialInstitutionResponse.model_validate(institution)
 
-    async def deactivate_institution(
+    async def delete_institution(
         self,
         institution_id: uuid.UUID,
         current_user: User,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> FinancialInstitutionResponse:
+    ) -> None:
         """
-        Deactivate financial institution (admin only).
+        Delete financial institution (admin only).
 
-        Sets is_active = False. Institution remains in database for
-        historical references but won't appear in active listings.
+        Soft deletes the institution (sets deleted_at timestamp).
+        Institution is preserved for historical references but filtered from queries.
 
-        Logs deactivation to audit trail.
+        Logs deletion to audit trail.
 
         Args:
-            institution_id: Institution UUID to deactivate
+            institution_id: Institution UUID to delete
             current_user: Currently authenticated user (must be admin)
             request_id: Request ID for audit logging
             ip_address: Client IP address
             user_agent: Client user agent
 
-        Returns:
-            FinancialInstitutionResponse with deactivated institution data
-
         Raises:
             NotFoundError: If institution not found
 
         Example:
-            institution = await service.deactivate_institution(
+            await service.delete_institution(
                 institution_id=uuid.UUID("..."),
                 current_user=admin_user
             )
@@ -511,26 +500,29 @@ class FinancialInstitutionService:
         if not institution:
             raise NotFoundError(f"Institution with ID {institution_id} not found")
 
-        # Deactivate
-        institution.is_active = False
+        # Store details for audit log before deletion
+        institution_name = institution.short_name
+        institution_swift = institution.swift_code
+
+        # Soft delete
+        await self.institution_repo.delete(institution)
 
         # Commit transaction
         await self.session.commit()
-        await self.session.refresh(institution)
 
         logger.info(
-            f"Institution deactivated: {institution.id} ({institution.short_name}) by admin {current_user.id}"
+            f"Institution deleted: {institution_id} ({institution_name}) by admin {current_user.id}"
         )
 
         # Log to audit trail
         await self.audit_service.log_event(
             user_id=current_user.id,
-            action=AuditAction.DEACTIVATE_FINANCIAL_INSTITUTION,
+            action=AuditAction.DELETE,
             entity_type="financial_institution",
-            entity_id=institution.id,
+            entity_id=institution_id,
             extra_metadata={
-                "institution_name": institution.short_name,
-                "swift_code": institution.swift_code,
+                "institution_name": institution_name,
+                "swift_code": institution_swift,
             },
             request_id=request_id,
             ip_address=ip_address,

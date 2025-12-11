@@ -37,6 +37,11 @@ dev = [
     "ruff>=0.6.0",
 ]
 
+[tool.ruff]
+# Ignore F821 (undefined name) in model files for SQLAlchemy forward references
+[tool.ruff.lint.per-file-ignores]
+"src/models/*.py" = ["F821"]
+
 [tool.mypy]
 strict = true
 
