@@ -9,7 +9,6 @@ Tests:
 - Delete transaction with balance updates
 - Split transaction with validation
 - Join split transaction
-- Tag management
 - Permission enforcement
 """
 
@@ -46,7 +45,6 @@ class TestTransactionServiceCreate:
             description="Grocery shopping",
             transaction_type=TransactionType.expense,
             merchant="Whole Foods",
-            tags=["groceries", "food"],
             current_user=test_user,
         )
 
@@ -55,7 +53,6 @@ class TestTransactionServiceCreate:
         assert transaction.amount == Decimal("-50.25")
         assert transaction.description == "Grocery shopping"
         assert transaction.merchant == "Whole Foods"
-        assert len(transaction.tags) == 2
 
     async def test_create_transaction_updates_balance(
         self, db_session, test_user, test_account
@@ -657,73 +654,6 @@ class TestTransactionServiceSplit:
 
 
 @pytest.mark.asyncio
-class TestTransactionServiceTags:
-    """Test suite for tag management."""
-
-    async def test_add_tag_success(self, db_session, test_user, test_account):
-        """Test adding a tag to transaction."""
-        service = TransactionService(db_session)
-
-        # Create transaction
-        transaction = await service.create_transaction(
-            account_id=test_account.id,
-            transaction_date=date.today(),
-            amount=Decimal("-50.00"),
-            currency="USD",
-            description="Test",
-            transaction_type=TransactionType.expense,
-            current_user=test_user,
-        )
-
-        # Add tag
-        updated = await service.add_tag(transaction.id, "groceries", test_user)
-
-        assert any(tag.tag == "groceries" for tag in updated.tags)
-
-    async def test_remove_tag_success(self, db_session, test_user, test_account):
-        """Test removing a tag from transaction."""
-        service = TransactionService(db_session)
-
-        # Create transaction with tag
-        transaction = await service.create_transaction(
-            account_id=test_account.id,
-            transaction_date=date.today(),
-            amount=Decimal("-50.00"),
-            currency="USD",
-            description="Test",
-            transaction_type=TransactionType.expense,
-            tags=["groceries"],
-            current_user=test_user,
-        )
-
-        # Remove tag
-        removed = await service.remove_tag(transaction.id, "groceries", test_user)
-
-        assert removed is True
-
-    async def test_tag_permission_denied(
-        self, db_session, test_user, test_account, admin_user
-    ):
-        """Test that user without permission cannot add tags."""
-        service = TransactionService(db_session)
-
-        # Create transaction
-        transaction = await service.create_transaction(
-            account_id=test_account.id,
-            transaction_date=date.today(),
-            amount=Decimal("-50.00"),
-            currency="USD",
-            description="Test",
-            transaction_type=TransactionType.expense,
-            current_user=test_user,
-        )
-
-        # Try to add tag as different user
-        with pytest.raises(AuthorizationError):
-            await service.add_tag(transaction.id, "hacked", admin_user)
-
-
-@pytest.mark.asyncio
 class TestTransactionServiceCardValidation:
     """Test suite for card validation in transaction operations."""
 
@@ -798,7 +728,6 @@ class TestTransactionServiceCardValidation:
         """Test that using another user's card raises NotFoundError."""
         from src.models.card import Card
         from src.models.enums import CardType
-        from src.repositories.card_repository import CardRepository
 
         # Create card for admin user
         admin_account = await AccountRepository(db_session).create(

@@ -6,7 +6,7 @@ This module tests the full lifecycle of a user interacting with the application:
 2. User login and authentication
 3. Profile access and management
 4. Account creation
-5. Transaction management (create, split, tag, search)
+5. Transaction management (create, split, search)
 6. Profile updates and password changes
 
 These tests validate that all components work together correctly
@@ -32,8 +32,6 @@ async def test_complete_user_journey(async_client: AsyncClient):
     - Add income transaction
     - Add expense transaction
     - Split expense transaction
-    - Add tags to transactions
-    - Search transactions by tag
     - Update profile
     - Change password
     """
@@ -106,11 +104,9 @@ async def test_complete_user_journey(async_client: AsyncClient):
             "description": "Monthly Salary",
             "merchant": "ACME Corp",
             "transaction_type": "income",
-            "tags": ["income", "salary"],
         },
     )
     assert income_response.status_code == 201
-    income = income_response.json()
     print("✓ Step 5: Added income transaction (+$2500.00)")
 
     # Step 6: Add expense transaction
@@ -124,7 +120,6 @@ async def test_complete_user_journey(async_client: AsyncClient):
             "description": "Grocery Shopping",
             "merchant": "Whole Foods",
             "transaction_type": "expense",
-            "tags": ["groceries", "food"],
         },
     )
     assert expense_response.status_code == 201
@@ -151,28 +146,7 @@ async def test_complete_user_journey(async_client: AsyncClient):
     assert len(split_data["children"]) == 2
     print("✓ Step 7: Split expense into 2 transactions ($100 + $50)")
 
-    # Step 8: Add tags to transaction
-    tag_response = await async_client.post(
-        f"/api/v1/transactions/{income['id']}/tags",
-        headers=headers,
-        json={"tag": "recurring"},
-    )
-    assert tag_response.status_code == 200
-    print("✓ Step 8: Added 'recurring' tag to income transaction")
-
-    # Step 9: Search transactions by tag
-    search_response = await async_client.get(
-        f"/api/v1/accounts/{account_id}/transactions?tag=groceries",
-        headers=headers,
-    )
-    assert search_response.status_code == 200
-    search_results = search_response.json()
-    assert search_results["total"] >= 1
-    print(
-        f"✓ Step 9: Searched transactions by tag (found {search_results['total']} results)"
-    )
-
-    # Step 10: Update profile
+    # Step 8: Update profile
     update_profile_response = await async_client.patch(
         "/api/v1/users/me",
         headers=headers,
@@ -342,90 +316,6 @@ async def test_user_deactivation_workflow(async_client: AsyncClient):
     # After deactivation, user should not be able to login
     # Note: This requires admin functionality which we'll test separately
     print("✓ Deactivation workflow test structure verified")
-
-
-@pytest.mark.asyncio
-async def test_transaction_tag_management_workflow(async_client: AsyncClient):
-    """
-    Test: User adds, removes, and searches by tags.
-    """
-
-    # Setup: Register, login, create account
-    await async_client.post(
-        "/api/auth/register",
-        json={
-            "email": "tagger@example.com",
-            "username": "tagger",
-            "password": "Tagger123!",
-        },
-    )
-
-    login_response = await async_client.post(
-        "/api/auth/login",
-        json={"email": "tagger@example.com", "password": "Tagger123!"},
-    )
-    headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
-
-    account_response = await async_client.post(
-        "/api/v1/accounts",
-        headers=headers,
-        json={
-            "account_name": "Tag Account",
-            "account_type": "savings",
-            "currency": "USD",
-            "opening_balance": "1000.00",
-        },
-    )
-    account_id = account_response.json()["id"]
-
-    # Create transaction with initial tags
-    txn_response = await async_client.post(
-        f"/api/v1/accounts/{account_id}/transactions",
-        headers=headers,
-        json={
-            "transaction_date": str(date.today()),
-            "amount": "-50.00",
-            "currency": "USD",
-            "description": "Restaurant",
-            "transaction_type": "expense",
-            "tags": ["food", "dining"],
-        },
-    )
-    txn_id = txn_response.json()["id"]
-
-    # Add additional tag
-    add_tag_response = await async_client.post(
-        f"/api/v1/transactions/{txn_id}/tags",
-        headers=headers,
-        json={"tag": "business"},
-    )
-    assert add_tag_response.status_code == 200
-    txn_data = add_tag_response.json()
-    tags = txn_data["tags"]  # tags is already a list of strings
-    assert "business" in tags
-    assert "food" in tags
-    assert "dining" in tags
-
-    # Remove a tag
-    remove_tag_response = await async_client.delete(
-        f"/api/v1/transactions/{txn_id}/tags/dining",
-        headers=headers,
-    )
-    assert remove_tag_response.status_code == 204
-
-    # Get transaction to verify tag was removed
-    get_txn_response = await async_client.get(
-        f"/api/v1/transactions/{txn_id}",
-        headers=headers,
-    )
-    assert get_txn_response.status_code == 200
-    updated_txn = get_txn_response.json()
-    remaining_tags = updated_txn["tags"]  # tags is already a list of strings
-    assert "dining" not in remaining_tags
-    assert "food" in remaining_tags
-    assert "business" in remaining_tags
-
-    print("✓ Tag management workflow completed successfully")
 
 
 @pytest.mark.asyncio

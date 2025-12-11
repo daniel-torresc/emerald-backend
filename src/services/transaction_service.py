@@ -9,7 +9,6 @@ This module provides:
 - Delete transaction (soft delete) with balance updates
 - Split transaction into multiple parts
 - Join split transactions back together
-- Tag management (add/remove tags)
 """
 
 import logging
@@ -32,7 +31,6 @@ from src.models.user import User
 from src.repositories.account_repository import AccountRepository
 from src.repositories.card_repository import CardRepository
 from src.repositories.transaction_repository import TransactionRepository
-from src.repositories.transaction_tag_repository import TransactionTagRepository
 from src.services.audit_service import AuditService
 from src.services.currency_service import CurrencyService
 from src.services.permission_service import PermissionService
@@ -57,7 +55,6 @@ class TransactionService:
     - Transaction CRUD with permission checks
     - Balance calculations and updates
     - Transaction splitting and joining
-    - Tag management
     - Advanced search and filtering
 
     All methods require an active database session.
@@ -73,7 +70,6 @@ class TransactionService:
         """
         self.session = session
         self.transaction_repo = TransactionRepository(session)
-        self.tag_repo = TransactionTagRepository(session)
         self.account_repo = AccountRepository(session)
         self.card_repo = CardRepository(session)
         self.permission_service = PermissionService(session)
@@ -93,7 +89,6 @@ class TransactionService:
         card_id: uuid.UUID | None = None,
         value_date: date | None = None,
         user_notes: str | None = None,
-        tags: list[str] | None = None,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -106,9 +101,8 @@ class TransactionService:
         2. Get account and verify currency matches
         3. Verify account is not deleted and is active
         4. Create transaction in database
-        5. Add tags if provided
-        6. Update account balance (in same transaction)
-        7. Log audit entry
+        5. Update account balance (in same transaction)
+        6. Log audit entry
         8. Return created transaction
 
         Args:
@@ -123,7 +117,6 @@ class TransactionService:
             card_id: Card used for transaction (optional)
             value_date: Date transaction value applied (optional)
             user_notes: User comments (optional, max 1000 chars)
-            tags: List of tags to add (optional)
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
@@ -145,7 +138,6 @@ class TransactionService:
                 description="Grocery Shopping",
                 transaction_type=TransactionType.DEBIT,
                 merchant="Whole Foods",
-                tags=["groceries", "food"],
                 current_user=user,
             )
         """
@@ -226,13 +218,6 @@ class TransactionService:
 
         created = await self.transaction_repo.create(transaction)
 
-        # Add tags if provided
-        if tags:
-            for tag in tags:
-                tag_normalized = tag.lower().strip()
-                if tag_normalized:  # Skip empty tags
-                    await self.tag_repo.add_tag(created.id, tag_normalized)
-
         # Update account balance with row lock
         account = await self.account_repo.get_for_update(account_id)
         old_balance = account.current_balance
@@ -259,7 +244,6 @@ class TransactionService:
                 "merchant": merchant,
                 "card_id": str(card_id) if card_id else None,
                 "transaction_type": transaction_type.value,
-                "tags": tags,
             },
             extra_metadata={
                 "account_id": str(account_id),
@@ -271,8 +255,8 @@ class TransactionService:
             request_id=request_id,
         )
 
-        # Refresh to get tags and card relationships
-        await self.session.refresh(created, ["tags", "card"])
+        # Refresh to get card relationships
+        await self.session.refresh(created, ["card"])
         return created
 
     async def get_transaction(
@@ -333,7 +317,6 @@ class TransactionService:
         amount_max: Decimal | None = None,
         description: str | None = None,
         merchant: str | None = None,
-        tags: list[str] | None = None,
         transaction_type: TransactionType | None = None,
         card_id: uuid.UUID | None = None,
         card_type: CardType | None = None,
@@ -354,7 +337,6 @@ class TransactionService:
             amount_max: Maximum amount (inclusive)
             description: Fuzzy search on description
             merchant: Fuzzy search on merchant
-            tags: Filter by tags (ANY match)
             transaction_type: Filter by type
             card_id: Filter by specific card UUID
             card_type: Filter by card type (credit_card or debit_card)
@@ -376,7 +358,6 @@ class TransactionService:
                 description="grocery",
                 amount_min=Decimal("10.00"),
                 amount_max=Decimal("100.00"),
-                tags=["food"],
                 skip=0,
                 limit=20,
             )
@@ -405,7 +386,6 @@ class TransactionService:
             amount_max=amount_max,
             description=description,
             merchant=merchant,
-            tags=tags,
             transaction_type=transaction_type,
             card_id=card_id,
             card_type=card_type,
@@ -739,8 +719,7 @@ class TransactionService:
         1. Create child transactions with parent_transaction_id set
         2. Each child inherits: account_id, currency, transaction_date, value_date
         3. Each child has individual: amount, description, merchant
-        4. Tags are NOT inherited (each child tagged independently)
-        5. Balance update is net-zero (total in = total out)
+        4. Balance update is net-zero (total in = total out)
 
         Args:
             transaction_id: UUID of transaction to split
@@ -953,119 +932,3 @@ class TransactionService:
         # Refresh to update children relationship
         await self.session.refresh(parent, ["child_transactions"])
         return parent
-
-    async def add_tag(
-        self,
-        transaction_id: uuid.UUID,
-        tag: str,
-        current_user: User,
-    ) -> Transaction:
-        """
-        Add a tag to a transaction.
-
-        Args:
-            transaction_id: UUID of the transaction
-            tag: Tag text (will be normalized)
-            current_user: Currently authenticated user
-
-        Returns:
-            Transaction with updated tags
-
-        Raises:
-            NotFoundError: If transaction not found
-            AuthorizationError: If user doesn't have permission
-
-        Example:
-            transaction = await transaction_service.add_tag(
-                transaction_id=transaction.id,
-                tag="groceries",
-                current_user=user,
-            )
-        """
-        # Get transaction
-        transaction = await self.transaction_repo.get_by_id(transaction_id)
-        if transaction is None:
-            logger.warning(f"Transaction {transaction_id} not found")
-            raise NotFoundError("Transaction")
-
-        # Permission check (EDITOR or higher can add tags)
-        has_permission = await self.permission_service.check_permission(
-            user_id=current_user.id,
-            account_id=transaction.account_id,
-            required_permission=PermissionLevel.editor,
-        )
-
-        if not has_permission:
-            logger.warning(
-                f"User {current_user.id} attempted to add tag to transaction {transaction_id} without permission"
-            )
-            raise AuthorizationError(
-                "You don't have permission to modify tags for this transaction"
-            )
-
-        # Add tag
-        await self.tag_repo.add_tag(transaction_id, tag)
-
-        # Refresh to get updated tags
-        await self.session.refresh(transaction, ["tags"])
-
-        logger.info(f"Added tag '{tag}' to transaction {transaction_id}")
-
-        return transaction
-
-    async def remove_tag(
-        self,
-        transaction_id: uuid.UUID,
-        tag: str,
-        current_user: User,
-    ) -> bool:
-        """
-        Remove a tag from a transaction.
-
-        Args:
-            transaction_id: UUID of the transaction
-            tag: Tag text to remove (will be normalized)
-            current_user: Currently authenticated user
-
-        Returns:
-            True if tag was removed, False if not found
-
-        Raises:
-            NotFoundError: If transaction not found
-            AuthorizationError: If user doesn't have permission
-
-        Example:
-            removed = await transaction_service.remove_tag(
-                transaction_id=transaction.id,
-                tag="groceries",
-                current_user=user,
-            )
-        """
-        # Get transaction
-        transaction = await self.transaction_repo.get_by_id(transaction_id)
-        if transaction is None:
-            logger.warning(f"Transaction {transaction_id} not found")
-            raise NotFoundError("Transaction")
-
-        # Permission check (EDITOR or higher can remove tags)
-        has_permission = await self.permission_service.check_permission(
-            user_id=current_user.id,
-            account_id=transaction.account_id,
-            required_permission=PermissionLevel.editor,
-        )
-
-        if not has_permission:
-            logger.warning(
-                f"User {current_user.id} attempted to remove tag from transaction {transaction_id} without permission"
-            )
-            raise AuthorizationError(
-                "You don't have permission to modify tags for this transaction"
-            )
-
-        # Remove tag
-        removed = await self.tag_repo.remove_tag(transaction_id, tag)
-
-        if removed:
-            logger.info(f"Removed tag '{tag}' from transaction {transaction_id}")
-
-        return removed
