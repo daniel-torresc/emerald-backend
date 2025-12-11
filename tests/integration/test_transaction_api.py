@@ -696,7 +696,37 @@ async def test_cannot_create_transaction_with_wrong_currency(
         },
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_cannot_create_transaction_with_unsupported_currency(
+    async_client: AsyncClient,
+    user_token: dict,
+    test_account,
+):
+    """Test: Cannot create transaction with unsupported currency code."""
+    # Valid format (3 uppercase letters) but not in supported list
+    unsupported_currencies = ["ZZZ", "ABC", "XYZ"]
+
+    for currency in unsupported_currencies:
+        response = await async_client.post(
+            f"/api/v1/accounts/{test_account.id}/transactions",
+            headers={"Authorization": f"Bearer {user_token['access_token']}"},
+            json={
+                "transaction_date": str(date.today()),
+                "amount": "-25.00",
+                "currency": currency,
+                "description": f"Test {currency}",
+                "transaction_type": "expense",
+            },
+        )
+
+        assert response.status_code == 422
+        error_data = response.json()
+        assert "error" in error_data
+        error_message = str(error_data["error"]["message"]).lower()
+        assert "unsupported" in error_message and "currency" in error_message
 
 
 @pytest.mark.asyncio

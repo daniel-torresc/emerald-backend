@@ -1,19 +1,16 @@
 """
 Unit tests for currency service.
 
-Tests the CurrencyService singleton and Currency model to ensure:
-- Singleton pattern works correctly
+Tests the CurrencyService and Currency model to ensure:
+- Service instantiation works correctly
 - Currency data is valid
 - Service methods work as expected
 """
 
 import pytest
 
-from src.services.currency_service import (
-    Currency,
-    CurrencyService,
-    get_currency_service,
-)
+from src.schemas.currency import Currency
+from src.services.currency_service import CurrencyService
 
 
 class TestCurrency:
@@ -62,23 +59,31 @@ class TestCurrency:
 
 
 class TestCurrencyService:
-    """Test cases for CurrencyService singleton."""
+    """Test cases for CurrencyService."""
 
-    def test_singleton_pattern(self):
-        """Test that CurrencyService returns same instance."""
+    def test_service_instantiation_without_session(self):
+        """Test that CurrencyService can be instantiated without session."""
+        service = CurrencyService()
+        assert service is not None
+        assert service.session is None
+
+    def test_service_instantiation_with_session(self):
+        """Test that CurrencyService can be instantiated with session."""
+        # Mock session object (we don't actually use it)
+        mock_session = object()
+        service = CurrencyService(session=mock_session)
+        assert service is not None
+        assert service.session is mock_session
+
+    def test_multiple_instances_are_different(self):
+        """Test that multiple CurrencyService instances are different objects."""
         service1 = CurrencyService()
         service2 = CurrencyService()
-        assert service1 is service2
-
-    def test_get_currency_service_returns_singleton(self):
-        """Test that get_currency_service() returns singleton instance."""
-        service1 = get_currency_service()
-        service2 = get_currency_service()
-        assert service1 is service2
+        assert service1 is not service2
 
     def test_get_all_returns_currencies(self):
         """Test that get_all() returns list of currencies."""
-        service = get_currency_service()
+        service = CurrencyService()
         currencies = service.get_all()
 
         assert isinstance(currencies, list)
@@ -87,7 +92,7 @@ class TestCurrencyService:
 
     def test_get_all_returns_copy(self):
         """Test that get_all() returns a copy to prevent external modification."""
-        service = get_currency_service()
+        service = CurrencyService()
         currencies1 = service.get_all()
         currencies2 = service.get_all()
 
@@ -99,7 +104,7 @@ class TestCurrencyService:
 
     def test_all_currencies_have_required_fields(self):
         """Test that all currencies have valid code, symbol, and name."""
-        service = get_currency_service()
+        service = CurrencyService()
         currencies = service.get_all()
 
         for currency in currencies:
@@ -110,7 +115,7 @@ class TestCurrencyService:
 
     def test_no_duplicate_currency_codes(self):
         """Test that there are no duplicate currency codes."""
-        service = get_currency_service()
+        service = CurrencyService()
         currencies = service.get_all()
 
         codes = [c.code for c in currencies]
@@ -118,7 +123,7 @@ class TestCurrencyService:
 
     def test_get_by_code_found(self):
         """Test get_by_code() returns currency when found."""
-        service = get_currency_service()
+        service = CurrencyService()
         currency = service.get_by_code("USD")
 
         assert currency is not None
@@ -128,7 +133,7 @@ class TestCurrencyService:
 
     def test_get_by_code_case_insensitive(self):
         """Test get_by_code() is case-insensitive."""
-        service = get_currency_service()
+        service = CurrencyService()
 
         usd_upper = service.get_by_code("USD")
         usd_lower = service.get_by_code("usd")
@@ -141,33 +146,33 @@ class TestCurrencyService:
 
     def test_get_by_code_not_found(self):
         """Test get_by_code() returns None when not found."""
-        service = get_currency_service()
+        service = CurrencyService()
         currency = service.get_by_code("INVALID")
 
         assert currency is None
 
     def test_is_supported_true(self):
         """Test is_supported() returns True for valid currency."""
-        service = get_currency_service()
+        service = CurrencyService()
         assert service.is_supported("USD") is True
         assert service.is_supported("EUR") is True
         assert service.is_supported("GBP") is True
 
     def test_is_supported_case_insensitive(self):
         """Test is_supported() is case-insensitive."""
-        service = get_currency_service()
+        service = CurrencyService()
         assert service.is_supported("usd") is True
         assert service.is_supported("UsD") is True
 
     def test_is_supported_false(self):
         """Test is_supported() returns False for invalid currency."""
-        service = get_currency_service()
+        service = CurrencyService()
         assert service.is_supported("INVALID") is False
         assert service.is_supported("XXX") is False
 
     def test_specific_currencies_exist(self):
         """Test that specific expected currencies exist."""
-        service = get_currency_service()
+        service = CurrencyService()
 
         # Test major currencies
         assert service.is_supported("USD")
@@ -179,10 +184,24 @@ class TestCurrencyService:
 
     def test_currency_symbols_are_valid_utf8(self):
         """Test that all currency symbols are valid UTF-8."""
-        service = get_currency_service()
+        service = CurrencyService()
         currencies = service.get_all()
 
         for currency in currencies:
             # Should not raise exception
             symbol_encoded = currency.symbol.encode("utf-8")
             assert len(symbol_encoded) > 0
+
+    def test_get_supported_codes(self):
+        """Test get_supported_codes() returns list of currency codes."""
+        service = CurrencyService()
+        codes = service.get_supported_codes()
+
+        assert isinstance(codes, list)
+        assert len(codes) == 6
+        assert "USD" in codes
+        assert "EUR" in codes
+        assert "GBP" in codes
+        assert "JPY" in codes
+        assert "CNY" in codes
+        assert "CHF" in codes

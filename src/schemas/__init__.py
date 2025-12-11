@@ -30,6 +30,11 @@ from src.schemas.common import (
     ResponseMeta,
     SuccessResponse,
 )
+from src.schemas.currency import (
+    Currency,
+    CurrenciesResponse,
+    CurrencyResponse,
+)
 from src.schemas.financial_institution import (
     FinancialInstitutionCreate,
     FinancialInstitutionFilterParams,
@@ -55,6 +60,10 @@ __all__ = [
     "SuccessResponse",
     "ErrorDetail",
     "ErrorResponse",
+    # Currency schemas
+    "Currency",
+    "CurrencyResponse",
+    "CurrenciesResponse",
     # User schemas
     "UserCreate",
     "UserUpdate",

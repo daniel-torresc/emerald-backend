@@ -33,6 +33,7 @@ from src.repositories.account_share_repository import AccountShareRepository
 from src.repositories.account_type_repository import AccountTypeRepository
 from src.repositories.user_repository import UserRepository
 from src.services.audit_service import AuditService
+from src.services.currency_service import CurrencyService
 from src.services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ class AccountService:
         self.user_repo = UserRepository(session)
         self.permission_service = PermissionService(session)
         self.audit_service = AuditService(session)
+        self.currency_service = CurrencyService(session)
         self.encryption_service = EncryptionService()
 
     async def create_account(
@@ -160,13 +162,15 @@ class AccountService:
         # Note: All account types are system-wide and accessible to all users
         # No per-user custom types - all types are managed globally
 
-        # Validate currency format (ISO 4217: 3 uppercase letters)
-        if not (len(currency) == 3 and currency.isalpha() and currency.isupper()):
+        # Validate currency is supported (ISO 4217 currency codes)
+        if not self.currency_service.is_supported(currency):
+            supported_codes = ", ".join(self.currency_service.get_supported_codes())
             logger.warning(
-                f"User {user_id} attempted to create account with invalid currency: {currency}"
+                f"User {user_id} attempted to create account with unsupported currency: {currency}"
             )
-            raise ValueError(
-                f"Invalid currency code '{currency}'. Must be 3 uppercase letters (e.g., USD, EUR, GBP)"
+            raise ValidationError(
+                f"Unsupported currency code '{currency}'. "
+                f"Supported currencies: {supported_codes}"
             )
 
         # Validate financial institution exists and is active

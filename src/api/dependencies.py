@@ -22,8 +22,17 @@ from src.core.database import get_db
 from src.core.security import TOKEN_TYPE_ACCESS, decode_token, verify_token_type
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
-from src.services import (AccountService, AccountTypeService, AuditService, AuthService,
-                          CardService, FinancialInstitutionService, TransactionService, UserService)
+from src.services import (
+    AccountService,
+    AccountTypeService,
+    AuditService,
+    AuthService,
+    CardService,
+    CurrencyService,
+    FinancialInstitutionService,
+    TransactionService,
+    UserService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -389,6 +398,30 @@ def get_card_service(db: AsyncSession = Depends(get_db)) -> CardService:
             return await service.create_card(...)
     """
     return CardService(db)
+
+
+def get_currency_service(db: AsyncSession = Depends(get_db)) -> CurrencyService:
+    """
+    Dependency to get CurrencyService instance.
+
+    This dependency provides a CurrencyService with an active database session.
+    Note: CurrencyService currently serves static data and doesn't use the session,
+    but accepts it for pattern consistency and future extensibility.
+
+    Args:
+        db: Database session
+
+    Returns:
+        CurrencyService instance
+
+    Usage:
+        @app.get("/api/v1/metadata/currencies")
+        async def get_currencies(
+            service: CurrencyService = Depends(get_currency_service)
+        ):
+            return service.get_all()
+    """
+    return CurrencyService(db)
 
 
 # Convenience type aliases for common dependencies
