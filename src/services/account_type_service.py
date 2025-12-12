@@ -17,7 +17,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions import AlreadyExistsError, NotFoundError
-from src.models.audit_log import AuditAction
+from src.models import AuditAction
 from src.models.user import User
 from src.repositories.account_type_repository import AccountTypeRepository
 from src.schemas.account_type import (

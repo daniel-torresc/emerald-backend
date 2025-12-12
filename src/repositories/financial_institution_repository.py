@@ -4,7 +4,7 @@ Financial institution repository for database operations.
 This module provides database operations for the FinancialInstitution model,
 including searches by SWIFT code, routing number, and filtering by country/type.
 """
-
+from pydantic_extra_types.country import CountryAlpha2
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -85,7 +85,7 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
     async def search(
         self,
         query_text: str | None = None,
-        country_code: str | None = None,
+        country_code: CountryAlpha2 | None = None,
         institution_type: InstitutionType | None = None,
         limit: int = 20,
         offset: int = 0,
@@ -153,16 +153,16 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
         query = query.order_by(FinancialInstitution.short_name)
 
         # Apply pagination
-        query = query.limit(min(limit, 100)).offset(offset)
+        query = query.limit(limit).offset(offset)
 
         # Execute query
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def count_filtered(
+    async def search_count(
         self,
         query_text: str | None = None,
-        country_code: str | None = None,
+        country_code: CountryAlpha2 | None = None,
         institution_type: InstitutionType | None = None,
     ) -> int:
         """
@@ -211,25 +211,6 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
         # Execute count query
         result = await self.session.execute(query)
         return result.scalar_one()
-
-    async def get_all_ordered(self) -> list[FinancialInstitution]:
-        """
-        Get all financial institutions ordered by short_name.
-
-        Automatically excludes soft-deleted institutions via BaseRepository.
-        Useful for dropdown menus and selection lists.
-
-        Returns:
-            List of all non-deleted FinancialInstitution instances
-
-        Example:
-            institutions = await repo.get_all_ordered()
-        """
-        query = select(FinancialInstitution).order_by(FinancialInstitution.short_name)
-        query = self._apply_soft_delete_filter(query)
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
 
     async def exists_by_swift_code(self, swift_code: str) -> bool:
         """

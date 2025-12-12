@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.dependencies import ActiveUser, get_audit_service, get_auth_service
 from src.core.config import settings
 from src.core.database import get_db
-from src.models.audit_log import AuditAction, AuditStatus
+from src.models import AuditAction, AuditStatus
 from src.schemas.auth import (
     AccessTokenResponse,
     LoginRequest,

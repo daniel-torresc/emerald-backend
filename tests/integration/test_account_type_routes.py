@@ -345,7 +345,7 @@ class TestAccountTypeRoutes:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        response.json()
 
     async def test_list_account_types_all(
         self, async_client: AsyncClient, user_token: dict, admin_token: dict
@@ -515,7 +515,7 @@ class TestAccountTypeRoutes:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        response.json()
 
     async def test_get_account_type_by_id_unauthenticated(
         self, async_client: AsyncClient
@@ -687,7 +687,7 @@ class TestAccountTypeRoutes:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        response.json()
 
     async def test_update_account_type_not_found(
         self, async_client: AsyncClient, admin_token: dict
@@ -755,8 +755,7 @@ class TestAccountTypeRoutes:
         )
 
         assert response.status_code == 200
-        data = response.json()
-
+        response.json()
 
     async def test_deactivate_account_type_already_inactive(
         self, async_client: AsyncClient, admin_token: dict
@@ -781,7 +780,7 @@ class TestAccountTypeRoutes:
         )
 
         assert response.status_code == 200
-        data = response.json()
+        response.json()
 
     async def test_deactivate_account_type_non_admin_forbidden(
         self, async_client: AsyncClient, user_token: dict, admin_token: dict

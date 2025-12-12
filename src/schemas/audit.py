@@ -12,6 +12,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from src.models import AuditAction, AuditStatus
+
 
 class AuditLogResponse(BaseModel):
     """
@@ -93,7 +95,9 @@ class AuditLogFilterParams(BaseModel):
     """
 
     user_id: UUID | None = Field(default=None, description="Filter by user ID")
-    action: str | None = Field(default=None, description="Filter by action type")
+    action: AuditAction | None = Field(
+        default=None, description="Filter by action type"
+    )
     entity_type: str | None = Field(
         default=None,
         description="Filter by entity type",
@@ -102,7 +106,7 @@ class AuditLogFilterParams(BaseModel):
         default=None,
         description="Filter by entity ID",
     )
-    status: str | None = Field(
+    status: AuditStatus | None = Field(
         default=None,
         description="Filter by status (SUCCESS/FAILURE/PARTIAL)",
     )

@@ -499,7 +499,6 @@ async def test_financial_institution(test_engine):
             institution_type=InstitutionType.bank,
             logo_url="https://example.com/chase-logo.png",
             website_url="https://www.chase.com",
-            
         )
 
         session.add(institution)
@@ -680,7 +679,6 @@ async def test_account(
             currency="USD",
             opening_balance=Decimal("1000.00"),
             current_balance=Decimal("1000.00"),
-            
             created_by=test_user.id,
             updated_by=test_user.id,
         )
@@ -749,7 +747,9 @@ async def test_financial_institution_for_cards(test_engine):
     async with async_session_factory() as session:
         # Try to get existing institution (not soft deleted)
         result = await session.execute(
-            text("SELECT * FROM financial_institutions WHERE deleted_at IS NULL LIMIT 1")
+            text(
+                "SELECT * FROM financial_institutions WHERE deleted_at IS NULL LIMIT 1"
+            )
         )
         row = result.first()
 
@@ -761,7 +761,6 @@ async def test_financial_institution_for_cards(test_engine):
         institution = FinancialInstitution(
             name="Test Bank",
             institution_type="bank",
-            
         )
         session.add(institution)
         await session.commit()

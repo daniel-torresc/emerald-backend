@@ -11,18 +11,19 @@ This module provides:
 
 import logging
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
 from src.api.dependencies import get_account_service, require_active_user
 from src.models.user import User
 from src.schemas.account import (
     AccountCreate,
+    AccountFilterParams,
     AccountListItem,
     AccountResponse,
     AccountUpdate,
 )
+from src.schemas.common import PaginatedResponse, PaginationParams
 from src.services.account_service import AccountService
 
 logger = logging.getLogger(__name__)
@@ -123,31 +124,39 @@ async def create_account(
 
 @router.get(
     "",
-    response_model=list[AccountListItem],
+    response_model=PaginatedResponse[AccountListItem],
     summary="List user's accounts",
     description="""
     List all accounts for the authenticated user with pagination and filtering.
 
-    Supports filtering by active status and account type.
+    Supports filtering by account type and financial institution.
     Results are ordered by created_at descending (newest first).
 
     **Permission:** Authenticated user (can only list own accounts)
     """,
     responses={
         200: {
-            "description": "List of accounts",
+            "description": "Paginated list of accounts",
             "content": {
                 "application/json": {
-                    "example": [
-                        {
-                            "id": "550e8400-e29b-41d4-a716-446655440000",
-                            "account_name": "Chase Checking",
-                            "account_type": "savings",
-                            "currency": "USD",
-                            "current_balance": "1234.56",
-                            "created_at": "2025-11-04T00:00:00Z",
-                        }
-                    ]
+                    "example": {
+                        "data": [
+                            {
+                                "id": "550e8400-e29b-41d4-a716-446655440000",
+                                "account_name": "Chase Checking",
+                                "account_type": "savings",
+                                "currency": "USD",
+                                "current_balance": "1234.56",
+                                "created_at": "2025-11-04T00:00:00Z",
+                            }
+                        ],
+                        "meta": {
+                            "total": 42,
+                            "page": 1,
+                            "page_size": 20,
+                            "total_pages": 3,
+                        },
+                    }
                 }
             },
         },
@@ -156,46 +165,33 @@ async def create_account(
 )
 async def list_accounts(
     request: Request,
+    filters: AccountFilterParams = Depends(),
+    pagination: PaginationParams = Depends(),
     current_user: User = Depends(require_active_user),
     account_service: AccountService = Depends(get_account_service),
-    skip: Annotated[int, Query(ge=0, description="Number of records to skip")] = 0,
-    limit: Annotated[
-        int, Query(ge=1, le=100, description="Maximum number of records to return")
-    ] = 20,
-    account_type_id: Annotated[
-        uuid.UUID | None, Query(description="Filter by account type ID")
-    ] = None,
-    financial_institution_id: Annotated[
-        uuid.UUID | None, Query(description="Filter by financial institution")
-    ] = None,
-) -> list[AccountListItem]:
+) -> PaginatedResponse[AccountListItem]:
     """
     List user's accounts with pagination and filtering.
 
     Query parameters:
-        - skip: Number of records to skip (default: 0)
-        - limit: Max records to return (default: 20, max: 100)
-        - is_active: Filter by status (optional)
+        - page: Page number (default: 1)
+        - page_size: Items per page (default: 20, max: 100)
         - account_type_id: Filter by account type ID (optional)
         - financial_institution_id: Filter by institution (optional)
 
     Returns:
-        List of AccountListItem (optimized response with institution details)
+        PaginatedResponse with list of AccountListItem and pagination metadata
 
     Requires:
         - Valid access token
         - Active user account
     """
-    accounts = await account_service.list_accounts(
+    return await account_service.list_user_accounts(
         user_id=current_user.id,
         current_user=current_user,
-        skip=skip,
-        limit=limit,
-        account_type_id=account_type_id,
-        financial_institution_id=financial_institution_id,
+        pagination=pagination,
+        filters=filters,
     )
-
-    return [AccountListItem.model_validate(account) for account in accounts]
 
 
 @router.get(

@@ -24,13 +24,18 @@ from src.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from src.models.audit_log import AuditAction
+from src.models import AuditAction
 from src.models.enums import CardType, PermissionLevel, TransactionType
 from src.models.transaction import Transaction
 from src.models.user import User
 from src.repositories.account_repository import AccountRepository
 from src.repositories.card_repository import CardRepository
 from src.repositories.transaction_repository import TransactionRepository
+from src.schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
+from src.schemas.transaction import (
+    TransactionFilterParams,
+    TransactionResponse,
+)
 from src.services.audit_service import AuditService
 from src.services.currency_service import CurrencyService
 from src.services.permission_service import PermissionService
@@ -393,6 +398,92 @@ class TransactionService:
             sort_order=sort_order,
             skip=skip,
             limit=limit,
+        )
+
+    async def search_transactions_paginated(
+        self,
+        account_id: uuid.UUID,
+        current_user: User,
+        pagination: PaginationParams,
+        filters: TransactionFilterParams,
+    ) -> PaginatedResponse[TransactionResponse]:
+        """
+        Search transactions with pagination and filters.
+
+        Args:
+            account_id: Account to search in
+            current_user: Currently authenticated user
+            pagination: Pagination parameters (page, page_size)
+            filters: Filter parameters (dates, amounts, description, etc.)
+
+        Returns:
+            PaginatedResponse with TransactionResponse objects and metadata
+
+        Raises:
+            AuthorizationError: If user doesn't have account access
+
+        Example:
+            response = await transaction_service.search_transactions_paginated(
+                account_id=account.id,
+                current_user=user,
+                pagination=PaginationParams(page=1, page_size=20),
+                filters=TransactionFilterParams(
+                    description="grocery",
+                    amount_min=Decimal("10.00")
+                )
+            )
+        """
+        # Check user has account access (VIEWER or higher)
+        has_permission = await self.permission_service.check_permission(
+            user_id=current_user.id,
+            account_id=account_id,
+            required_permission=PermissionLevel.viewer,
+        )
+
+        if not has_permission:
+            logger.warning(
+                f"User {current_user.id} attempted to search transactions for account {account_id} without permission"
+            )
+            raise AuthorizationError(
+                "You don't have permission to view transactions for this account"
+            )
+
+        # Delegate to repository
+        transactions, total = await self.transaction_repo.search_transactions(
+            account_id=account_id,
+            date_from=filters.date_from,
+            date_to=filters.date_to,
+            amount_min=filters.amount_min,
+            amount_max=filters.amount_max,
+            description=filters.description,
+            merchant=filters.merchant,
+            transaction_type=filters.transaction_type,
+            card_id=filters.card_id,
+            card_type=filters.card_type,
+            sort_by=filters.sort_by,
+            sort_order=filters.sort_order,
+            skip=pagination.offset,
+            limit=pagination.page_size,
+        )
+
+        # Convert to TransactionResponse
+        transaction_items = [
+            TransactionResponse.model_validate(t) for t in transactions
+        ]
+
+        # Calculate total pages
+        total_pages = PaginationParams.calculate_total_pages(
+            total, pagination.page_size
+        )
+
+        return PaginatedResponse(
+            data=transaction_items,
+            meta=PaginationMeta(
+                total=total,
+                page=pagination.page,
+                page_size=pagination.page_size,
+                total_pages=total_pages,
+            ),
         )
 
     async def update_transaction(

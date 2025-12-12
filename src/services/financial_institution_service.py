@@ -17,7 +17,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions import AlreadyExistsError, NotFoundError
-from src.models.audit_log import AuditAction
+from src.models import AuditAction
 from src.models.user import User
 from src.repositories.financial_institution_repository import (
     FinancialInstitutionRepository,
@@ -131,7 +131,7 @@ class FinancialInstitutionService:
             short_name=data.short_name,
             swift_code=data.swift_code,
             routing_number=data.routing_number,
-            country_code=str(data.country_code),
+            country_code=data.country_code,
             institution_type=data.institution_type,
             logo_url=str(data.logo_url) if data.logo_url else None,
             website_url=str(data.website_url) if data.website_url else None,
@@ -253,8 +253,8 @@ class FinancialInstitutionService:
 
     async def list_institutions(
         self,
-        pagination: PaginationParams,
         filters: FinancialInstitutionFilterParams,
+        pagination: PaginationParams,
     ) -> PaginatedResponse[FinancialInstitutionListItem]:
         """
         List financial institutions with pagination and filtering.
@@ -280,22 +280,20 @@ class FinancialInstitutionService:
                 )
             )
         """
-        # Calculate offset
-        offset = (pagination.page - 1) * pagination.page_size
 
         # Get institutions
         institutions = await self.institution_repo.search(
             query_text=filters.search,
-            country_code=str(filters.country_code) if filters.country_code else None,
+            country_code=filters.country_code,
             institution_type=filters.institution_type,
             limit=pagination.page_size,
-            offset=offset,
+            offset=pagination.offset,
         )
 
         # Get total count
-        total_count = await self.institution_repo.count_filtered(
+        total_count = await self.institution_repo.search_count(
             query_text=filters.search,
-            country_code=str(filters.country_code) if filters.country_code else None,
+            country_code=filters.country_code,
             institution_type=filters.institution_type,
         )
 
@@ -399,18 +397,18 @@ class FinancialInstitutionService:
             institution.routing_number = data.routing_number
 
         # Update other fields
-        if data.name is not None:
+        if data.name is not None and data.name != institution.name:
             changes["name"] = {"old": institution.name, "new": data.name}
             institution.name = data.name
 
-        if data.short_name is not None:
+        if data.short_name is not None and data.short_name != institution.short_name:
             changes["short_name"] = {
                 "old": institution.short_name,
                 "new": data.short_name,
             }
             institution.short_name = data.short_name
 
-        if data.country_code is not None:
+        if data.country_code is not None and data.country_code != institution.country_code:
             changes["country_code"] = {
                 "old": institution.country_code,
                 "new": str(data.country_code),
@@ -528,5 +526,3 @@ class FinancialInstitutionService:
             ip_address=ip_address,
             user_agent=user_agent,
         )
-
-        return FinancialInstitutionResponse.model_validate(institution)

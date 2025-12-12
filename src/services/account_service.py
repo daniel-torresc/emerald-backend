@@ -25,7 +25,7 @@ from src.exceptions import (
     ValidationError,
 )
 from src.models.account import Account, AccountShare
-from src.models.audit_log import AuditAction
+from src.models import AuditAction
 from src.models.enums import PermissionLevel
 from src.models.user import User
 from src.repositories import FinancialInstitutionRepository
@@ -33,6 +33,8 @@ from src.repositories.account_repository import AccountRepository
 from src.repositories.account_share_repository import AccountShareRepository
 from src.repositories.account_type_repository import AccountTypeRepository
 from src.repositories.user_repository import UserRepository
+from src.schemas.account import AccountFilterParams, AccountListItem
+from src.schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
 from src.services.audit_service import AuditService
 from src.services.currency_service import CurrencyService
 from src.services.permission_service import PermissionService
@@ -166,7 +168,9 @@ class AccountService:
             )
 
         # Validate financial institution exists
-        financial_institution = await self.financial_institution_repo.exists(financial_institution_id)
+        financial_institution = await self.financial_institution_repo.exists(
+            financial_institution_id
+        )
         if not financial_institution:
             logger.warning(
                 f"User {user_id} attempted to create account with non existent "
@@ -282,42 +286,36 @@ class AccountService:
 
         return account
 
-    async def list_accounts(
+    async def list_user_accounts(
         self,
         user_id: uuid.UUID,
         current_user: User,
-        skip: int = 0,
-        limit: int = 20,
-        account_type_id: uuid.UUID | None = None,
-        financial_institution_id: uuid.UUID | None = None,
-    ) -> list[Account]:
+        pagination: PaginationParams,
+        filters: AccountFilterParams,
+    ) -> PaginatedResponse[AccountListItem]:
         """
         List all accounts for a user with pagination and filtering.
 
-        Includes both owned accounts and accounts shared with the user.
+        Returns paginated response with metadata.
 
         Args:
             user_id: ID of the user whose accounts to list
             current_user: Currently authenticated user
-            skip: Number of records to skip (pagination)
-            limit: Maximum number of records to return (max 100)
-            is_active: Filter by active status (None = all)
-            account_type_id: Filter by account type ID (None = all types)
-            financial_institution_id: Filter by institution (None = all)
+            pagination: Pagination parameters (page, page_size)
+            filters: Filter parameters (account_type_id, financial_institution_id)
 
         Returns:
-            List of Account instances (owned + shared)
+            PaginatedResponse with AccountListItem instances and metadata
 
         Raises:
             PermissionError: If user attempts to list another user's accounts
 
         Example:
-            accounts = await account_service.list_accounts(
+            response = await account_service.list_accounts_paginated(
                 user_id=user.id,
                 current_user=user,
-                account_type_id=checking_type_id,
-                financial_institution_id=chase_id,
-                limit=20
+                pagination=PaginationParams(page=1, page_size=20),
+                filters=AccountFilterParams(account_type_id=checking_type_id)
             )
         """
         # User can only list their own accounts (admins can list any user's accounts)
@@ -327,24 +325,20 @@ class AccountService:
             )
             raise PermissionError("You can only list your own accounts")
 
-        # Enforce maximum limit
-        if limit > 100:
-            limit = 100
-
         # Get owned accounts (without pagination - we'll paginate the combined results)
         owned_accounts = await self.account_repo.get_by_user(
             user_id=user_id,
             skip=0,
             limit=100,  # Get all owned accounts (up to 100)
-            account_type_id=account_type_id,
-            financial_institution_id=financial_institution_id,
+            account_type_id=filters.account_type_id,
+            financial_institution_id=filters.financial_institution_id,
         )
 
         # Get shared accounts (accounts where user has a share)
         shared_accounts = await self.account_repo.get_shared_with_user(
             user_id=user_id,
-            account_type_id=account_type_id,
-            financial_institution_id=financial_institution_id,
+            account_type_id=filters.account_type_id,
+            financial_institution_id=filters.financial_institution_id,
         )
 
         # Combine and deduplicate (in case user owns AND has a share on same account)
@@ -356,10 +350,33 @@ class AccountService:
                 all_accounts.append(shared_acc)
                 account_ids_seen.add(shared_acc.id)
 
+        # Get total count
+        total = len(all_accounts)
+
         # Apply pagination to combined results
-        # Note: This combines owned+shared before pagination
-        # For a production system, we'd want to do pagination at the DB level
-        return all_accounts[skip : skip + limit]
+        paginated_accounts = all_accounts[
+            pagination.offset : pagination.offset + pagination.page_size
+        ]
+
+        # Convert to AccountListItem
+        account_items = [
+            AccountListItem.model_validate(account) for account in paginated_accounts
+        ]
+
+        # Calculate total pages
+        total_pages = PaginationParams.calculate_total_pages(
+            total, pagination.page_size
+        )
+
+        return PaginatedResponse(
+            data=account_items,
+            meta=PaginationMeta(
+                total=total,
+                page=pagination.page,
+                page_size=pagination.page_size,
+                total_pages=total_pages,
+            ),
+        )
 
     async def update_account(
         self,

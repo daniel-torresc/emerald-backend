@@ -426,6 +426,7 @@ class TestListUsers:
         """Test listing users with filters."""
         # Setup
         pagination = PaginationParams(page=1, page_size=10)
+        filters = UserFilterParams(is_superuser=False, search="john")
 
         mock_user_repo.filter_users.return_value = []
         mock_user_repo.count_filtered.return_value = 0

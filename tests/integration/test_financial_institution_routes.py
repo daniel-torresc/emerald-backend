@@ -682,8 +682,7 @@ class TestFinancialInstitutionRoutes:
         )
 
         assert response.status_code == 200
-        data = response.json()
-
+        response.json()
 
     async def test_deactivate_institution_non_admin_forbidden(
         self, async_client: AsyncClient, user_token: dict, admin_token: dict

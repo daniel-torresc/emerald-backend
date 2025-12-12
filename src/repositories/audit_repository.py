@@ -13,7 +13,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.audit_log import AuditAction, AuditLog, AuditStatus
+from src.models import AuditAction, AuditStatus
+from src.models.audit_log import AuditLog
 
 
 class AuditLogRepository:
@@ -300,6 +301,54 @@ class AuditLogRepository:
             .select_from(AuditLog)
             .where(AuditLog.user_id == user_id)
         )
+
+        # Apply filters
+        if action:
+            query = query.where(AuditLog.action == action)
+
+        if entity_type:
+            query = query.where(AuditLog.entity_type == entity_type)
+
+        if status:
+            query = query.where(AuditLog.status == status)
+
+        if start_date:
+            query = query.where(AuditLog.created_at >= start_date)
+
+        if end_date:
+            query = query.where(AuditLog.created_at <= end_date)
+
+        result = await self.session.execute(query)
+        return result.scalar_one()
+
+    async def count_all_logs(
+        self,
+        action: AuditAction | None = None,
+        entity_type: str | None = None,
+        status: AuditStatus | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> int:
+        """
+        Count all audit logs with filters (admin only).
+
+        Used for pagination metadata.
+
+        Args:
+            action: Filter by action type
+            entity_type: Filter by entity type
+            status: Filter by status
+            start_date: Filter logs after this date
+            end_date: Filter logs before this date
+
+        Returns:
+            Total count of matching logs
+
+        Example:
+            total = await audit_repo.count_all_logs()
+            total_pages = (total + limit - 1) // limit
+        """
+        query = select(func.count()).select_from(AuditLog)
 
         # Apply filters
         if action:

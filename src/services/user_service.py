@@ -20,7 +20,7 @@ from src.exceptions import (
     InsufficientPermissionsError,
     NotFoundError,
 )
-from src.models.audit_log import AuditAction
+from src.models import AuditAction
 from src.models.user import User
 from src.repositories.refresh_token_repository import RefreshTokenRepository
 from src.repositories.user_repository import UserRepository

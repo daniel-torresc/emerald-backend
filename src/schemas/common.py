@@ -41,6 +41,46 @@ class PaginationParams(BaseModel):
             return 100
         return value
 
+    @property
+    def offset(self) -> int:
+        """
+        Calculate SQL OFFSET from page number.
+
+        Returns:
+            Offset value for SQL query (0-indexed)
+
+        Example:
+            >>> params = PaginationParams(page=1, page_size=20)
+            >>> params.offset
+            0
+            >>> params = PaginationParams(page=2, page_size=20)
+            >>> params.offset
+            20
+        """
+        return (self.page - 1) * self.page_size
+
+    @staticmethod
+    def calculate_total_pages(total: int, page_size: int) -> int:
+        """
+        Calculate total pages from total count.
+
+        Args:
+            total: Total number of items
+            page_size: Number of items per page
+
+        Returns:
+            Total number of pages (0 if no items)
+
+        Example:
+            >>> PaginationParams.calculate_total_pages(100, 20)
+            5
+            >>> PaginationParams.calculate_total_pages(95, 20)
+            5
+            >>> PaginationParams.calculate_total_pages(0, 20)
+            0
+        """
+        return (total + page_size - 1) // page_size if total > 0 else 0
+
 
 class PaginationMeta(BaseModel):
     """

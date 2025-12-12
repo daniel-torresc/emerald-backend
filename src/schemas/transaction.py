@@ -542,6 +542,8 @@ class TransactionSplitRequest(BaseModel):
 
 class TransactionSearchParams(BaseModel):
     """
+    DEPRECATED: Use TransactionFilterParams + PaginationParams instead.
+
     Query parameters for transaction search/filtering.
 
     All fields are optional - if not provided, no filter is applied.
@@ -632,4 +634,85 @@ class TransactionSearchParams(BaseModel):
         ge=1,
         le=100,
         description="Maximum records to return (max 100)",
+    )
+
+
+class TransactionFilterParams(BaseModel):
+    """
+    Query parameters for filtering transactions.
+
+    All fields are optional - if not provided, no filter is applied.
+    Pagination is handled separately via PaginationParams.
+
+    Attributes:
+        date_from: Filter from this date (inclusive)
+        date_to: Filter to this date (inclusive)
+        amount_min: Minimum amount (inclusive)
+        amount_max: Maximum amount (inclusive)
+        description: Fuzzy search on description
+        merchant: Fuzzy search on merchant
+        transaction_type: Filter by type
+        card_id: Filter by specific card UUID
+        card_type: Filter by card type (credit_card or debit_card)
+        sort_by: Sort field (transaction_date, amount, description, created_at)
+        sort_order: Sort order (asc or desc)
+    """
+
+    date_from: date | None = Field(
+        default=None,
+        description="Filter from this date (inclusive)",
+    )
+
+    date_to: date | None = Field(
+        default=None,
+        description="Filter to this date (inclusive)",
+    )
+
+    amount_min: Decimal | None = Field(
+        default=None,
+        description="Minimum amount (inclusive)",
+    )
+
+    amount_max: Decimal | None = Field(
+        default=None,
+        description="Maximum amount (inclusive)",
+    )
+
+    description: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Fuzzy search on description (handles typos)",
+    )
+
+    merchant: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Fuzzy search on merchant (handles typos)",
+    )
+
+    transaction_type: TransactionType | None = Field(
+        default=None,
+        description="Filter by transaction type",
+    )
+
+    card_id: uuid.UUID | None = Field(
+        default=None,
+        description="Filter by specific card UUID",
+    )
+
+    card_type: CardType | None = Field(
+        default=None,
+        description="Filter by card type (credit_card or debit_card)",
+    )
+
+    sort_by: str = Field(
+        default="transaction_date",
+        pattern="^(transaction_date|amount|description|created_at)$",
+        description="Sort field",
+    )
+
+    sort_order: str = Field(
+        default="desc",
+        pattern="^(asc|desc)$",
+        description="Sort order",
     )

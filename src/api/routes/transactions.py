@@ -21,11 +21,11 @@ from src.api.dependencies import (
     require_active_user,
 )
 from src.models.user import User
+from src.schemas.common import PaginatedResponse, PaginationParams
 from src.schemas.transaction import (
     TransactionCreate,
-    TransactionListResponse,
+    TransactionFilterParams,
     TransactionResponse,
-    TransactionSearchParams,
     TransactionSplitRequest,
     TransactionUpdate,
 )
@@ -109,7 +109,7 @@ async def create_transaction(
 
 @router.get(
     "/accounts/{account_id}/transactions",
-    response_model=TransactionListResponse,
+    response_model=PaginatedResponse[TransactionResponse],
     summary="List and search transactions",
     description="""
     List transactions for an account with advanced search and filtering.
@@ -134,14 +134,17 @@ async def create_transaction(
 async def list_transactions(
     request: Request,
     account_id: uuid.UUID = Path(description="Account UUID"),
-    search_params: TransactionSearchParams = Depends(),
+    pagination: PaginationParams = Depends(),
+    filters: TransactionFilterParams = Depends(),
     current_user: User = Depends(require_active_user),
     transaction_service: TransactionService = Depends(get_transaction_service),
-) -> TransactionListResponse:
+) -> PaginatedResponse[TransactionResponse]:
     """
     List and search transactions for an account.
 
     Query parameters:
+        - page: Page number (default: 1)
+        - page_size: Items per page (default: 20, max: 100)
         - date_from: Filter from this date (inclusive)
         - date_to: Filter to this date (inclusive)
         - amount_min: Minimum amount (inclusive)
@@ -149,41 +152,23 @@ async def list_transactions(
         - description: Fuzzy search on description (handles typos)
         - merchant: Fuzzy search on merchant (handles typos)
         - transaction_type: Filter by type
+        - card_id: Filter by card UUID
+        - card_type: Filter by card type (credit_card or debit_card)
         - sort_by: Sort field (transaction_date, amount, description, created_at)
         - sort_order: Sort order (asc or desc)
-        - skip: Number of records to skip (pagination)
-        - limit: Maximum records to return (max 100)
 
     Returns:
-        TransactionListResponse with items and total count
+        PaginatedResponse with transactions and pagination metadata
 
     Requires:
         - Valid access token
         - VIEWER or higher permission on account
     """
-    transactions, total = await transaction_service.search_transactions(
+    return await transaction_service.search_transactions_paginated(
         account_id=account_id,
         current_user=current_user,
-        date_from=search_params.date_from,
-        date_to=search_params.date_to,
-        amount_min=search_params.amount_min,
-        amount_max=search_params.amount_max,
-        description=search_params.description,
-        merchant=search_params.merchant,
-        transaction_type=search_params.transaction_type,
-        card_id=search_params.card_id,
-        card_type=search_params.card_type,
-        sort_by=search_params.sort_by,
-        sort_order=search_params.sort_order,
-        skip=search_params.skip,
-        limit=search_params.limit,
-    )
-
-    return TransactionListResponse(
-        items=[TransactionResponse.model_validate(t) for t in transactions],
-        total=total,
-        skip=search_params.skip,
-        limit=search_params.limit,
+        pagination=pagination,
+        filters=filters,
     )
 
 
