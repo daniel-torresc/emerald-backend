@@ -460,7 +460,7 @@ class AuditService:
         end_date: datetime | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> list[AuditLog]:
+    ) -> tuple[list[AuditLog], int]:
         """
         Get all audit logs with filtering (admin only).
 
@@ -474,16 +474,16 @@ class AuditService:
             limit: Maximum number of records to return
 
         Returns:
-            List of AuditLog instances
+            Tuple of (list of AuditLog instances, total count)
 
         Example:
             # Get all failed login attempts in last week
-            logs = await audit_service.get_all_audit_logs(
+            logs, total = await audit_service.get_all_audit_logs(
                 action=AuditAction.LOGIN_FAILED,
                 start_date=datetime.now(UTC) - timedelta(days=7)
             )
         """
-        return await self.audit_repo.get_all_logs(
+        logs = await self.audit_repo.get_all_logs(
             action=action,
             entity_type=entity_type,
             status=status,
@@ -492,3 +492,13 @@ class AuditService:
             skip=skip,
             limit=limit,
         )
+
+        total = await self.audit_repo.count_all_logs(
+            action=action,
+            entity_type=entity_type,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return logs, total

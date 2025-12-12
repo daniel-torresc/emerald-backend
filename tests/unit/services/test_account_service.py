@@ -45,7 +45,7 @@ class TestAccountService:
         assert account.currency == "USD"
         assert account.opening_balance == Decimal("1500.00")
         assert account.current_balance == Decimal("1500.00")
-        
+
         assert account.created_by == test_user.id
         assert account.updated_by == test_user.id
 

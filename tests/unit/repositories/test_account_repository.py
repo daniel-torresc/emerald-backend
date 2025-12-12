@@ -46,7 +46,7 @@ class TestAccountRepository:
         assert account.currency == "USD"
         assert account.opening_balance == Decimal("1000.00")
         assert account.current_balance == Decimal("1000.00")
-        
+
         assert account.deleted_at is None
 
     async def test_get_by_id(
@@ -167,7 +167,6 @@ class TestAccountRepository:
 
         active_accounts = await repo.get_by_user(user_id=test_user.id)
         assert len(active_accounts) == 2
-        
 
         # Filter by account_type_id
         savings_accounts = await repo.get_by_user(

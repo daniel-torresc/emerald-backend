@@ -646,11 +646,12 @@ class TestGetAllAuditLogs:
             ),
         ]
         mock_audit_repo.get_all_logs.return_value = mock_logs
+        mock_audit_repo.count_all_logs.return_value = len(mock_logs)
 
         start_date = datetime.now(UTC) - timedelta(days=7)
 
         # Execute
-        logs = await audit_service.get_all_audit_logs(
+        logs, total = await audit_service.get_all_audit_logs(
             action=AuditAction.LOGIN_FAILED,
             status=AuditStatus.FAILURE,
             start_date=start_date,
@@ -660,6 +661,7 @@ class TestGetAllAuditLogs:
 
         # Verify
         assert logs == mock_logs
+        assert total == len(mock_logs)
         mock_audit_repo.get_all_logs.assert_called_once_with(
             action=AuditAction.LOGIN_FAILED,
             entity_type=None,
@@ -668,6 +670,13 @@ class TestGetAllAuditLogs:
             end_date=None,
             skip=0,
             limit=50,
+        )
+        mock_audit_repo.count_all_logs.assert_called_once_with(
+            action=AuditAction.LOGIN_FAILED,
+            entity_type=None,
+            status=AuditStatus.FAILURE,
+            start_date=start_date,
+            end_date=None,
         )
 
     @pytest.mark.asyncio
@@ -684,13 +693,16 @@ class TestGetAllAuditLogs:
             for _ in range(100)
         ]
         mock_audit_repo.get_all_logs.return_value = mock_logs
+        mock_audit_repo.count_all_logs.return_value = len(mock_logs)
 
         # Execute
-        logs = await audit_service.get_all_audit_logs()
+        logs, total = await audit_service.get_all_audit_logs()
 
         # Verify
         assert len(logs) == 100
+        assert total == 100
         mock_audit_repo.get_all_logs.assert_called_once()
+        mock_audit_repo.count_all_logs.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_all_audit_logs_by_entity_type(
@@ -713,9 +725,10 @@ class TestGetAllAuditLogs:
             ),
         ]
         mock_audit_repo.get_all_logs.return_value = mock_logs
+        mock_audit_repo.count_all_logs.return_value = len(mock_logs)
 
         # Execute
-        logs = await audit_service.get_all_audit_logs(
+        logs, total = await audit_service.get_all_audit_logs(
             entity_type="transaction",
             skip=0,
             limit=20,
@@ -723,5 +736,7 @@ class TestGetAllAuditLogs:
 
         # Verify
         assert logs == mock_logs
+        assert total == len(mock_logs)
         call_args = mock_audit_repo.get_all_logs.call_args[1]
         assert call_args["entity_type"] == "transaction"
+        mock_audit_repo.count_all_logs.assert_called_once()

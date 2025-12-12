@@ -7,9 +7,8 @@ This module provides:
 """
 
 import logging
-from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Request
 
 from src.api.dependencies import (
     get_audit_service,
@@ -18,8 +17,12 @@ from src.api.dependencies import (
 )
 from src.models.audit_log import AuditAction, AuditStatus
 from src.models.user import User
-from src.schemas.audit import AuditLogResponse
-from src.schemas.common import PaginatedResponse, PaginationMeta
+from src.schemas.audit import AuditLogFilterParams, AuditLogResponse
+from src.schemas.common import (
+    PaginatedResponse,
+    PaginationMeta,
+    PaginationParams,
+)
 from src.services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -35,24 +38,8 @@ router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 )
 async def get_current_user_audit_logs(
     request: Request,
-    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
-    page_size: int = Query(
-        default=20,
-        ge=1,
-        le=100,
-        description="Items per page (max 100)",
-    ),
-    action: str | None = Query(default=None, description="Filter by action type"),
-    entity_type: str | None = Query(default=None, description="Filter by entity type"),
-    status: str | None = Query(default=None, description="Filter by status"),
-    start_date: datetime | None = Query(
-        default=None,
-        description="Filter logs after this date (ISO 8601)",
-    ),
-    end_date: datetime | None = Query(
-        default=None,
-        description="Filter logs before this date (ISO 8601)",
-    ),
+    pagination: PaginationParams = Depends(),
+    filters: AuditLogFilterParams = Depends(),
     current_user: User = Depends(require_active_user),
     audit_service: AuditService = Depends(get_audit_service),
 ) -> PaginatedResponse[AuditLogResponse]:
@@ -81,32 +68,32 @@ async def get_current_user_audit_logs(
     """
 
     # Convert string parameters to enums if provided
-    action_enum = AuditAction[action] if action else None
-    status_enum = AuditStatus[status] if status else None
+    action_enum = AuditAction[filters.action] if filters.action else None
+    status_enum = AuditStatus[filters.status] if filters.status else None
 
     logs, total = await audit_service.get_user_audit_logs(
         user_id=current_user.id,
         action=action_enum,
-        entity_type=entity_type,
+        entity_type=filters.entity_type,
         status=status_enum,
-        start_date=start_date,
-        end_date=end_date,
-        skip=(page - 1) * page_size,
-        limit=page_size,
+        start_date=filters.start_date,
+        end_date=filters.end_date,
+        skip=pagination.offset,
+        limit=pagination.page_size,
     )
 
     # Convert to response schemas
     log_responses = [AuditLogResponse.model_validate(log) for log in logs]
 
     # Calculate total pages
-    total_pages = (total + page_size - 1) // page_size
+    total_pages = PaginationParams.calculate_total_pages(total, pagination.page_size)
 
     return PaginatedResponse(
         data=log_responses,
         meta=PaginationMeta(
             total=total,
-            page=page,
-            page_size=page_size,
+            page=pagination.page,
+            page_size=pagination.page_size,
             total_pages=total_pages,
         ),
     )
@@ -120,24 +107,8 @@ async def get_current_user_audit_logs(
 )
 async def get_all_audit_logs(
     request: Request,
-    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
-    page_size: int = Query(
-        default=20,
-        ge=1,
-        le=100,
-        description="Items per page (max 100)",
-    ),
-    action: str | None = Query(default=None, description="Filter by action type"),
-    entity_type: str | None = Query(default=None, description="Filter by entity type"),
-    status: str | None = Query(default=None, description="Filter by status"),
-    start_date: datetime | None = Query(
-        default=None,
-        description="Filter logs after this date (ISO 8601)",
-    ),
-    end_date: datetime | None = Query(
-        default=None,
-        description="Filter logs before this date (ISO 8601)",
-    ),
+    pagination: PaginationParams = Depends(),
+    filters: AuditLogFilterParams = Depends(),
     current_user: User = Depends(require_admin),
     audit_service: AuditService = Depends(get_audit_service),
 ) -> PaginatedResponse[AuditLogResponse]:
@@ -166,34 +137,32 @@ async def get_all_audit_logs(
     """
 
     # Convert string parameters to enums if provided
-    action_enum = AuditAction[action] if action else None
-    status_enum = AuditStatus[status] if status else None
+    action_enum = AuditAction[filters.action] if filters.action else None
+    status_enum = AuditStatus[filters.status] if filters.status else None
 
-    # Note: get_all_audit_logs doesn't return total, so we need to get it separately
-    logs = await audit_service.get_all_audit_logs(
+    # Get logs and total count (BUG FIX: now returns correct total count)
+    logs, total = await audit_service.get_all_audit_logs(
         action=action_enum,
-        entity_type=entity_type,
+        entity_type=filters.entity_type,
         status=status_enum,
-        start_date=start_date,
-        end_date=end_date,
-        skip=(page - 1) * page_size,
-        limit=page_size,
+        start_date=filters.start_date,
+        end_date=filters.end_date,
+        skip=pagination.offset,
+        limit=pagination.page_size,
     )
-
-    # TODO: Add count method to audit service for total count
-    # For now, return the actual count of returned logs
-    total = len(logs)
-    total_pages = 1 if logs else 0
 
     # Convert to response schemas
     log_responses = [AuditLogResponse.model_validate(log) for log in logs]
+
+    # Calculate total pages
+    total_pages = PaginationParams.calculate_total_pages(total, pagination.page_size)
 
     return PaginatedResponse(
         data=log_responses,
         meta=PaginationMeta(
             total=total,
-            page=page,
-            page_size=page_size,
+            page=pagination.page,
+            page_size=pagination.page_size,
             total_pages=total_pages,
         ),
     )

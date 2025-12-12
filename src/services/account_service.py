@@ -166,7 +166,9 @@ class AccountService:
             )
 
         # Validate financial institution exists
-        financial_institution = await self.financial_institution_repo.exists(financial_institution_id)
+        financial_institution = await self.financial_institution_repo.exists(
+            financial_institution_id
+        )
         if not financial_institution:
             logger.warning(
                 f"User {user_id} attempted to create account with non existent "
