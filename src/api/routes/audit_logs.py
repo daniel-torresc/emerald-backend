@@ -67,15 +67,12 @@ async def get_current_user_audit_logs(
         - Active user account
     """
 
-    # Convert string parameters to enums if provided
-    action_enum = AuditAction[filters.action] if filters.action else None
-    status_enum = AuditStatus[filters.status] if filters.status else None
-
+    # Get logs and total count
     logs, total = await audit_service.get_user_audit_logs(
         user_id=current_user.id,
-        action=action_enum,
+        action=filters.action,
         entity_type=filters.entity_type,
-        status=status_enum,
+        status=filters.status,
         start_date=filters.start_date,
         end_date=filters.end_date,
         skip=pagination.offset,
@@ -136,15 +133,11 @@ async def get_all_audit_logs(
         - 403 Forbidden: If user is not admin
     """
 
-    # Convert string parameters to enums if provided
-    action_enum = AuditAction[filters.action] if filters.action else None
-    status_enum = AuditStatus[filters.status] if filters.status else None
-
-    # Get logs and total count (BUG FIX: now returns correct total count)
+    # Get logs and total count
     logs, total = await audit_service.get_all_audit_logs(
-        action=action_enum,
+        action=filters.action,
         entity_type=filters.entity_type,
-        status=status_enum,
+        status=filters.status,
         start_date=filters.start_date,
         end_date=filters.end_date,
         skip=pagination.offset,

@@ -10,7 +10,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions import AuthorizationError, NotFoundError
-from src.models.audit_log import AuditAction, AuditStatus
+from src.models import AuditAction, AuditStatus
 from src.models.enums import CardType
 from src.models.user import User
 from src.repositories.account_repository import AccountRepository

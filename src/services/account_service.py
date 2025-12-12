@@ -25,7 +25,7 @@ from src.exceptions import (
     ValidationError,
 )
 from src.models.account import Account, AccountShare
-from src.models.audit_log import AuditAction
+from src.models import AuditAction
 from src.models.enums import PermissionLevel
 from src.models.user import User
 from src.repositories import FinancialInstitutionRepository

@@ -10,7 +10,6 @@ This module implements immutable audit logging for:
 Audit logs are WRITE-ONCE - they cannot be modified or deleted after creation.
 """
 
-import enum
 import uuid
 from datetime import UTC, datetime
 from typing import Any, Optional
@@ -20,64 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
-
-
-class AuditAction(str, enum.Enum):
-    """
-    Enumeration of audit log action types.
-
-    These actions are logged for compliance and security monitoring.
-    """
-
-    # Authentication actions
-    LOGIN = "LOGIN"
-    LOGOUT = "LOGOUT"
-    LOGIN_FAILED = "LOGIN_FAILED"
-    PASSWORD_CHANGE = "PASSWORD_CHANGE"
-    TOKEN_REFRESH = "TOKEN_REFRESH"
-
-    # CRUD actions (data modifications)
-    CREATE = "CREATE"
-    READ = "READ"
-    UPDATE = "UPDATE"
-    DELETE = "DELETE"
-
-    # Transaction-specific actions
-    SPLIT_TRANSACTION = "SPLIT_TRANSACTION"
-    JOIN_TRANSACTION = "JOIN_TRANSACTION"
-
-    # Financial institution actions
-    CREATE_FINANCIAL_INSTITUTION = "CREATE_FINANCIAL_INSTITUTION"
-    UPDATE_FINANCIAL_INSTITUTION = "UPDATE_FINANCIAL_INSTITUTION"
-    DEACTIVATE_FINANCIAL_INSTITUTION = "DEACTIVATE_FINANCIAL_INSTITUTION"
-
-    # Account type actions
-    CREATE_ACCOUNT_TYPE = "CREATE_ACCOUNT_TYPE"
-    UPDATE_ACCOUNT_TYPE = "UPDATE_ACCOUNT_TYPE"
-    DEACTIVATE_ACCOUNT_TYPE = "DEACTIVATE_ACCOUNT_TYPE"
-
-    # Authorization actions
-    PERMISSION_GRANT = "PERMISSION_GRANT"
-    PERMISSION_REVOKE = "PERMISSION_REVOKE"
-
-    # Administrative actions
-    ACCOUNT_ACTIVATE = "ACCOUNT_ACTIVATE"
-    ACCOUNT_DEACTIVATE = "ACCOUNT_DEACTIVATE"
-    ACCOUNT_LOCK = "ACCOUNT_LOCK"
-    ACCOUNT_UNLOCK = "ACCOUNT_UNLOCK"
-
-    # Security events
-    RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
-    INVALID_TOKEN = "INVALID_TOKEN"
-    PERMISSION_DENIED = "PERMISSION_DENIED"
-
-
-class AuditStatus(str, enum.Enum):
-    """Status of the audited action."""
-
-    SUCCESS = "SUCCESS"
-    FAILURE = "FAILURE"
-    PARTIAL = "PARTIAL"
+from src.models.enums import AuditAction, AuditStatus
 
 
 class AuditLog(Base):

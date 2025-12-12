@@ -24,7 +24,7 @@ from src.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from src.models.audit_log import AuditAction
+from src.models import AuditAction
 from src.models.enums import CardType, PermissionLevel, TransactionType
 from src.models.transaction import Transaction
 from src.models.user import User
