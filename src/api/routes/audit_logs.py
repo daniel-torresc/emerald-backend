@@ -15,7 +15,6 @@ from src.api.dependencies import (
     require_active_user,
     require_admin,
 )
-from src.models.audit_log import AuditAction, AuditStatus
 from src.models.user import User
 from src.schemas.audit import AuditLogFilterParams, AuditLogResponse
 from src.schemas.common import (

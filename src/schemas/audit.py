@@ -95,7 +95,9 @@ class AuditLogFilterParams(BaseModel):
     """
 
     user_id: UUID | None = Field(default=None, description="Filter by user ID")
-    action: AuditAction | None = Field(default=None, description="Filter by action type")
+    action: AuditAction | None = Field(
+        default=None, description="Filter by action type"
+    )
     entity_type: str | None = Field(
         default=None,
         description="Filter by entity type",

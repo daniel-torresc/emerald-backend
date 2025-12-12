@@ -13,7 +13,7 @@ This module provides:
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
 from src.api.dependencies import (
     get_user_service,
@@ -155,23 +155,8 @@ async def get_user_by_id(
 )
 async def list_users(
     request: Request,
-    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
-    page_size: int = Query(
-        default=20,
-        ge=1,
-        le=100,
-        description="Items per page (max 100)",
-    ),
-    is_superuser: bool | None = Query(
-        default=None,
-        description="Filter by superuser status",
-    ),
-    search: str | None = Query(
-        default=None,
-        min_length=1,
-        max_length=100,
-        description="Search in email or username",
-    ),
+    pagination: PaginationParams = Depends(),
+    filters: UserFilterParams = Depends(),
     current_user: User = Depends(require_admin),
     user_service: UserService = Depends(get_user_service),
 ) -> PaginatedResponse[UserListItem]:
@@ -195,12 +180,6 @@ async def list_users(
     Raises:
         - 403 Forbidden: If user is not admin
     """
-
-    pagination = PaginationParams(page=page, page_size=page_size)
-    filters = UserFilterParams(
-        is_superuser=is_superuser,
-        search=search,
-    )
 
     return await user_service.list_users(
         pagination=pagination,

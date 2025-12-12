@@ -10,7 +10,13 @@ from src.models.account_type import AccountType
 from src.models.audit_log import AuditLog
 from src.models.base import Base
 from src.models.card import Card
-from src.models.enums import AuditAction, AuditStatus, CardType, PermissionLevel, TransactionType
+from src.models.enums import (
+    AuditAction,
+    AuditStatus,
+    CardType,
+    PermissionLevel,
+    TransactionType,
+)
 from src.models.financial_institution import FinancialInstitution
 from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 from src.models.refresh_token import RefreshToken
