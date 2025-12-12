@@ -243,3 +243,31 @@ class CardListItem(BaseModel):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CardFilterParams(BaseModel):
+    """
+    Query parameters for filtering cards.
+
+    All fields are optional - if not provided, no filter is applied.
+
+    Attributes:
+        card_type: Filter by card type (credit_card or debit_card)
+        account_id: Filter by account ID
+        include_deleted: Include soft-deleted cards in results
+    """
+
+    card_type: CardType | None = Field(
+        default=None,
+        description="Filter by card type (credit_card or debit_card)",
+    )
+
+    account_id: uuid.UUID | None = Field(
+        default=None,
+        description="Filter by account ID",
+    )
+
+    include_deleted: bool = Field(
+        default=False,
+        description="Include soft-deleted cards in results",
+    )
