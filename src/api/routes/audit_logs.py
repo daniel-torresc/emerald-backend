@@ -35,10 +35,10 @@ router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
     summary="Get current user's audit logs",
     description="Get audit logs for the currently authenticated user (GDPR right to access)",
 )
-async def get_current_user_audit_logs(
+async def list_user_audit_logs(
     request: Request,
-    pagination: PaginationParams = Depends(),
     filters: AuditLogFilterParams = Depends(),
+    pagination: PaginationParams = Depends(),
     current_user: User = Depends(require_active_user),
     audit_service: AuditService = Depends(get_audit_service),
 ) -> PaginatedResponse[AuditLogResponse]:

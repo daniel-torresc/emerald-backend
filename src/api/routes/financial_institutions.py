@@ -90,8 +90,8 @@ async def create_institution(
     description="List financial institutions with optional filtering and pagination",
 )
 async def list_institutions(
-    pagination: PaginationParams = Depends(),
     filters: FinancialInstitutionFilterParams = Depends(),
+    pagination: PaginationParams = Depends(),
     current_user: User = Depends(require_active_user),
     service: FinancialInstitutionService = Depends(get_financial_institution_service),
 ) -> PaginatedResponse[FinancialInstitutionListItem]:

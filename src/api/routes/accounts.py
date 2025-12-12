@@ -165,8 +165,8 @@ async def create_account(
 )
 async def list_accounts(
     request: Request,
-    pagination: PaginationParams = Depends(),
     filters: AccountFilterParams = Depends(),
+    pagination: PaginationParams = Depends(),
     current_user: User = Depends(require_active_user),
     account_service: AccountService = Depends(get_account_service),
 ) -> PaginatedResponse[AccountListItem]:
@@ -186,7 +186,7 @@ async def list_accounts(
         - Valid access token
         - Active user account
     """
-    return await account_service.list_accounts_paginated(
+    return await account_service.list_user_accounts(
         user_id=current_user.id,
         current_user=current_user,
         pagination=pagination,
