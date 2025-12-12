@@ -18,7 +18,14 @@ from src.repositories.card_repository import CardRepository
 from src.repositories.financial_institution_repository import (
     FinancialInstitutionRepository,
 )
-from src.schemas.card import CardCreate, CardListItem, CardResponse, CardUpdate
+from src.schemas.card import (
+    CardCreate,
+    CardFilterParams,
+    CardListItem,
+    CardResponse,
+    CardUpdate,
+)
+from src.schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
 from src.services.audit_service import AuditService
 
 
@@ -211,6 +218,88 @@ class CardService:
         )
 
         return [CardListItem.model_validate(card) for card in cards]
+
+    async def list_cards_paginated(
+        self,
+        current_user: User,
+        pagination: PaginationParams,
+        filters: CardFilterParams,
+    ) -> PaginatedResponse[CardListItem]:
+        """
+        List all cards for the current user with pagination.
+
+        Args:
+            current_user: Authenticated user
+            pagination: Pagination parameters (page, page_size)
+            filters: Filter parameters (card_type, account_id, include_deleted)
+
+        Returns:
+            PaginatedResponse with CardListItem objects and metadata
+
+        Raises:
+            AuthorizationError: If filtering by account user doesn't own
+
+        Example:
+            response = await service.list_cards_paginated(
+                current_user=user,
+                pagination=PaginationParams(page=1, page_size=20),
+                filters=CardFilterParams(card_type=CardType.credit_card)
+            )
+        """
+        # If filtering by account, verify ownership
+        if filters.account_id:
+            account = await self.account_repo.get_by_id(filters.account_id)
+            if not account or account.user_id != current_user.id:
+                raise AuthorizationError("Account does not belong to you")
+
+        # Get cards
+        cards = await self.card_repo.get_by_user(
+            user_id=current_user.id,
+            card_type=filters.card_type,
+            account_id=filters.account_id,
+            include_deleted=filters.include_deleted,
+            skip=pagination.offset,
+            limit=pagination.page_size,
+        )
+
+        # Get total count
+        # Note: count_by_user doesn't support account_id filter, so we'll count all
+        # and filter in-memory for now (acceptable for small datasets)
+        if filters.account_id:
+            # For account filter, we need to get all cards and count them
+            all_cards = await self.card_repo.get_by_user(
+                user_id=current_user.id,
+                card_type=filters.card_type,
+                account_id=filters.account_id,
+                include_deleted=filters.include_deleted,
+                skip=0,
+                limit=1000,  # Reasonable upper limit
+            )
+            total = len(all_cards)
+        else:
+            total = await self.card_repo.count_by_user(
+                user_id=current_user.id,
+                card_type=filters.card_type,
+                include_deleted=filters.include_deleted,
+            )
+
+        # Convert to CardListItem
+        card_items = [CardListItem.model_validate(card) for card in cards]
+
+        # Calculate total pages
+        total_pages = PaginationParams.calculate_total_pages(
+            total, pagination.page_size
+        )
+
+        return PaginatedResponse(
+            data=card_items,
+            meta=PaginationMeta(
+                total=total,
+                page=pagination.page,
+                page_size=pagination.page_size,
+                total_pages=total_pages,
+            ),
+        )
 
     async def update_card(
         self,

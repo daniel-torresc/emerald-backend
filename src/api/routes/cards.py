@@ -11,45 +11,30 @@ This module provides RESTful API endpoints for card management:
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Request, status
 
 from src.api.dependencies import get_card_service, require_active_user
-from src.models.enums import CardType
 from src.models.user import User
-from src.schemas.card import CardCreate, CardListItem, CardResponse, CardUpdate
+from src.schemas.card import (
+    CardCreate,
+    CardFilterParams,
+    CardListItem,
+    CardResponse,
+    CardUpdate,
+)
+from src.schemas.common import PaginatedResponse, PaginationParams
 from src.services.card_service import CardService
 
 router = APIRouter(prefix="/cards", tags=["Cards"])
 
 
-@router.get("", response_model=list[CardListItem])
+@router.get("", response_model=PaginatedResponse[CardListItem])
 async def list_cards(
-    card_type: CardType | None = Query(
-        default=None,
-        description="Filter by card type (credit_card or debit_card)",
-    ),
-    account_id: uuid.UUID | None = Query(
-        default=None,
-        description="Filter by account ID",
-    ),
-    include_deleted: bool = Query(
-        default=False,
-        description="Include soft-deleted cards",
-    ),
-    skip: int = Query(
-        default=0,
-        ge=0,
-        description="Number of records to skip for pagination",
-    ),
-    limit: int = Query(
-        default=100,
-        ge=1,
-        le=100,
-        description="Maximum number of records to return",
-    ),
+    pagination: PaginationParams = Depends(),
+    filters: CardFilterParams = Depends(),
     current_user: User = Depends(require_active_user),
     service: CardService = Depends(get_card_service),
-) -> list[CardListItem]:
+) -> PaginatedResponse[CardListItem]:
     """
     List all cards for the authenticated user.
 
@@ -58,29 +43,24 @@ async def list_cards(
 
     **Authorization**: Requires active user authentication.
 
-    **Filters**:
+    **Query Parameters**:
+    - `page`: Page number (default: 1)
+    - `page_size`: Items per page (default: 20, max: 100)
     - `card_type`: Filter by credit_card or debit_card
     - `account_id`: Filter cards for specific account
     - `include_deleted`: Show soft-deleted cards (default: false)
 
-    **Pagination**:
-    - `skip`: Number of records to skip (default: 0)
-    - `limit`: Max records to return (default: 100, max: 100)
-
-    **Returns**: List of cards with basic details and relationships.
+    **Returns**: Paginated response with cards and metadata.
 
     **Example**:
     ```
-    GET /api/v1/cards?card_type=credit_card&limit=20
+    GET /api/v1/cards?page=1&page_size=20&card_type=credit_card
     ```
     """
-    return await service.list_cards(
+    return await service.list_cards_paginated(
         current_user=current_user,
-        card_type=card_type,
-        account_id=account_id,
-        include_deleted=include_deleted,
-        skip=skip,
-        limit=limit,
+        pagination=pagination,
+        filters=filters,
     )
 
 
