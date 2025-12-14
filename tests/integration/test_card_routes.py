@@ -200,8 +200,14 @@ class TestListCards:
 
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) >= 1
+        # Verify paginated response structure
+        assert "data" in data
+        assert "meta" in data
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) >= 1
+        # Verify pagination metadata
+        assert data["meta"]["page"] == 1
+        assert data["meta"]["total"] >= 1
 
     async def test_list_cards_filter_by_type(
         self,
@@ -230,7 +236,9 @@ class TestListCards:
 
         assert response.status_code == 200
         data = response.json()
-        assert all(card["card_type"] == "credit_card" for card in data)
+        # Verify paginated response with filter
+        assert "data" in data
+        assert all(card["card_type"] == "credit_card" for card in data["data"])
 
     async def test_list_cards_unauthorized(
         self,

@@ -218,8 +218,11 @@ class TestAccountRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 0
+        # Verify paginated response structure
+        assert "data" in data
+        assert "meta" in data
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) == 0
 
     async def test_list_accounts_multiple(
         self,
@@ -251,7 +254,9 @@ class TestAccountRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 3
+        # Verify paginated response
+        assert "data" in data
+        assert len(data["data"]) == 3
 
     async def test_list_accounts_filter_by_type(
         self,
@@ -296,8 +301,10 @@ class TestAccountRoutes:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["account_type"]["key"] == "savings"
+        # Verify paginated response with filter
+        assert "data" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["account_type"]["key"] == "savings"
 
     async def test_list_accounts_filter_by_active(
         self,
@@ -349,8 +356,9 @@ class TestAccountRoutes:
         assert response.status_code == 200
         data = response.json()
         # Should only have the "Still Active" account, not the deleted one
-        assert len(data) == 1
-        assert data[0]["account_name"] == "Still Active"
+        assert "data" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["account_name"] == "Still Active"
 
     async def test_list_accounts_pagination(
         self,

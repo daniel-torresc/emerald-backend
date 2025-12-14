@@ -70,8 +70,11 @@ class TestTransactionAPI:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["total"] >= 3
-        assert len(data["items"]) >= 3
+        # Verify paginated response structure
+        assert "data" in data
+        assert "meta" in data
+        assert data["meta"]["total"] >= 3
+        assert len(data["data"]) >= 3
 
     async def test_get_transaction(
         self, async_client: AsyncClient, test_user: User, user_token: dict, test_account
@@ -1201,9 +1204,9 @@ class TestTransactionCardIntegration:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["total"] >= 2
+        assert data["meta"]["total"] >= 2
         # All returned transactions should have the specified card_id
-        for item in data["items"]:
+        for item in data["data"]:
             assert item["card_id"] == str(test_card.id)
 
     async def test_list_transactions_filter_by_card_type(
@@ -1250,9 +1253,9 @@ class TestTransactionCardIntegration:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["total"] >= 1
+        assert data["meta"]["total"] >= 1
         # All returned transactions should have cards of the specified type
-        for item in data["items"]:
+        for item in data["data"]:
             assert item["card"] is not None
             assert item["card"]["card_type"] == test_card.card_type.value
 
@@ -1288,7 +1291,7 @@ class TestTransactionCardIntegration:
         assert response.status_code == 200
         data = response.json()
         # Verify none of the results are cash transactions
-        for item in data["items"]:
+        for item in data["data"]:
             assert item["card"] is not None, (
                 "card_type filter should exclude cash transactions"
             )
