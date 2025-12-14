@@ -13,21 +13,15 @@ This module provides:
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Request, status
 
-from src.api.dependencies import (
-    get_account_type_service,
-    require_active_user,
-    require_admin,
-)
-from src.models.user import User
+from src.api.dependencies import AccountTypeServiceDep, AdminUser, CurrentUser
 from src.schemas.account_type import (
     AccountTypeCreate,
     AccountTypeListItem,
     AccountTypeResponse,
     AccountTypeUpdate,
 )
-from src.services.account_type_service import AccountTypeService
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +37,9 @@ router = APIRouter(prefix="/account-types", tags=["Account Types"])
 )
 async def create_account_type(
     request: Request,
+    current_user: AdminUser,
     data: AccountTypeCreate,
-    current_user: User = Depends(require_admin),
-    service: AccountTypeService = Depends(get_account_type_service),
+    service: AccountTypeServiceDep,
 ) -> AccountTypeResponse:
     """
     Create a new account type.
@@ -85,8 +79,8 @@ async def create_account_type(
     description="List account types with optional filtering by active status",
 )
 async def list_account_types(
-    current_user: User = Depends(require_active_user),
-    service: AccountTypeService = Depends(get_account_type_service),
+    current_user: CurrentUser,
+    service: AccountTypeServiceDep,
 ) -> list[AccountTypeListItem]:
     """
     List all account types.
@@ -108,9 +102,9 @@ async def list_account_types(
     description="Get detailed information about a specific account type",
 )
 async def get_account_type(
+    current_user: CurrentUser,
     account_type_id: uuid.UUID,
-    current_user: User = Depends(require_active_user),
-    service: AccountTypeService = Depends(get_account_type_service),
+    service: AccountTypeServiceDep,
 ) -> AccountTypeResponse:
     """
     Get account type by ID.
@@ -140,9 +134,9 @@ async def get_account_type(
     description="Lookup account type by unique key identifier",
 )
 async def get_by_key(
+    current_user: CurrentUser,
     key: str,
-    current_user: User = Depends(require_active_user),
-    service: AccountTypeService = Depends(get_account_type_service),
+    service: AccountTypeServiceDep,
 ) -> AccountTypeResponse:
     """
     Get account type by key.
@@ -173,8 +167,8 @@ async def update_account_type(
     request: Request,
     account_type_id: uuid.UUID,
     data: AccountTypeUpdate,
-    current_user: User = Depends(require_admin),
-    service: AccountTypeService = Depends(get_account_type_service),
+    current_user: AdminUser,
+    service: AccountTypeServiceDep,
 ) -> AccountTypeResponse:
     """
     Update account type.
@@ -221,8 +215,8 @@ async def update_account_type(
 async def delete_account_type(
     request: Request,
     account_type_id: uuid.UUID,
-    current_user: User = Depends(require_admin),
-    service: AccountTypeService = Depends(get_account_type_service),
+    current_user: AdminUser,
+    service: AccountTypeServiceDep,
 ) -> None:
     """
     Delete account type (hard delete).

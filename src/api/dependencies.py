@@ -11,14 +11,14 @@ This module provides:
 
 import logging
 import uuid
-from typing import Annotated
+from typing import Annotated, AsyncGenerator
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
 
-from src.core.database import get_db
 from src.core.security import TOKEN_TYPE_ACCESS, decode_token, verify_token_type
 from src.models.user import User
 from src.repositories.user_repository import UserRepository
@@ -36,185 +36,44 @@ from src.services import (
 
 logger = logging.getLogger(__name__)
 
-# Security scheme for Swagger UI - this adds the padlock icon
-security = HTTPBearer(
-    scheme_name="Bearer",
-    description="Enter your JWT access token",
-    auto_error=False,
-)
+
+# ============================================================================
+# Database Dependencies
+# ============================================================================
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db),
-) -> User:
+async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """
-    Dependency to extract and validate current user from JWT access token.
+    Dependency function to provide database session to FastAPI routes.
 
-    This dependency:
-    1. Extracts Bearer token from Authorization header
-    2. Decodes and validates JWT
-    3. Verifies token is an access token (not refresh token)
-    4. Retrieves user from database
-    5. Returns User instance
+    Gets the sessionmaker from app state and yields a session.
+    Ensures proper session cleanup with commit/rollback handling.
 
     Args:
-        credentials: HTTP Bearer credentials from security scheme
-        db: Database session
+        request: FastAPI request object (provides access to app.state)
 
-    Returns:
-        User instance of authenticated user
+    Usage in FastAPI routes:
+        @app.get("/users")
+        async def get_users(db: AsyncSession = Depends(get_db)):
+            # Use db session here
+            ...
 
-    Raises:
-        HTTPException (401): If token is missing, invalid, or user not found
-
-    Usage:
-        @app.get("/api/v1/profile")
-        async def get_profile(
-            current_user: User = Depends(get_current_user)
-        ):
-            return {"email": current_user.email}
-    """
-    # Check if credentials are present
-    if not credentials:
-        logger.warning("Authentication failed: missing Bearer token")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = credentials.credentials
-
-    # Decode and validate token
-    try:
-        token_data = decode_token(token)
-    except JWTError as e:
-        logger.warning(f"Authentication failed: invalid JWT - {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Verify token type (must be access token)
-    if not verify_token_type(token_data, TOKEN_TYPE_ACCESS):
-        logger.warning("Authentication failed: wrong token type")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Extract user ID from token
-    user_id_str = token_data.get("sub")
-    if not user_id_str:
-        logger.warning("Authentication failed: missing user ID in token")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Parse user ID
-    try:
-        user_id = uuid.UUID(user_id_str)
-    except ValueError:
-        logger.warning(f"Authentication failed: invalid user ID format - {user_id_str}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Get user from database
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-
-    if not user:
-        logger.warning(f"Authentication failed: user not found - {user_id}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return user
-
-
-async def require_active_user(
-    current_user: User = Depends(get_current_user),
-) -> User:
-    """
-    Dependency to ensure user is active (not deactivated/banned).
-
-    This dependency extends get_current_user by verifying the user
-    account is active.
-
-    Args:
-        current_user: Current authenticated user
-
-    Returns:
-        User instance (guaranteed to be active)
+    Yields:
+        AsyncSession: Database session for the request
 
     Raises:
-        HTTPException (403): If user account is inactive
-
-    Usage:
-        @app.post("/api/v1/transactions")
-        async def create_transaction(
-            current_user: User = Depends(require_active_user)
-        ):
-            # Only active users can create transactions
-            pass
+        Exception: Re-raises any exception after rolling back transaction
     """
-    # Check if user is soft-deleted (deleted_at is set)
-    if current_user.deleted_at is not None:
-        logger.warning(f"Access denied: deleted user {current_user.id}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive. Please contact support.",
-        )
-
-    return current_user
-
-
-async def require_admin(
-    current_user: User = Depends(require_active_user),
-) -> User:
-    """
-    Dependency to ensure user has admin privileges.
-
-    This dependency extends require_active_user by verifying the user
-    has superuser/admin status.
-
-    Args:
-        current_user: Current authenticated user (must be active)
-
-    Returns:
-        User instance (guaranteed to be active admin)
-
-    Raises:
-        HTTPException (403): If user is not an admin
-
-    Usage:
-        @app.get("/api/v1/admin/users")
-        async def list_all_users(
-            current_user: User = Depends(require_admin)
-        ):
-            # Only admins can list all users
-            pass
-    """
-    if not current_user.is_admin:
-        logger.warning(
-            f"Access denied: user {current_user.id} attempted admin-only action"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Administrator privileges required",
-        )
-
-    return current_user
+    sessionmaker = request.app.state.sessionmaker
+    async with sessionmaker() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 
 
 # ============================================================================
@@ -425,7 +284,170 @@ def get_currency_service(db: AsyncSession = Depends(get_db)) -> CurrencyService:
     return CurrencyService(db)
 
 
+# ============================================================================
+# Security Dependencies
+# ============================================================================
+
+
+# Security scheme for Swagger UI - this adds the padlock icon
+security = HTTPBearer(
+    scheme_name="Bearer",
+    description="Enter your JWT access token",
+    auto_error=False,
+)
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Dependency to extract and validate current user from JWT access token.
+
+    This dependency:
+    1. Extracts Bearer token from Authorization header
+    2. Decodes and validates JWT
+    3. Verifies token is an access token (not refresh token)
+    4. Retrieves user from database
+    5. Returns User instance
+
+    Args:
+        credentials: HTTP Bearer credentials from security scheme
+        db: Database session
+
+    Returns:
+        User instance of authenticated user
+
+    Raises:
+        HTTPException (401): If token is missing, invalid, or user not found
+
+    Usage:
+        @app.get("/api/v1/profile")
+        async def get_profile(
+            current_user: User = Depends(get_current_user)
+        ):
+            return {"email": current_user.email}
+    """
+    # Check if credentials are present
+    if not credentials:
+        logger.warning("Authentication failed: missing Bearer token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+
+    # Decode and validate token
+    try:
+        token_data = decode_token(token)
+    except JWTError as e:
+        logger.warning(f"Authentication failed: invalid JWT - {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Verify token type (must be access token)
+    if not verify_token_type(token_data, TOKEN_TYPE_ACCESS):
+        logger.warning("Authentication failed: wrong token type")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Extract user ID from token
+    user_id_str = token_data.get("sub")
+    if not user_id_str:
+        logger.warning("Authentication failed: missing user ID in token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Parse user ID
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        logger.warning(f"Authentication failed: invalid user ID format - {user_id_str}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Get user from database
+    user_repo = UserRepository(db)
+    user = await user_repo.get_by_id(user_id)
+
+    if not user:
+        logger.warning(f"Authentication failed: user not found - {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user
+
+
+async def require_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Dependency to ensure user has admin privileges.
+
+    This dependency extends require_active_user by verifying the user
+    has superuser/admin status.
+
+    Args:
+        current_user: Current authenticated user (must be active)
+
+    Returns:
+        User instance (guaranteed to be active admin)
+
+    Raises:
+        HTTPException (403): If user is not an admin
+
+    Usage:
+        @app.get("/api/v1/admin/users")
+        async def list_all_users(
+            current_user: User = Depends(require_admin)
+        ):
+            # Only admins can list all users
+            pass
+    """
+    if not current_user.is_admin:
+        logger.warning(
+            f"Access denied: user {current_user.id} attempted admin-only action"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator privileges required",
+        )
+
+    return current_user
+
+
 # Convenience type aliases for common dependencies
+# Database
+DbSession = Annotated[AsyncSession, Depends(get_db)]
+# Service
+AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+AuditServiceDep = Annotated[AuditService, Depends(get_audit_service)]
+AccountServiceDep = Annotated[AccountService, Depends(get_account_service)]
+TransactionServiceDep = Annotated[TransactionService, Depends(get_transaction_service)]
+FinancialInstitutionServiceDep = Annotated[
+    FinancialInstitutionService, Depends(get_financial_institution_service)
+]
+AccountTypeServiceDep = Annotated[AccountTypeService, Depends(get_account_type_service)]
+CardServiceDep = Annotated[CardService, Depends(get_card_service)]
+CurrencyServiceDep = Annotated[CurrencyService, Depends(get_currency_service)]
+# Security
 CurrentUser = Annotated[User, Depends(get_current_user)]
-ActiveUser = Annotated[User, Depends(require_active_user)]
 AdminUser = Annotated[User, Depends(require_admin)]

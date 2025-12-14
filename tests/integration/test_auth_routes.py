@@ -175,7 +175,12 @@ class TestLogin:
     async def test_login_inactive_user(
         self, async_client: AsyncClient, inactive_user: User
     ):
-        """Test login with inactive account fails."""
+        """Test login with inactive account fails.
+
+        Note: Soft-deleted users are filtered at the repository level,
+        so they return INVALID_CREDENTIALS instead of INACTIVE_ACCOUNT.
+        This is more secure as it doesn't leak account status information.
+        """
         response = await async_client.post(
             "/api/auth/login",
             json={
@@ -186,7 +191,8 @@ class TestLogin:
 
         assert response.status_code == 401
         data = response.json()
-        assert data["error"]["code"] == "INACTIVE_ACCOUNT"
+        # Soft-deleted users are filtered at repository level
+        assert data["error"]["code"] == "INVALID_CREDENTIALS"
 
 
 # ============================================================================

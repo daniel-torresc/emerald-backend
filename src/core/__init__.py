@@ -6,10 +6,8 @@ Exports the main configuration, database, security, and logging components.
 
 from src.core.config import settings
 from src.core.database import (
-    check_database_connection,
     close_database_connection,
     create_database_engine,
-    get_db,
 )
 from src.core.encryption import EncryptionService
 from src.core.logging import get_logger, setup_logging
@@ -32,8 +30,6 @@ __all__ = [
     "settings",
     # Database
     "create_database_engine",
-    "get_db",
-    "check_database_connection",
     "close_database_connection",
     # Logging
     "setup_logging",

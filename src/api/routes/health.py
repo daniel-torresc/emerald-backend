@@ -6,8 +6,9 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
+from sqlalchemy import text
 
-from src.core import check_database_connection
+from src.api.dependencies import DbSession
 from src.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,10 @@ async def health_check() -> dict[str, str]:
 
 
 @router.get("/ready")
-async def readiness_check(request: Request) -> dict[str, Any]:
+async def readiness_check(
+    request: Request,
+    db: DbSession,
+) -> dict[str, Any]:
     """
     Readiness check endpoint.
 
@@ -42,9 +46,12 @@ async def readiness_check(request: Request) -> dict[str, Any]:
     Returns:
         Detailed readiness status
     """
-    # Check database connection
-    sessionmaker = request.app.state.sessionmaker
-    db_healthy = await check_database_connection(sessionmaker)
+    try:
+        await db.execute(text("SELECT 1"))
+        db_healthy = True
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        db_healthy = False
 
     return {
         "status": "ready" if db_healthy else "degraded",

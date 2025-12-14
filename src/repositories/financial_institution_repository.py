@@ -4,6 +4,7 @@ Financial institution repository for database operations.
 This module provides database operations for the FinancialInstitution model,
 including searches by SWIFT code, routing number, and filtering by country/type.
 """
+
 from pydantic_extra_types.country import CountryAlpha2
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession

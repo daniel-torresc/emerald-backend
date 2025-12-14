@@ -7,14 +7,9 @@ dependency injection for FastAPI routes.
 """
 
 import logging
-from collections.abc import AsyncGenerator
 
-from fastapi import Request
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
     create_async_engine,
 )
 from sqlalchemy.pool import AsyncAdaptedQueuePool
@@ -73,81 +68,12 @@ def create_database_engine(database_url: str | None = None) -> AsyncEngine:
     return engine
 
 
-# Engine and sessionmaker are now managed via FastAPI app.state
-# No global instances - use get_db() dependency for sessions
-
-
-# -----------------------------------------------------------------------------
-# Dependency Injection for FastAPI
-# -----------------------------------------------------------------------------
-
-
-async def get_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """
-    Dependency function to provide database session to FastAPI routes.
-
-    Gets the sessionmaker from app state and yields a session.
-    Ensures proper session cleanup with commit/rollback handling.
-
-    Args:
-        request: FastAPI request object (provides access to app.state)
-
-    Usage in FastAPI routes:
-        @app.get("/users")
-        async def get_users(db: AsyncSession = Depends(get_db)):
-            # Use db session here
-            ...
-
-    Yields:
-        AsyncSession: Database session for the request
-
-    Raises:
-        Exception: Re-raises any exception after rolling back transaction
-    """
-    sessionmaker = request.app.state.sessionmaker
-    async with sessionmaker() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
-
-
-# -----------------------------------------------------------------------------
-# Database Health Check
-# -----------------------------------------------------------------------------
-
-
-async def check_database_connection(sessionmaker: async_sessionmaker) -> bool:
-    """
-    Check if database connection is healthy.
-
-    Used for health check endpoints to verify database connectivity.
-
-    Args:
-        sessionmaker: AsyncSessionMaker from app.state
-
-    Returns:
-        True if database is reachable, False otherwise
-    """
-    try:
-        async with sessionmaker() as session:
-            await session.execute(text("SELECT 1"))
-            return True
-    except Exception as e:
-        logger.error(f"Database health check failed: {e}")
-        return False
-
-
 # -----------------------------------------------------------------------------
 # Lifecycle Management
 # -----------------------------------------------------------------------------
 
 
-async def close_database_connection(engine: AsyncEngine | None) -> None:
+async def close_database_connection(engine: AsyncEngine) -> None:
     """
     Close database engine and dispose of connection pool.
 
@@ -157,10 +83,6 @@ async def close_database_connection(engine: AsyncEngine | None) -> None:
     Args:
         engine: The AsyncEngine to dispose. If None, logs warning and returns.
     """
-    if engine is None:
-        logger.warning("close_database_connection called with None engine")
-        return
-
     try:
         await engine.dispose()
         logger.info("Database engine disposed successfully")

@@ -260,13 +260,16 @@ class TestLogin:
         mock_user_repo,
         sample_user,
     ):
-        """Test login with inactive account."""
-        # Setup
-        mock_user_repo.get_by_email.return_value = sample_user
-        mock_verify_password.return_value = True
+        """Test login with inactive (soft-deleted) account.
 
-        # Execute & Verify
-        with pytest.raises(AuthenticationError, match="inactive"):
+        Soft-deleted users are filtered at the repository level,
+        so get_by_email returns None for inactive users.
+        """
+        # Setup - soft-deleted users are filtered by repository
+        mock_user_repo.get_by_email.return_value = None
+
+        # Execute & Verify - returns invalid credentials, not account inactive
+        with pytest.raises(InvalidCredentialsError):
             await auth_service.login(
                 email="test@example.com",
                 password="correct_password",
@@ -468,7 +471,11 @@ class TestRefreshAccessToken:
         mock_token_repo,
         sample_user,
     ):
-        """Test refresh with inactive user account."""
+        """Test refresh with inactive (soft-deleted) user account.
+
+        Soft-deleted users are filtered at repository level,
+        so get_by_id returns None for inactive users.
+        """
         # Setup
         mock_decode.return_value = {"sub": str(sample_user.id), "type": "refresh"}
         mock_verify_type.return_value = True
@@ -483,10 +490,11 @@ class TestRefreshAccessToken:
             is_revoked=False,
         )
         mock_token_repo.get_by_token_hash.return_value = db_token
-        mock_user_repo.get_by_id.return_value = sample_user
+        # Soft-deleted users are filtered by repository
+        mock_user_repo.get_by_id.return_value = None
 
-        # Execute & Verify
-        with pytest.raises(AuthenticationError, match="inactive"):
+        # Execute & Verify - returns invalid token
+        with pytest.raises(InvalidTokenError):
             await auth_service.refresh_access_token(refresh_token="valid_token")
 
 

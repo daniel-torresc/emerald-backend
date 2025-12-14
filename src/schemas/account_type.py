@@ -12,7 +12,7 @@ import re
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 
 class AccountTypeBase(BaseModel):
@@ -49,7 +49,7 @@ class AccountTypeBase(BaseModel):
         examples=["Standard checking account for daily transactions and bill payments"],
     )
 
-    icon_url: str | None = Field(
+    icon_url: HttpUrl | None = Field(
         default=None,
         max_length=500,
         description="URL to icon image for UI display",
@@ -173,7 +173,7 @@ class AccountTypeUpdate(BaseModel):
         description="Detailed description of the account type",
     )
 
-    icon_url: str | None = Field(
+    icon_url: HttpUrl | None = Field(
         default=None,
         max_length=500,
         description="URL to icon image for UI display",
@@ -236,7 +236,7 @@ class AccountTypeListItem(BaseModel):
     id: uuid.UUID = Field(description="Unique identifier")
     key: str = Field(description="Unique key identifier")
     name: str = Field(description="Display name")
-    icon_url: str | None = Field(description="Icon URL")
+    icon_url: HttpUrl | None = Field(description="Icon URL")
     sort_order: int = Field(description="Display order")
 
     model_config = {"from_attributes": True}

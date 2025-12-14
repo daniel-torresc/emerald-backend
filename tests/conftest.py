@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.pool import NullPool
 
 from src.core.config import settings
-from src.core.database import get_db
+from src.api.dependencies import get_db
 from src.main import app
 from src.models.base import Base
 from src.models.card import Card

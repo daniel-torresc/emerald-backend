@@ -16,12 +16,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from src.api.dependencies import (
-    get_financial_institution_service,
-    require_active_user,
-    require_admin,
-)
-from src.models.user import User
+from src.api.dependencies import AdminUser, CurrentUser, FinancialInstitutionServiceDep
 from src.schemas.common import PaginatedResponse, PaginationParams
 from src.schemas.financial_institution import (
     FinancialInstitutionCreate,
@@ -30,7 +25,6 @@ from src.schemas.financial_institution import (
     FinancialInstitutionResponse,
     FinancialInstitutionUpdate,
 )
-from src.services.financial_institution_service import FinancialInstitutionService
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +41,8 @@ router = APIRouter(prefix="/financial-institutions", tags=["Financial Institutio
 async def create_institution(
     request: Request,
     data: FinancialInstitutionCreate,
-    current_user: User = Depends(require_admin),
-    service: FinancialInstitutionService = Depends(get_financial_institution_service),
+    current_user: AdminUser,
+    service: FinancialInstitutionServiceDep,
 ) -> FinancialInstitutionResponse:
     """
     Create a new financial institution.
@@ -90,10 +84,10 @@ async def create_institution(
     description="List financial institutions with optional filtering and pagination",
 )
 async def list_institutions(
+    current_user: CurrentUser,
+    service: FinancialInstitutionServiceDep,
     filters: FinancialInstitutionFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
-    current_user: User = Depends(require_active_user),
-    service: FinancialInstitutionService = Depends(get_financial_institution_service),
 ) -> PaginatedResponse[FinancialInstitutionListItem]:
     """
     List financial institutions with filtering.
@@ -129,8 +123,8 @@ async def list_institutions(
 )
 async def get_institution(
     institution_id: uuid.UUID,
-    current_user: User = Depends(require_active_user),
-    service: FinancialInstitutionService = Depends(get_financial_institution_service),
+    current_user: CurrentUser,
+    service: FinancialInstitutionServiceDep,
 ) -> FinancialInstitutionResponse:
     """
     Get financial institution by ID.
@@ -161,8 +155,8 @@ async def get_institution(
 )
 async def get_by_swift_code(
     swift_code: str,
-    current_user: User = Depends(require_active_user),
-    service: FinancialInstitutionService = Depends(get_financial_institution_service),
+    current_user: CurrentUser,
+    service: FinancialInstitutionServiceDep,
 ) -> FinancialInstitutionResponse:
     """
     Get financial institution by SWIFT/BIC code.
@@ -192,8 +186,8 @@ async def get_by_swift_code(
 )
 async def get_by_routing_number(
     routing_number: str,
-    current_user: User = Depends(require_active_user),
-    service: FinancialInstitutionService = Depends(get_financial_institution_service),
+    current_user: CurrentUser,
+    service: FinancialInstitutionServiceDep,
 ) -> FinancialInstitutionResponse:
     """
     Get financial institution by ABA routing number.
@@ -227,8 +221,8 @@ async def update_institution(
     request: Request,
     institution_id: uuid.UUID,
     data: FinancialInstitutionUpdate,
-    current_user: User = Depends(require_admin),
-    service: FinancialInstitutionService = Depends(get_financial_institution_service),
+    current_user: AdminUser,
+    service: FinancialInstitutionServiceDep,
 ) -> FinancialInstitutionResponse:
     """
     Update financial institution.
@@ -278,8 +272,8 @@ async def update_institution(
 async def delete_institution(
     request: Request,
     institution_id: uuid.UUID,
-    current_user: User = Depends(require_admin),
-    service: FinancialInstitutionService = Depends(get_financial_institution_service),
+    current_user: AdminUser,
+    service: FinancialInstitutionServiceDep,
 ) -> None:
     """
     Delete financial institution (soft delete).

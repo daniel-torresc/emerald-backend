@@ -16,11 +16,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Path, Request, status
 
-from src.api.dependencies import (
-    get_transaction_service,
-    require_active_user,
-)
-from src.models.user import User
+from src.api.dependencies import CurrentUser, TransactionServiceDep
 from src.schemas.common import PaginatedResponse, PaginationParams
 from src.schemas.transaction import (
     TransactionCreate,
@@ -29,7 +25,7 @@ from src.schemas.transaction import (
     TransactionSplitRequest,
     TransactionUpdate,
 )
-from src.services.transaction_service import TransactionService, UNSET
+from src.services.transaction_service import UNSET
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +58,10 @@ router = APIRouter(tags=["Transactions"])
 )
 async def create_transaction(
     request: Request,
+    current_user: CurrentUser,
+    transaction_service: TransactionServiceDep,
     account_id: uuid.UUID = Path(description="Account UUID"),
     transaction_data: TransactionCreate = ...,
-    current_user: User = Depends(require_active_user),
-    transaction_service: TransactionService = Depends(get_transaction_service),
 ) -> TransactionResponse:
     """
     Create new transaction for an account.
@@ -133,11 +129,11 @@ async def create_transaction(
 )
 async def list_transactions(
     request: Request,
+    current_user: CurrentUser,
+    transaction_service: TransactionServiceDep,
     account_id: uuid.UUID = Path(description="Account UUID"),
     pagination: PaginationParams = Depends(),
     filters: TransactionFilterParams = Depends(),
-    current_user: User = Depends(require_active_user),
-    transaction_service: TransactionService = Depends(get_transaction_service),
 ) -> PaginatedResponse[TransactionResponse]:
     """
     List and search transactions for an account.
@@ -192,9 +188,9 @@ async def list_transactions(
 )
 async def get_transaction(
     request: Request,
+    current_user: CurrentUser,
+    transaction_service: TransactionServiceDep,
     transaction_id: uuid.UUID = Path(description="Transaction UUID"),
-    current_user: User = Depends(require_active_user),
-    transaction_service: TransactionService = Depends(get_transaction_service),
 ) -> TransactionResponse:
     """
     Get transaction details by ID.
@@ -238,10 +234,10 @@ async def get_transaction(
 )
 async def update_transaction(
     request: Request,
+    current_user: CurrentUser,
+    transaction_service: TransactionServiceDep,
     transaction_id: uuid.UUID = Path(description="Transaction UUID"),
     transaction_data: TransactionUpdate = ...,
-    current_user: User = Depends(require_active_user),
-    transaction_service: TransactionService = Depends(get_transaction_service),
 ) -> TransactionResponse:
     """
     Update transaction fields.
@@ -310,9 +306,9 @@ async def update_transaction(
 )
 async def delete_transaction(
     request: Request,
+    current_user: CurrentUser,
+    transaction_service: TransactionServiceDep,
     transaction_id: uuid.UUID = Path(description="Transaction UUID"),
-    current_user: User = Depends(require_active_user),
-    transaction_service: TransactionService = Depends(get_transaction_service),
 ) -> None:
     """
     Delete transaction (soft delete).
@@ -357,10 +353,10 @@ async def delete_transaction(
 )
 async def split_transaction(
     request: Request,
+    current_user: CurrentUser,
+    transaction_service: TransactionServiceDep,
     transaction_id: uuid.UUID = Path(description="Transaction UUID to split"),
     split_data: TransactionSplitRequest = ...,
-    current_user: User = Depends(require_active_user),
-    transaction_service: TransactionService = Depends(get_transaction_service),
 ) -> dict:
     """
     Split transaction into multiple parts.
@@ -419,9 +415,9 @@ async def split_transaction(
 )
 async def join_split_transaction(
     request: Request,
+    current_user: CurrentUser,
+    transaction_service: TransactionServiceDep,
     transaction_id: uuid.UUID = Path(description="Parent transaction UUID"),
-    current_user: User = Depends(require_active_user),
-    transaction_service: TransactionService = Depends(get_transaction_service),
 ) -> TransactionResponse:
     """
     Join split transactions back to parent.

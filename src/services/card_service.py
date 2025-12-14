@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions import AuthorizationError, NotFoundError
 from src.models import AuditAction, AuditStatus
-from src.models.enums import CardType
 from src.models.user import User
 from src.repositories.account_repository import AccountRepository
 from src.repositories.card_repository import CardRepository
@@ -129,6 +128,7 @@ class CardService:
             status=AuditStatus.SUCCESS,
             ip_address=ip_address,
             user_agent=user_agent,
+            request_id=request_id,
         )
 
         return CardResponse.model_validate(card)
@@ -166,62 +166,6 @@ class CardService:
     async def list_cards(
         self,
         current_user: User,
-        card_type: CardType | None = None,
-        account_id: uuid.UUID | None = None,
-        include_deleted: bool = False,
-        skip: int = 0,
-        limit: int = 100,
-    ) -> list[CardListItem]:
-        """
-        List all cards for the current user.
-
-        Args:
-            current_user: Authenticated user
-            card_type: Optional filter by card type
-            account_id: Optional filter by account
-            include_deleted: Whether to include soft-deleted cards
-            skip: Number of records to skip for pagination
-            limit: Maximum number of records to return
-
-        Returns:
-            List of CardListItem objects
-
-        Raises:
-            AuthorizationError: If filtering by account user doesn't own
-
-        Example:
-            # Get all active credit cards
-            cards = await service.list_cards(
-                current_user=user,
-                card_type=CardType.credit_card
-            )
-
-            # Get cards for specific account
-            cards = await service.list_cards(
-                current_user=user,
-                account_id=account.id
-            )
-        """
-        # If filtering by account, verify ownership
-        if account_id:
-            account = await self.account_repo.get_by_id(account_id)
-            if not account or account.user_id != current_user.id:
-                raise AuthorizationError("Account does not belong to you")
-
-        cards = await self.card_repo.get_by_user(
-            user_id=current_user.id,
-            card_type=card_type,
-            account_id=account_id,
-            include_deleted=include_deleted,
-            skip=skip,
-            limit=limit,
-        )
-
-        return [CardListItem.model_validate(card) for card in cards]
-
-    async def list_cards_paginated(
-        self,
-        current_user: User,
         pagination: PaginationParams,
         filters: CardFilterParams,
     ) -> PaginatedResponse[CardListItem]:
@@ -231,7 +175,7 @@ class CardService:
         Args:
             current_user: Authenticated user
             pagination: Pagination parameters (page, page_size)
-            filters: Filter parameters (card_type, account_id, include_deleted)
+            filters: Filter parameters (card_type, account_id)
 
         Returns:
             PaginatedResponse with CardListItem objects and metadata
@@ -253,53 +197,36 @@ class CardService:
                 raise AuthorizationError("Account does not belong to you")
 
         # Get cards
-        cards = await self.card_repo.get_by_user(
+        cards = await self.card_repo.search(
             user_id=current_user.id,
             card_type=filters.card_type,
             account_id=filters.account_id,
-            include_deleted=filters.include_deleted,
-            skip=pagination.offset,
+            offset=pagination.offset,
             limit=pagination.page_size,
         )
 
-        # Get total count
-        # Note: count_by_user doesn't support account_id filter, so we'll count all
-        # and filter in-memory for now (acceptable for small datasets)
-        if filters.account_id:
-            # For account filter, we need to get all cards and count them
-            all_cards = await self.card_repo.get_by_user(
-                user_id=current_user.id,
-                card_type=filters.card_type,
-                account_id=filters.account_id,
-                include_deleted=filters.include_deleted,
-                skip=0,
-                limit=1000,  # Reasonable upper limit
-            )
-            total = len(all_cards)
-        else:
-            total = await self.card_repo.count_by_user(
-                user_id=current_user.id,
-                card_type=filters.card_type,
-                include_deleted=filters.include_deleted,
-            )
+        total_count = await self.card_repo.search_count(
+            user_id=current_user.id,
+            card_type=filters.card_type,
+            account_id=filters.account_id,
+        )
 
         # Convert to CardListItem
-        card_items = [CardListItem.model_validate(card) for card in cards]
+        items = [CardListItem.model_validate(card) for card in cards]
 
         # Calculate total pages
         total_pages = PaginationParams.calculate_total_pages(
-            total, pagination.page_size
+            total_count, pagination.page_size
         )
 
-        return PaginatedResponse(
-            data=card_items,
-            meta=PaginationMeta(
-                total=total,
-                page=pagination.page,
-                page_size=pagination.page_size,
-                total_pages=total_pages,
-            ),
+        metadata = PaginationMeta(
+            page=pagination.page,
+            page_size=pagination.page_size,
+            total=total_count,
+            total_pages=total_pages,
         )
+
+        return PaginatedResponse(data=items, meta=metadata)
 
     async def update_card(
         self,
@@ -357,11 +284,6 @@ class CardService:
 
         # 3. Update only provided fields
         update_data = data.model_dump(exclude_unset=True)
-
-        # Strip name if provided
-        if "name" in update_data and update_data["name"]:
-            update_data["name"] = update_data["name"].strip()
-
         update_data["updated_by"] = current_user.id
 
         card = await self.card_repo.update(card, **update_data)
@@ -375,6 +297,7 @@ class CardService:
             status=AuditStatus.SUCCESS,
             ip_address=ip_address,
             user_agent=user_agent,
+            request_id=request_id,
         )
 
         return CardResponse.model_validate(card)
@@ -428,4 +351,5 @@ class CardService:
             status=AuditStatus.SUCCESS,
             ip_address=ip_address,
             user_agent=user_agent,
+            request_id=request_id,
         )

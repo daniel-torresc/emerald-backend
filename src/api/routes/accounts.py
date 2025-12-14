@@ -14,8 +14,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from src.api.dependencies import get_account_service, require_active_user
-from src.models.user import User
+from src.api.dependencies import AccountServiceDep, CurrentUser
 from src.schemas.account import (
     AccountCreate,
     AccountFilterParams,
@@ -24,7 +23,6 @@ from src.schemas.account import (
     AccountUpdate,
 )
 from src.schemas.common import PaginatedResponse, PaginationParams
-from src.services.account_service import AccountService
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +70,9 @@ router = APIRouter(prefix="/accounts", tags=["Accounts"])
 )
 async def create_account(
     request: Request,
+    current_user: CurrentUser,
     account_data: AccountCreate,
-    current_user: User = Depends(require_active_user),
-    account_service: AccountService = Depends(get_account_service),
+    account_service: AccountServiceDep,
 ) -> AccountResponse:
     """
     Create new account for authenticated user.
@@ -165,10 +163,10 @@ async def create_account(
 )
 async def list_accounts(
     request: Request,
+    current_user: CurrentUser,
+    account_service: AccountServiceDep,
     filters: AccountFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
-    current_user: User = Depends(require_active_user),
-    account_service: AccountService = Depends(get_account_service),
 ) -> PaginatedResponse[AccountListItem]:
     """
     List user's accounts with pagination and filtering.
@@ -231,9 +229,9 @@ async def list_accounts(
 )
 async def get_account(
     request: Request,
+    current_user: CurrentUser,
     account_id: uuid.UUID,
-    current_user: User = Depends(require_active_user),
-    account_service: AccountService = Depends(get_account_service),
+    account_service: AccountServiceDep,
 ) -> AccountResponse:
     """
     Get account details by ID.
@@ -288,10 +286,10 @@ async def get_account(
 )
 async def update_account(
     request: Request,
+    current_user: CurrentUser,
     account_id: uuid.UUID,
     update_data: AccountUpdate,
-    current_user: User = Depends(require_active_user),
-    account_service: AccountService = Depends(get_account_service),
+    account_service: AccountServiceDep,
 ) -> AccountResponse:
     """
     Update account details.
@@ -365,9 +363,9 @@ async def update_account(
 )
 async def delete_account(
     request: Request,
+    current_user: CurrentUser,
     account_id: uuid.UUID,
-    current_user: User = Depends(require_active_user),
-    account_service: AccountService = Depends(get_account_service),
+    account_service: AccountServiceDep,
 ) -> None:
     """
     Soft delete account.
