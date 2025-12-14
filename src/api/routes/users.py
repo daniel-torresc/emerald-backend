@@ -15,15 +15,9 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from src.api.dependencies import (
-    get_user_service,
-    require_active_user,
-    require_admin,
-)
-from src.models.user import User
+from src.api.dependencies import AdminUser, CurrentUser, UserServiceDep
 from src.schemas.common import PaginatedResponse, PaginationParams
 from src.schemas.user import UserFilterParams, UserListItem, UserResponse, UserUpdate
-from src.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +32,8 @@ router = APIRouter(prefix="/users", tags=["Users"])
 )
 async def get_current_user_profile(
     request: Request,
-    current_user: User = Depends(require_active_user),
-    user_service: UserService = Depends(get_user_service),
+    current_user: CurrentUser,
+    user_service: UserServiceDep,
 ) -> UserResponse:
     """
     Get current user's profile.
@@ -70,8 +64,8 @@ async def get_current_user_profile(
 async def update_current_user_profile(
     request: Request,
     update_data: UserUpdate,
-    current_user: User = Depends(require_active_user),
-    user_service: UserService = Depends(get_user_service),
+    current_user: CurrentUser,
+    user_service: UserServiceDep,
 ) -> UserResponse:
     """
     Update current user's profile.
@@ -116,8 +110,8 @@ async def update_current_user_profile(
 async def get_user_by_id(
     request: Request,
     user_id: uuid.UUID,
-    current_user: User = Depends(require_active_user),
-    user_service: UserService = Depends(get_user_service),
+    current_user: CurrentUser,
+    user_service: UserServiceDep,
 ) -> UserResponse:
     """
     Get specific user profile by ID.
@@ -155,10 +149,10 @@ async def get_user_by_id(
 )
 async def list_users(
     request: Request,
+    current_user: AdminUser,
+    user_service: UserServiceDep,
     pagination: PaginationParams = Depends(),
     filters: UserFilterParams = Depends(),
-    current_user: User = Depends(require_admin),
-    user_service: UserService = Depends(get_user_service),
 ) -> PaginatedResponse[UserListItem]:
     """
     List all users with pagination and filtering.
@@ -200,8 +194,8 @@ async def list_users(
 async def deactivate_user(
     request: Request,
     user_id: uuid.UUID,
-    current_user: User = Depends(require_admin),
-    user_service: UserService = Depends(get_user_service),
+    current_user: AdminUser,
+    user_service: UserServiceDep,
 ) -> None:
     """
     Deactivate a user account.
@@ -242,8 +236,8 @@ async def deactivate_user(
 async def delete_user(
     request: Request,
     user_id: uuid.UUID,
-    current_user: User = Depends(require_admin),
-    user_service: UserService = Depends(get_user_service),
+    current_user: AdminUser,
+    user_service: UserServiceDep,
 ) -> None:
     """
     Soft delete a user account.

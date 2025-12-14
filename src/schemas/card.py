@@ -254,7 +254,6 @@ class CardFilterParams(BaseModel):
     Attributes:
         card_type: Filter by card type (credit_card or debit_card)
         account_id: Filter by account ID
-        include_deleted: Include soft-deleted cards in results
     """
 
     card_type: CardType | None = Field(
@@ -265,9 +264,4 @@ class CardFilterParams(BaseModel):
     account_id: uuid.UUID | None = Field(
         default=None,
         description="Filter by account ID",
-    )
-
-    include_deleted: bool = Field(
-        default=False,
-        description="Include soft-deleted cards in results",
     )

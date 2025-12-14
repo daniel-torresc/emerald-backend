@@ -11,14 +11,12 @@ This module provides REST endpoints for:
 
 import logging
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import ActiveUser, get_audit_service, get_auth_service
+from src.api.dependencies import AuditServiceDep, AuthServiceDep, CurrentUser, DbSession
 from src.core.config import settings
-from src.core.database import get_db
 from src.models import AuditAction, AuditStatus
 from src.schemas.auth import (
     AccessTokenResponse,
@@ -28,8 +26,6 @@ from src.schemas.auth import (
     TokenResponse,
 )
 from src.schemas.user import UserCreate, UserPasswordChange, UserResponse
-from src.services.audit_service import AuditService
-from src.services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +59,9 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 async def register(
     user_data: UserCreate,
     request: Request,
-    auth_service: AuthService = Depends(get_auth_service),
-    audit_service: AuditService = Depends(get_audit_service),
-    db: AsyncSession = Depends(get_db),
+    auth_service: AuthServiceDep,
+    audit_service: AuditServiceDep,
+    db: DbSession,
 ) -> UserResponse:
     """
     Register a new user.
@@ -112,7 +108,7 @@ async def register(
         request_id=request_id,
     )
 
-    await db.commit()
+    await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
     logger.info(f"User registered: {user.id} ({user.email})")
 
@@ -141,9 +137,9 @@ async def register(
 async def login(
     credentials: LoginRequest,
     request: Request,
-    auth_service: AuthService = Depends(get_auth_service),
-    audit_service: AuditService = Depends(get_audit_service),
-    db: AsyncSession = Depends(get_db),
+    auth_service: AuthServiceDep,
+    audit_service: AuditServiceDep,
+    db: DbSession,
 ) -> TokenResponse:
     """
     Login and receive authentication tokens.
@@ -184,7 +180,7 @@ async def login(
             success=True,
         )
 
-        await db.commit()
+        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
         logger.info(f"User logged in: {user.id} ({user.email})")
 
@@ -205,7 +201,7 @@ async def login(
             error_message=str(e),
         )
 
-        await db.commit()
+        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
         logger.warning(f"Failed login attempt for {credentials.email}")
 
@@ -234,9 +230,9 @@ async def login(
 async def refresh(
     token_request: RefreshTokenRequest,
     request: Request,
-    auth_service: AuthService = Depends(get_auth_service),
-    audit_service: AuditService = Depends(get_audit_service),
-    db: AsyncSession = Depends(get_db),
+    auth_service: AuthServiceDep,
+    audit_service: AuditServiceDep,
+    db: DbSession,
 ) -> AccessTokenResponse:
     """
     Refresh access token using refresh token.
@@ -287,7 +283,7 @@ async def refresh(
                 success=True,
             )
 
-        await db.commit()
+        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
         logger.info("Token refreshed successfully")
 
@@ -307,7 +303,7 @@ async def refresh(
             error_message=str(e),
         )
 
-        await db.commit()
+        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
         logger.warning("Failed token refresh attempt")
 
@@ -329,9 +325,9 @@ async def refresh(
 async def logout(
     logout_request: LogoutRequest,
     request: Request,
-    auth_service: AuthService = Depends(get_auth_service),
-    audit_service: AuditService = Depends(get_audit_service),
-    db: AsyncSession = Depends(get_db),
+    auth_service: AuthServiceDep,
+    audit_service: AuditServiceDep,
+    db: DbSession,
 ) -> None:
     """
     Logout user by revoking refresh token.
@@ -375,7 +371,7 @@ async def logout(
             request_id=request_id,
         )
 
-    await db.commit()
+    await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
     logger.info("User logged out")
 
@@ -397,10 +393,10 @@ async def logout(
 async def change_password(
     password_data: UserPasswordChange,
     request: Request,
-    current_user: ActiveUser,
-    auth_service: AuthService = Depends(get_auth_service),
-    audit_service: AuditService = Depends(get_audit_service),
-    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser,
+    auth_service: AuthServiceDep,
+    audit_service: AuditServiceDep,
+    db: DbSession,
 ) -> None:
     """
     Change user password.
@@ -439,7 +435,7 @@ async def change_password(
             success=True,
         )
 
-        await db.commit()
+        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
         logger.info(f"Password changed for user {current_user.id}")
 
@@ -454,7 +450,7 @@ async def change_password(
             error_message=str(e),
         )
 
-        await db.commit()
+        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
         logger.warning(f"Failed password change for user {current_user.id}")
 

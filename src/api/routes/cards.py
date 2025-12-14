@@ -13,8 +13,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from src.api.dependencies import get_card_service, require_active_user
-from src.models.user import User
+from src.api.dependencies import CardServiceDep, CurrentUser
 from src.schemas.card import (
     CardCreate,
     CardFilterParams,
@@ -23,17 +22,16 @@ from src.schemas.card import (
     CardUpdate,
 )
 from src.schemas.common import PaginatedResponse, PaginationParams
-from src.services.card_service import CardService
 
 router = APIRouter(prefix="/cards", tags=["Cards"])
 
 
 @router.get("", response_model=PaginatedResponse[CardListItem])
 async def list_cards(
-    pagination: PaginationParams = Depends(),
+    current_user: CurrentUser,
+    service: CardServiceDep,
     filters: CardFilterParams = Depends(),
-    current_user: User = Depends(require_active_user),
-    service: CardService = Depends(get_card_service),
+    pagination: PaginationParams = Depends(),
 ) -> PaginatedResponse[CardListItem]:
     """
     List all cards for the authenticated user.
@@ -48,7 +46,6 @@ async def list_cards(
     - `page_size`: Items per page (default: 20, max: 100)
     - `card_type`: Filter by credit_card or debit_card
     - `account_id`: Filter cards for specific account
-    - `include_deleted`: Show soft-deleted cards (default: false)
 
     **Returns**: Paginated response with cards and metadata.
 
@@ -57,7 +54,7 @@ async def list_cards(
     GET /api/v1/cards?page=1&page_size=20&card_type=credit_card
     ```
     """
-    return await service.list_cards_paginated(
+    return await service.list_cards(
         current_user=current_user,
         pagination=pagination,
         filters=filters,
@@ -67,8 +64,8 @@ async def list_cards(
 @router.get("/{card_id}", response_model=CardResponse)
 async def get_card(
     card_id: uuid.UUID,
-    current_user: User = Depends(require_active_user),
-    service: CardService = Depends(get_card_service),
+    current_user: CurrentUser,
+    service: CardServiceDep,
 ) -> CardResponse:
     """
     Get a specific card by ID.
@@ -96,8 +93,8 @@ async def get_card(
 async def create_card(
     request: Request,
     data: CardCreate,
-    current_user: User = Depends(require_active_user),
-    service: CardService = Depends(get_card_service),
+    current_user: CurrentUser,
+    service: CardServiceDep,
 ) -> CardResponse:
     """
     Create a new card linked to an account.
@@ -162,8 +159,8 @@ async def update_card(
     card_id: uuid.UUID,
     data: CardUpdate,
     request: Request,
-    current_user: User = Depends(require_active_user),
-    service: CardService = Depends(get_card_service),
+    current_user: CurrentUser,
+    service: CardServiceDep,
 ) -> CardResponse:
     """
     Update an existing card.
@@ -222,8 +219,8 @@ async def update_card(
 async def delete_card(
     card_id: uuid.UUID,
     request: Request,
-    current_user: User = Depends(require_active_user),
-    service: CardService = Depends(get_card_service),
+    current_user: CurrentUser,
+    service: CardServiceDep,
 ) -> None:
     """
     Soft-delete a card.

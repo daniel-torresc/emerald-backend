@@ -9,18 +9,15 @@ This module provides endpoints for:
 """
 
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Request, status
 
-from src.api.dependencies import get_account_service, get_current_user
-from src.models.user import User
+from src.api.dependencies import AccountServiceDep, CurrentUser
 from src.schemas.account_share import (
     AccountShareCreate,
     AccountShareResponse,
     AccountShareUpdate,
 )
-from src.services.account_service import AccountService
 
 router = APIRouter(prefix="/accounts", tags=["Account Shares"])
 
@@ -53,8 +50,8 @@ async def create_share(
     account_id: uuid.UUID,
     share_data: AccountShareCreate,
     request: Request,
-    current_user: Annotated[User, Depends(get_current_user)],
-    account_service: Annotated[AccountService, Depends(get_account_service)],
+    current_user: CurrentUser,
+    account_service: AccountServiceDep,
 ) -> AccountShareResponse:
     """
     Share account with another user.
@@ -109,8 +106,8 @@ async def create_share(
 )
 async def list_shares(
     account_id: uuid.UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
-    account_service: Annotated[AccountService, Depends(get_account_service)],
+    current_user: CurrentUser,
+    account_service: AccountServiceDep,
 ) -> list[AccountShareResponse]:
     """
     List all shares for an account.
@@ -162,8 +159,8 @@ async def update_share(
     share_id: uuid.UUID,
     share_data: AccountShareUpdate,
     request: Request,
-    current_user: Annotated[User, Depends(get_current_user)],
-    account_service: Annotated[AccountService, Depends(get_account_service)],
+    current_user: CurrentUser,
+    account_service: AccountServiceDep,
 ) -> AccountShareResponse:
     """
     Update permission level for an account share.
@@ -224,8 +221,8 @@ async def revoke_share(
     account_id: uuid.UUID,
     share_id: uuid.UUID,
     request: Request,
-    current_user: Annotated[User, Depends(get_current_user)],
-    account_service: Annotated[AccountService, Depends(get_account_service)],
+    current_user: CurrentUser,
+    account_service: AccountServiceDep,
 ) -> None:
     """
     Revoke account access from a user.

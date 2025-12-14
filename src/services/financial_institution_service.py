@@ -303,10 +303,8 @@ class FinancialInstitutionService:
         ]
 
         # Calculate pagination metadata
-        total_pages = (
-            (total_count + pagination.page_size - 1) // pagination.page_size
-            if total_count > 0
-            else 0
+        total_pages = PaginationParams.calculate_total_pages(
+            total=total_count, page_size=pagination.page_size
         )
 
         metadata = PaginationMeta(
@@ -408,12 +406,15 @@ class FinancialInstitutionService:
             }
             institution.short_name = data.short_name
 
-        if data.country_code is not None and data.country_code != institution.country_code:
+        if (
+            data.country_code is not None
+            and data.country_code != institution.country_code
+        ):
             changes["country_code"] = {
                 "old": institution.country_code,
-                "new": str(data.country_code),
+                "new": data.country_code,
             }
-            institution.country_code = str(data.country_code)
+            institution.country_code = data.country_code
 
         if data.institution_type is not None:
             changes["institution_type"] = {

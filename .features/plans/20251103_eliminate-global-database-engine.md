@@ -653,14 +653,15 @@ from src.core.database import (
 **Change 1**: Remove engine from imports and exports (lines 8-14, 30-38)
 
 **Before**:
+
 ```python
 from src.core.database import (
     AsyncSessionLocal,
     check_database_connection,
     close_database_connection,
     engine,
-    get_db,
 )
+from src.api.dependencies import get_db
 
 __all__ = [
     # Config
@@ -668,7 +669,6 @@ __all__ = [
     # Database
     "engine",
     "AsyncSessionLocal",
-    "get_db",
     "check_database_connection",
     "close_database_connection",
     ...
@@ -676,20 +676,20 @@ __all__ = [
 ```
 
 **After**:
+
 ```python
 from src.core.database import (
     check_database_connection,
     close_database_connection,
     create_database_engine,
-    get_db,
 )
+from src.api.dependencies import get_db
 
 __all__ = [
     # Config
     "settings",
     # Database
     "create_database_engine",
-    "get_db",
     "check_database_connection",
     "close_database_connection",
     ...

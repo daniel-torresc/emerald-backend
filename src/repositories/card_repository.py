@@ -7,7 +7,7 @@ All queries are scoped to user ownership via account relationships.
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -37,14 +37,13 @@ class CardRepository(BaseRepository[Card]):
         """
         super().__init__(Card, session)
 
-    async def get_by_user(
+    async def search(
         self,
         user_id: uuid.UUID,
         card_type: CardType | None = None,
         account_id: uuid.UUID | None = None,
-        include_deleted: bool = False,
-        skip: int = 0,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[Card]:
         """
         Get all cards for a user (via account ownership).
@@ -53,8 +52,7 @@ class CardRepository(BaseRepository[Card]):
             user_id: UUID of the user who owns the accounts
             card_type: Optional filter by card type (credit_card or debit_card)
             account_id: Optional filter by specific account
-            include_deleted: Whether to include soft-deleted cards (default: False)
-            skip: Number of records to skip for pagination (default: 0)
+            offset: Number of records to skip for pagination (default: 0)
             limit: Maximum number of records to return (default: 100)
 
         Returns:
@@ -84,10 +82,7 @@ class CardRepository(BaseRepository[Card]):
                 selectinload(Card.financial_institution),
             )
         )
-
-        # Apply soft delete filter
-        if not include_deleted:
-            query = self._apply_soft_delete_filter(query)
+        query = self._apply_soft_delete_filter(query)
 
         # Apply optional filters
         if card_type is not None:
@@ -96,17 +91,60 @@ class CardRepository(BaseRepository[Card]):
         if account_id is not None:
             query = query.where(Card.account_id == account_id)
 
-        # Apply pagination and ordering
-        query = query.offset(skip).limit(limit).order_by(Card.created_at.desc())
+        # Order by created_at desc
+        query = query.order_by(Card.created_at.desc())
+
+        # Apply pagination
+        query = query.limit(limit).offset(offset)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+    async def search_count(
+        self,
+        user_id: uuid.UUID,
+        card_type: CardType | None = None,
+        account_id: uuid.UUID | None = None,
+    ) -> int:
+        """
+        Count cards for a user (via account ownership).
+
+        Args:
+            user_id: UUID of the user who owns the accounts
+            card_type: Optional filter by card type
+            account_id: Optional filter by specific account
+
+        Returns:
+            Total number of cards matching criteria
+
+        Example:
+            total_credit_cards = await repo.count_by_user(
+                user_id=user.id,
+                card_type=CardType.credit_card
+            )
+        """
+        query = (
+            select(func.count())
+            .select_from(Card)
+            .join(Account, Card.account_id == Account.id)
+            .where(Account.user_id == user_id)
+        )
+        query = self._apply_soft_delete_filter(query)
+
+        # Apply optional card type filter
+        if card_type is not None:
+            query = query.where(Card.card_type == card_type)
+
+        if account_id is not None:
+            query = query.where(Card.account_id == account_id)
+
+        result = await self.session.execute(query)
+        return result.scalar_one()
 
     async def get_by_id_for_user(
         self,
         card_id: uuid.UUID,
         user_id: uuid.UUID,
-        include_deleted: bool = False,
     ) -> Card | None:
         """
         Get a card by ID if user owns the associated account.
@@ -114,7 +152,6 @@ class CardRepository(BaseRepository[Card]):
         Args:
             card_id: UUID of the card to retrieve
             user_id: UUID of the user (must own the card's account)
-            include_deleted: Whether to return soft-deleted cards (default: False)
 
         Returns:
             Card object if found and user owns it, None otherwise
@@ -136,10 +173,7 @@ class CardRepository(BaseRepository[Card]):
                 selectinload(Card.financial_institution),
             )
         )
-
-        # Apply soft delete filter
-        if not include_deleted:
-            query = self._apply_soft_delete_filter(query)
+        query = self._apply_soft_delete_filter(query)
 
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
@@ -147,14 +181,12 @@ class CardRepository(BaseRepository[Card]):
     async def get_by_account(
         self,
         account_id: uuid.UUID,
-        include_deleted: bool = False,
     ) -> list[Card]:
         """
         Get all cards for a specific account.
 
         Args:
             account_id: UUID of the account
-            include_deleted: Whether to include soft-deleted cards (default: False)
 
         Returns:
             List of Card objects ordered by created_at descending
@@ -174,53 +206,10 @@ class CardRepository(BaseRepository[Card]):
                 selectinload(Card.financial_institution),
             )
         )
-
-        # Apply soft delete filter
-        if not include_deleted:
-            query = self._apply_soft_delete_filter(query)
+        query = self._apply_soft_delete_filter(query)
 
         # Order by creation date descending
         query = query.order_by(Card.created_at.desc())
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
-
-    async def count_by_user(
-        self,
-        user_id: uuid.UUID,
-        card_type: CardType | None = None,
-        include_deleted: bool = False,
-    ) -> int:
-        """
-        Count cards for a user (via account ownership).
-
-        Args:
-            user_id: UUID of the user who owns the accounts
-            card_type: Optional filter by card type
-            include_deleted: Whether to include soft-deleted cards (default: False)
-
-        Returns:
-            Total number of cards matching criteria
-
-        Example:
-            total_credit_cards = await repo.count_by_user(
-                user_id=user.id,
-                card_type=CardType.credit_card
-            )
-        """
-        query = (
-            select(Card)
-            .join(Account, Card.account_id == Account.id)
-            .where(Account.user_id == user_id)
-        )
-
-        # Apply soft delete filter
-        if not include_deleted:
-            query = self._apply_soft_delete_filter(query)
-
-        # Apply optional card type filter
-        if card_type is not None:
-            query = query.where(Card.card_type == card_type)
-
-        result = await self.session.execute(query)
-        return len(result.scalars().all())

@@ -12,11 +12,10 @@ ensuring frontend and backend stay in sync.
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from src.api.dependencies import get_currency_service
+from src.api.dependencies import CurrencyServiceDep
 from src.schemas import CurrenciesResponse
-from src.services.currency_service import CurrencyService
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ router = APIRouter(prefix="/metadata", tags=["Metadata"])
     description="Returns list of supported currencies with ISO 4217 codes and symbols.",
 )
 async def get_currencies(
-    currency_service: CurrencyService = Depends(get_currency_service),
+    currency_service: CurrencyServiceDep,
 ) -> CurrenciesResponse:
     """
     Get all supported currencies.

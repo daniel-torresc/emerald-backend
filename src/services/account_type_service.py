@@ -111,7 +111,7 @@ class AccountTypeService:
             key=data.key,
             name=data.name,
             description=data.description,
-            icon_url=data.icon_url,
+            icon_url=str(data.icon_url),
             sort_order=data.sort_order,
         )
 
@@ -268,7 +268,7 @@ class AccountTypeService:
         changes = {}
 
         # Update fields (key is immutable, not included in AccountTypeUpdate schema)
-        if data.name is not None:
+        if data.name is not None and data.name != account_type.name:
             changes["name"] = {"old": account_type.name, "new": data.name}
             account_type.name = data.name
 
@@ -280,8 +280,11 @@ class AccountTypeService:
             account_type.description = data.description
 
         if data.icon_url is not None:
-            changes["icon_url"] = {"old": account_type.icon_url, "new": data.icon_url}
-            account_type.icon_url = data.icon_url
+            changes["icon_url"] = {
+                "old": account_type.icon_url,
+                "new": str(data.icon_url),
+            }
+            account_type.icon_url = str(data.icon_url)
 
         if data.sort_order is not None:
             changes["sort_order"] = {

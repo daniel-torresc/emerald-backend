@@ -81,11 +81,11 @@ async def lifespan(app: FastAPI):  # type: ignore
 
     # Create database engine and store in app state
     logger.info("Initializing database engine...")
-    app.state.engine = create_database_engine()
+    engine = create_database_engine()
 
     # Create sessionmaker and store in app state
     app.state.sessionmaker = async_sessionmaker(
-        app.state.engine,
+        engine,
         class_=AsyncSession,
         expire_on_commit=False,
         autocommit=False,
@@ -98,8 +98,7 @@ async def lifespan(app: FastAPI):  # type: ignore
 
     # Cleanup on shutdown
     logger.info("Shutting down application")
-    await close_database_connection(app.state.engine)
-    app.state.engine = None
+    await close_database_connection(engine)
     app.state.sessionmaker = None
 
 

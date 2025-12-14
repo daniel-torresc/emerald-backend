@@ -10,19 +10,13 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
-from src.api.dependencies import (
-    get_audit_service,
-    require_active_user,
-    require_admin,
-)
-from src.models.user import User
+from src.api.dependencies import AdminUser, AuditServiceDep, CurrentUser
 from src.schemas.audit import AuditLogFilterParams, AuditLogResponse
 from src.schemas.common import (
     PaginatedResponse,
     PaginationMeta,
     PaginationParams,
 )
-from src.services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +31,10 @@ router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 )
 async def list_user_audit_logs(
     request: Request,
+    current_user: CurrentUser,
+    audit_service: AuditServiceDep,
     filters: AuditLogFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
-    current_user: User = Depends(require_active_user),
-    audit_service: AuditService = Depends(get_audit_service),
 ) -> PaginatedResponse[AuditLogResponse]:
     """
     Get audit logs for current user.
@@ -103,10 +97,10 @@ async def list_user_audit_logs(
 )
 async def get_all_audit_logs(
     request: Request,
+    current_user: AdminUser,
+    audit_service: AuditServiceDep,
     pagination: PaginationParams = Depends(),
     filters: AuditLogFilterParams = Depends(),
-    current_user: User = Depends(require_admin),
-    audit_service: AuditService = Depends(get_audit_service),
 ) -> PaginatedResponse[AuditLogResponse]:
     """
     Get all audit logs with filtering (admin only).
