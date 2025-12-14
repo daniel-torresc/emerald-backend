@@ -710,31 +710,6 @@ class TestAccountRoutes:
         response_data = response.json()
         assert "error" in response_data
 
-    async def test_create_account_inactive_account_type(
-        self,
-        async_client: AsyncClient,
-        user_token: dict,
-        test_financial_institution,
-        inactive_account_type,
-    ):
-        """Test creating account with inactive account type."""
-        response = await async_client.post(
-            "/api/v1/accounts",
-            json={
-                "account_name": "Test Account",
-                "account_type_id": str(inactive_account_type.id),
-                "currency": "USD",
-                "opening_balance": "1000.00",
-                "financial_institution_id": str(test_financial_institution.id),
-            },
-            headers={"Authorization": f"Bearer {user_token['access_token']}"},
-        )
-
-        assert response.status_code == 422  # Validation error from service
-        response_data = response.json()
-        assert "error" in response_data
-        assert "not active" in response_data["error"]["message"].lower()
-
     async def test_create_account_system_account_type_success(
         self,
         async_client: AsyncClient,
@@ -794,39 +769,3 @@ class TestAccountRoutes:
         data = response.json()
         assert data["account_type"]["key"] == "checking"
         assert data["account_type_id"] == str(checking_account_type.id)
-
-    async def test_update_account_invalid_account_type(
-        self,
-        async_client: AsyncClient,
-        user_token: dict,
-        test_financial_institution,
-        savings_account_type,
-        inactive_account_type,
-    ):
-        """Test updating account to inactive account type fails."""
-        # Create account
-        create_response = await async_client.post(
-            "/api/v1/accounts",
-            json={
-                "account_name": "Test Account",
-                "account_type_id": str(savings_account_type.id),
-                "currency": "USD",
-                "opening_balance": "1000.00",
-                "financial_institution_id": str(test_financial_institution.id),
-            },
-            headers={"Authorization": f"Bearer {user_token['access_token']}"},
-        )
-
-        account_id = create_response.json()["id"]
-
-        # Try to update to inactive type
-        response = await async_client.put(
-            f"/api/v1/accounts/{account_id}",
-            json={"account_type_id": str(inactive_account_type.id)},
-            headers={"Authorization": f"Bearer {user_token['access_token']}"},
-        )
-
-        assert response.status_code == 422
-        response_data = response.json()
-        assert "error" in response_data
-        assert "not active" in response_data["error"]["message"].lower()

@@ -742,13 +742,13 @@ class TransactionService:
         if await self.transaction_repo.has_children(transaction_id):
             children = await self.transaction_repo.get_children(transaction_id)
             for child in children:
-                await self.transaction_repo.soft_delete(child.id)
+                await self.transaction_repo.soft_delete(child)
             logger.info(
                 f"Deleted {len(children)} child transactions of {transaction_id}"
             )
 
         # Delete transaction (soft delete)
-        deleted = await self.transaction_repo.soft_delete(transaction_id)
+        deleted = await self.transaction_repo.soft_delete(existing)
 
         if not deleted:
             return False
@@ -994,7 +994,7 @@ class TransactionService:
 
         # Delete all children
         for child in children:
-            await self.transaction_repo.soft_delete(child.id)
+            await self.transaction_repo.soft_delete(child)
 
         logger.info(
             f"Joined split transaction {transaction_id}, deleted {len(children)} children"

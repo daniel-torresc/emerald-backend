@@ -111,7 +111,7 @@ class AccountTypeService:
             key=data.key,
             name=data.name,
             description=data.description,
-            icon_url=str(data.icon_url),
+            icon_url=str(data.icon_url) if data.icon_url else None,
             sort_order=data.sort_order,
         )
 
@@ -282,9 +282,9 @@ class AccountTypeService:
         if data.icon_url is not None:
             changes["icon_url"] = {
                 "old": account_type.icon_url,
-                "new": str(data.icon_url),
+                "new": str(data.icon_url) if data.icon_url else None,
             }
-            account_type.icon_url = str(data.icon_url)
+            account_type.icon_url = str(data.icon_url) if data.icon_url else None
 
         if data.sort_order is not None:
             changes["sort_order"] = {

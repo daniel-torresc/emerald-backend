@@ -371,7 +371,7 @@ class TestTransactionRepository:
         created = await repo.create(transaction)
 
         # Soft delete
-        await repo.soft_delete(created.id)
+        await repo.soft_delete(created)
 
         # Should not be found
         retrieved = await repo.get_by_id(created.id)
