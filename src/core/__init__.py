@@ -4,14 +4,20 @@ Core module for Emerald Finance Platform.
 Exports the main configuration, database, security, and logging components.
 """
 
-from src.core.config import settings
-from src.core.database import (
+from core.config import settings
+from core.database import (
     close_database_connection,
     create_database_engine,
 )
-from src.core.encryption import EncryptionService
-from src.core.logging import get_logger, setup_logging
-from src.core.security import (
+from core.encryption import EncryptionService
+from core.handlers import (
+    app_exception_handler,
+    general_exception_handler,
+    rate_limit_handler,
+    validation_exception_handler,
+)
+from core.logging import get_logger, setup_logging
+from core.security import (
     TOKEN_TYPE_ACCESS,
     TOKEN_TYPE_REFRESH,
     create_access_token,
@@ -50,4 +56,9 @@ __all__ = [
     "verify_refresh_token_hash",
     # Security - Encryption
     "EncryptionService",
+    # Exception Handlers
+    "app_exception_handler",
+    "validation_exception_handler",
+    "general_exception_handler",
+    "rate_limit_handler",
 ]
