@@ -14,7 +14,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.models.enums import CardType, TransactionType
+from models.enums import CardType, TransactionType
 
 
 class CardEmbedded(BaseModel):

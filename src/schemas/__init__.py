@@ -7,21 +7,21 @@ This package provides all Pydantic models used for:
 - API documentation
 """
 
-from src.schemas.account_type import (
+from schemas.account_type import (
     AccountTypeCreate,
     AccountTypeListItem,
     AccountTypeResponse,
     AccountTypeUpdate,
 )
-from src.schemas.audit import AuditLogFilterParams, AuditLogResponse
-from src.schemas.auth import (
+from schemas.audit import AuditLogFilterParams, AuditLogResponse
+from schemas.auth import (
     AccessTokenResponse,
     LoginRequest,
     LogoutRequest,
     RefreshTokenRequest,
     TokenResponse,
 )
-from src.schemas.common import (
+from schemas.common import (
     ErrorDetail,
     ErrorResponse,
     PaginatedResponse,
@@ -30,19 +30,19 @@ from src.schemas.common import (
     ResponseMeta,
     SuccessResponse,
 )
-from src.schemas.currency import (
+from schemas.currency import (
     Currency,
     CurrenciesResponse,
     CurrencyResponse,
 )
-from src.schemas.financial_institution import (
+from schemas.financial_institution import (
     FinancialInstitutionCreate,
     FinancialInstitutionFilterParams,
     FinancialInstitutionListItem,
     FinancialInstitutionResponse,
     FinancialInstitutionUpdate,
 )
-from src.schemas.user import (
+from schemas.user import (
     UserCreate,
     UserFilterParams,
     UserListItem,

@@ -16,9 +16,9 @@ from typing import Optional
 from sqlalchemy import Enum as SQLEnum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import Base
-from src.models.enums import InstitutionType
-from src.models.mixins import SoftDeleteMixin, TimestampMixin
+from models.base import Base
+from models.enums import InstitutionType
+from models.mixins import SoftDeleteMixin, TimestampMixin
 
 
 class FinancialInstitution(Base, TimestampMixin, SoftDeleteMixin):

@@ -302,7 +302,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from src.core.config import settings
-from src.exceptions import EncryptionError
+from src.core.exceptions import EncryptionError
 ```
 
 **Key Constraint**: The encryption service **already depends on `src.core.config`**, making it natural to move it to `src.core/`.

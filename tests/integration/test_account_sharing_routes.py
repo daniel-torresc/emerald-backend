@@ -21,9 +21,9 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.models.account import Account, AccountShare
-from src.models.enums import PermissionLevel
-from src.models.user import User
+from models.account import Account, AccountShare
+from models.enums import PermissionLevel
+from models.user import User
 
 
 # ============================================================================
@@ -32,7 +32,7 @@ from src.models.user import User
 @pytest_asyncio.fixture
 async def second_user(test_engine) -> User:
     """Create a second test user for sharing tests."""
-    from src.core.security import hash_password
+    from core.security import hash_password
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -58,7 +58,7 @@ async def second_user(test_engine) -> User:
 @pytest_asyncio.fixture
 async def third_user(test_engine) -> User:
     """Create a third test user for multi-user sharing tests."""
-    from src.core.security import hash_password
+    from core.security import hash_password
 
     async_session_factory = async_sessionmaker(
         test_engine,

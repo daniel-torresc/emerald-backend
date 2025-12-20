@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.models.audit_log import AuditAction, AuditLog, AuditStatus
-from src.services.audit_service import AuditService
+from models.audit_log import AuditAction, AuditLog, AuditStatus
+from services.audit_service import AuditService
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def mock_audit_repo():
 def audit_service(mock_session, mock_audit_repo):
     """Create AuditService with mocked dependencies."""
     with patch(
-        "src.services.audit_service.AuditLogRepository", return_value=mock_audit_repo
+        "services.audit_service.AuditLogRepository", return_value=mock_audit_repo
     ):
         service = AuditService(mock_session)
     return service

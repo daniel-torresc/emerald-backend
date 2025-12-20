@@ -12,7 +12,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from src.models import AuditAction, AuditStatus
+from models import AuditAction, AuditStatus
 
 
 class AuditLogResponse(BaseModel):

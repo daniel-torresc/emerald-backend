@@ -14,15 +14,15 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from src.api.dependencies import AccountServiceDep, CurrentUser
-from src.schemas.account import (
+from api.dependencies import AccountServiceDep, CurrentUser
+from schemas.account import (
     AccountCreate,
     AccountFilterParams,
     AccountListItem,
     AccountResponse,
     AccountUpdate,
 )
-from src.schemas.common import PaginatedResponse, PaginationParams
+from schemas.common import PaginatedResponse, PaginationParams
 
 logger = logging.getLogger(__name__)
 

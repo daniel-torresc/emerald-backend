@@ -857,6 +857,7 @@ def upgrade() -> None:
 **Purpose**: Centralized encryption/decryption service for sensitive data
 
 **Implementation**:
+
 ```python
 """
 Encryption service for sensitive data (IBAN, etc.).
@@ -872,7 +873,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
 
 from src.core.config import settings
-from src.exceptions import EncryptionError
+from src.core.exceptions import EncryptionError
 
 logger = logging.getLogger(__name__)
 

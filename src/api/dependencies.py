@@ -19,10 +19,10 @@ from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
-from src.core.security import TOKEN_TYPE_ACCESS, decode_token, verify_token_type
-from src.models.user import User
-from src.repositories.user_repository import UserRepository
-from src.services import (
+from core.security import TOKEN_TYPE_ACCESS, decode_token, verify_token_type
+from models.user import User
+from repositories.user_repository import UserRepository
+from services import (
     AccountService,
     AccountTypeService,
     AuditService,

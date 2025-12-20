@@ -10,9 +10,9 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
-from src.api.dependencies import AdminUser, AuditServiceDep, CurrentUser
-from src.schemas.audit import AuditLogFilterParams, AuditLogResponse
-from src.schemas.common import (
+from api.dependencies import AdminUser, AuditServiceDep, CurrentUser
+from schemas.audit import AuditLogFilterParams, AuditLogResponse
+from schemas.common import (
     PaginatedResponse,
     PaginationMeta,
     PaginationParams,

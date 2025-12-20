@@ -5,7 +5,7 @@ This module defines all application settings loaded from environment variables.
 All configuration must go through this Settings class - NO hardcoded values.
 """
 
-from typing import List, Literal
+from typing import Literal
 
 from pydantic import EmailStr, Field, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     app_name: str = Field(default="Emerald Finance Platform")
     version: str = Field(default="0.1.0")
+    description: str = Field(default="Emerald Personal Finance Platform - Backend API")
     environment: Literal["development", "staging", "production"] = Field(
         default="development"
     )
@@ -86,7 +87,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # CORS Settings
     # -------------------------------------------------------------------------
-    cors_origins: List[str] = Field(
+    cors_origins: list[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000"],
         description="Comma-separated list of allowed CORS origins",
     )
@@ -101,7 +102,6 @@ class Settings(BaseSettings):
     rate_limit_register: str = Field(default="3/hour")
     rate_limit_password_change: str = Field(default="3/hour")
     rate_limit_token_refresh: str = Field(default="10/hour")
-    rate_limit_api: str = Field(default="100/minute")
 
     # -------------------------------------------------------------------------
     # Logging Configuration
@@ -122,7 +122,7 @@ class Settings(BaseSettings):
     audit_log_retention_days: int = Field(default=2555)  # 7 years
 
     # -------------------------------------------------------------------------
-    # Superuser Configuration (for Database Migration)
+    # Superuser Configuration
     # -------------------------------------------------------------------------
     superadmin_username: str = Field(
         ...,

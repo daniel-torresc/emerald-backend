@@ -13,9 +13,9 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.account import AccountShare
-from src.models.enums import PermissionLevel
-from src.repositories.base import BaseRepository
+from models.account import AccountShare
+from models.enums import PermissionLevel
+from repositories.base import BaseRepository
 
 
 class AccountShareRepository(BaseRepository[AccountShare]):

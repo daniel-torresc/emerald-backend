@@ -15,18 +15,18 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import (
+from core.exceptions import (
     AlreadyExistsError,
     InsufficientPermissionsError,
     NotFoundError,
 )
-from src.models import AuditAction
-from src.models.user import User
-from src.repositories.refresh_token_repository import RefreshTokenRepository
-from src.repositories.user_repository import UserRepository
-from src.schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
-from src.schemas.user import UserFilterParams, UserListItem, UserResponse, UserUpdate
-from src.services.audit_service import AuditService
+from models import AuditAction
+from models.user import User
+from repositories.refresh_token_repository import RefreshTokenRepository
+from repositories.user_repository import UserRepository
+from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
+from schemas.user import UserFilterParams, UserListItem, UserResponse, UserUpdate
+from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 

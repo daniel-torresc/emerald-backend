@@ -771,7 +771,7 @@ def upgrade() -> None:
         print("⏭️  Skipping superuser creation: Admin user(s) already exist")
     else:
         # Read and validate environment variables
-        from src.core.config import settings
+        from core.config import settings
 
         username = settings.superadmin_username
         email = settings.superadmin_email
@@ -881,7 +881,7 @@ def downgrade() -> None:
     bind = op.get_bind()
 
     try:
-        from src.core.config import settings
+        from core.config import settings
 
         username = settings.superadmin_username
         now = datetime.now(UTC)

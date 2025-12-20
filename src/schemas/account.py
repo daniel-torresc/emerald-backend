@@ -15,8 +15,8 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 from schwifty import IBAN
 
-from src.schemas.account_type import AccountTypeListItem
-from src.schemas.financial_institution import FinancialInstitutionResponse
+from schemas.account_type import AccountTypeListItem
+from schemas.financial_institution import FinancialInstitutionResponse
 
 
 class AccountBase(BaseModel):

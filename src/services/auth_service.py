@@ -17,8 +17,8 @@ from jose import JWTError
 from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.config import settings
-from src.core.security import (
+from core.config import settings
+from core.security import (
     TOKEN_TYPE_REFRESH,
     create_access_token,
     create_refresh_token,
@@ -28,17 +28,17 @@ from src.core.security import (
     verify_password,
     verify_token_type,
 )
-from src.exceptions import (
+from core.exceptions import (
     AlreadyExistsError,
     AuthenticationError,
     InvalidCredentialsError,
     InvalidTokenError,
 )
-from src.models.user import User
-from src.repositories.refresh_token_repository import RefreshTokenRepository
-from src.repositories.user_repository import UserRepository
-from src.schemas.auth import AccessTokenResponse, TokenResponse
-from src.schemas.user import UserCreate
+from models.user import User
+from repositories.refresh_token_repository import RefreshTokenRepository
+from repositories.user_repository import UserRepository
+from schemas.auth import AccessTokenResponse, TokenResponse
+from schemas.user import UserCreate
 
 logger = logging.getLogger(__name__)
 

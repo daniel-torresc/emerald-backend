@@ -16,7 +16,6 @@ os.environ["RATE_LIMIT_LOGIN"] = "10000 per hour"
 os.environ["RATE_LIMIT_REGISTER"] = "10000 per hour"
 os.environ["RATE_LIMIT_PASSWORD_CHANGE"] = "10000 per hour"
 os.environ["RATE_LIMIT_TOKEN_REFRESH"] = "10000 per hour"
-os.environ["RATE_LIMIT_API"] = "10000 per hour"
 
 import asyncio
 from typing import AsyncGenerator
@@ -30,13 +29,13 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
-from src.core.config import settings
-from src.api.dependencies import get_db
-from src.main import app
-from src.models.base import Base
-from src.models.card import Card
-from src.models.user import User
-from src.core.security import hash_password
+from core.config import settings
+from api.dependencies import get_db
+from main import app
+from models.base import Base
+from models.card import Card
+from models.user import User
+from core.security import hash_password
 
 
 # ============================================================================
@@ -78,7 +77,7 @@ async def test_engine(event_loop):
         await conn.run_sync(Base.metadata.create_all)
 
     # Seed account_types table with system types (from migration ec9ccafe4320)
-    from src.models.account_type import AccountType
+    from models.account_type import AccountType
 
     async_session_factory = async_sessionmaker(
         engine,
@@ -210,7 +209,7 @@ async def async_client(test_engine) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides[get_db] = override_get_db
 
     # Clear Redis (used for caching and other purposes) before test
-    redis_client = redis.from_url(str(settings.redis_url))
+    redis_client = redis.from_url(settings.redis_url_str)
     try:
         await redis_client.flushall()  # Clear ALL Redis databases
         await asyncio.sleep(0.01)  # Give Redis a moment to process
@@ -254,7 +253,7 @@ async def async_client(test_engine) -> AsyncGenerator[AsyncClient, None]:
             print(f"Warning: Database cleanup failed: {e}")
 
     # Clear Redis after test
-    redis_client = redis.from_url(str(settings.redis_url))
+    redis_client = redis.from_url(settings.redis_url_str)
     try:
         await redis_client.flushall()  # Clear ALL Redis databases
         await asyncio.sleep(0.01)  # Give Redis a moment to process
@@ -480,8 +479,8 @@ async def test_financial_institution(test_engine):
     Returns:
         FinancialInstitution instance for testing
     """
-    from src.models.financial_institution import FinancialInstitution
-    from src.models.enums import InstitutionType
+    from models.financial_institution import FinancialInstitution
+    from models.enums import InstitutionType
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -516,7 +515,7 @@ async def savings_account_type(test_engine):
     Returns:
         AccountType instance for the 'savings' system type
     """
-    from src.models.account_type import AccountType
+    from models.account_type import AccountType
     from sqlalchemy import select
 
     async_session_factory = async_sessionmaker(
@@ -541,7 +540,7 @@ async def checking_account_type(test_engine):
     Returns:
         AccountType instance for the 'checking' system type
     """
-    from src.models.account_type import AccountType
+    from models.account_type import AccountType
     from sqlalchemy import select
 
     async_session_factory = async_sessionmaker(
@@ -566,7 +565,7 @@ async def investment_account_type(test_engine):
     Returns:
         AccountType instance for the 'investment' system type
     """
-    from src.models.account_type import AccountType
+    from models.account_type import AccountType
     from sqlalchemy import select
 
     async_session_factory = async_sessionmaker(
@@ -591,7 +590,7 @@ async def other_account_type(test_engine):
     Returns:
         AccountType instance for the 'other' system type
     """
-    from src.models.account_type import AccountType
+    from models.account_type import AccountType
     from sqlalchemy import select
 
     async_session_factory = async_sessionmaker(
@@ -616,7 +615,7 @@ async def inactive_account_type(test_engine):
     Returns:
         AccountType instance that is inactive
     """
-    from src.models.account_type import AccountType
+    from models.account_type import AccountType
     from sqlalchemy import select
 
     async_session_factory = async_sessionmaker(
@@ -662,7 +661,7 @@ async def test_account(
         Account instance for testing transactions
     """
     from decimal import Decimal
-    from src.models.account import Account
+    from models.account import Account
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -701,8 +700,8 @@ async def test_card(test_engine, test_account, test_user) -> "Card":
     Returns:
         Card instance linked to test_account
     """
-    from src.models.card import Card
-    from src.models.enums import CardType
+    from models.card import Card
+    from models.enums import CardType
     from decimal import Decimal
 
     async_session_factory = async_sessionmaker(
@@ -736,7 +735,7 @@ async def test_card(test_engine, test_account, test_user) -> "Card":
 @pytest_asyncio.fixture
 async def test_financial_institution_for_cards(test_engine):
     """Get or create a test financial institution for cards."""
-    from src.models.financial_institution import FinancialInstitution
+    from models.financial_institution import FinancialInstitution
 
     async_session_factory = async_sessionmaker(
         test_engine,

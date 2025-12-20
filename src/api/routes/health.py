@@ -8,8 +8,8 @@ from typing import Any
 from fastapi import APIRouter, Request
 from sqlalchemy import text
 
-from src.api.dependencies import DbSession
-from src.core.config import settings
+from api.dependencies import DbSession
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 

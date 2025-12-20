@@ -16,17 +16,17 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import AlreadyExistsError, NotFoundError
-from src.models import AuditAction
-from src.models.user import User
-from src.repositories.account_type_repository import AccountTypeRepository
-from src.schemas.account_type import (
+from core.exceptions import AlreadyExistsError, NotFoundError
+from models import AuditAction
+from models.user import User
+from repositories.account_type_repository import AccountTypeRepository
+from schemas.account_type import (
     AccountTypeCreate,
     AccountTypeListItem,
     AccountTypeResponse,
     AccountTypeUpdate,
 )
-from src.services.audit_service import AuditService
+from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 

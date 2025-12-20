@@ -19,8 +19,8 @@ from typing import Optional
 from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.models.base import Base
-from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
+from models.base import Base
+from models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 
 
 # =============================================================================

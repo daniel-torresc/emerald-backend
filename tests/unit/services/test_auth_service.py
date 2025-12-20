@@ -11,16 +11,16 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from jose import JWTError
 
-from src.exceptions import (
+from core.exceptions import (
     AlreadyExistsError,
     AuthenticationError,
     InvalidCredentialsError,
     InvalidTokenError,
 )
-from src.models.refresh_token import RefreshToken
-from src.models.user import User
-from src.schemas.user import UserCreate
-from src.services.auth_service import AuthService
+from models.refresh_token import RefreshToken
+from models.user import User
+from schemas.user import UserCreate
+from services.auth_service import AuthService
 
 
 @pytest.fixture
@@ -50,9 +50,9 @@ def mock_token_repo():
 def auth_service(mock_session, mock_user_repo, mock_token_repo):
     """Create AuthService with mocked dependencies."""
     with (
-        patch("src.services.auth_service.UserRepository", return_value=mock_user_repo),
+        patch("services.auth_service.UserRepository", return_value=mock_user_repo),
         patch(
-            "src.services.auth_service.RefreshTokenRepository",
+            "services.auth_service.RefreshTokenRepository",
             return_value=mock_token_repo,
         ),
     ):
@@ -76,10 +76,10 @@ class TestRegister:
     """Test the register method."""
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.hash_password")
-    @patch("src.services.auth_service.create_access_token")
-    @patch("src.services.auth_service.create_refresh_token")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.hash_password")
+    @patch("services.auth_service.create_access_token")
+    @patch("services.auth_service.create_refresh_token")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_register_success(
         self,
         mock_hash_refresh,
@@ -175,10 +175,10 @@ class TestLogin:
     """Test the login method."""
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.verify_password")
-    @patch("src.services.auth_service.create_access_token")
-    @patch("src.services.auth_service.create_refresh_token")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.verify_password")
+    @patch("services.auth_service.create_access_token")
+    @patch("services.auth_service.create_refresh_token")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_login_success(
         self,
         mock_hash_refresh,
@@ -231,7 +231,7 @@ class TestLogin:
             )
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.verify_password")
+    @patch("services.auth_service.verify_password")
     async def test_login_wrong_password(
         self,
         mock_verify_password,
@@ -252,7 +252,7 @@ class TestLogin:
             )
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.verify_password")
+    @patch("services.auth_service.verify_password")
     async def test_login_inactive_user(
         self,
         mock_verify_password,
@@ -280,11 +280,11 @@ class TestRefreshAccessToken:
     """Test the refresh_access_token method."""
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
-    @patch("src.services.auth_service.verify_token_type")
-    @patch("src.services.auth_service.hash_refresh_token")
-    @patch("src.services.auth_service.create_access_token")
-    @patch("src.services.auth_service.create_refresh_token")
+    @patch("services.auth_service.decode_token")
+    @patch("services.auth_service.verify_token_type")
+    @patch("services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.create_access_token")
+    @patch("services.auth_service.create_refresh_token")
     async def test_refresh_token_success(
         self,
         mock_create_refresh,
@@ -334,7 +334,7 @@ class TestRefreshAccessToken:
         mock_session.commit.assert_called()
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
+    @patch("services.auth_service.decode_token")
     async def test_refresh_token_invalid_jwt(self, mock_decode, auth_service):
         """Test refresh with invalid JWT."""
         # Setup
@@ -345,8 +345,8 @@ class TestRefreshAccessToken:
             await auth_service.refresh_access_token(refresh_token="invalid_jwt")
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
-    @patch("src.services.auth_service.verify_token_type")
+    @patch("services.auth_service.decode_token")
+    @patch("services.auth_service.verify_token_type")
     async def test_refresh_token_wrong_type(
         self,
         mock_verify_type,
@@ -363,9 +363,9 @@ class TestRefreshAccessToken:
             await auth_service.refresh_access_token(refresh_token="access_token")
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
-    @patch("src.services.auth_service.verify_token_type")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.decode_token")
+    @patch("services.auth_service.verify_token_type")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_refresh_token_not_in_database(
         self,
         mock_hash_refresh,
@@ -386,9 +386,9 @@ class TestRefreshAccessToken:
             await auth_service.refresh_access_token(refresh_token="unknown_token")
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
-    @patch("src.services.auth_service.verify_token_type")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.decode_token")
+    @patch("services.auth_service.verify_token_type")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_refresh_token_reuse_detection(
         self,
         mock_hash_refresh,
@@ -425,9 +425,9 @@ class TestRefreshAccessToken:
         mock_session.commit.assert_called()
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
-    @patch("src.services.auth_service.verify_token_type")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.decode_token")
+    @patch("services.auth_service.verify_token_type")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_refresh_token_expired(
         self,
         mock_hash_refresh,
@@ -458,9 +458,9 @@ class TestRefreshAccessToken:
             await auth_service.refresh_access_token(refresh_token="expired_token")
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
-    @patch("src.services.auth_service.verify_token_type")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.decode_token")
+    @patch("services.auth_service.verify_token_type")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_refresh_token_inactive_user(
         self,
         mock_hash_refresh,
@@ -502,9 +502,9 @@ class TestLogout:
     """Test the logout method."""
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
-    @patch("src.services.auth_service.verify_token_type")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.decode_token")
+    @patch("services.auth_service.verify_token_type")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_logout_success(
         self,
         mock_hash_refresh,
@@ -539,7 +539,7 @@ class TestLogout:
         mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
+    @patch("services.auth_service.decode_token")
     async def test_logout_invalid_jwt(self, mock_decode, auth_service):
         """Test logout with invalid JWT."""
         # Setup
@@ -550,8 +550,8 @@ class TestLogout:
             await auth_service.logout(refresh_token="invalid_jwt")
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
-    @patch("src.services.auth_service.verify_token_type")
+    @patch("services.auth_service.decode_token")
+    @patch("services.auth_service.verify_token_type")
     async def test_logout_wrong_token_type(
         self,
         mock_verify_type,
@@ -568,9 +568,9 @@ class TestLogout:
             await auth_service.logout(refresh_token="access_token")
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.decode_token")
-    @patch("src.services.auth_service.verify_token_type")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.decode_token")
+    @patch("services.auth_service.verify_token_type")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_logout_token_not_found(
         self,
         mock_hash_refresh,
@@ -595,8 +595,8 @@ class TestChangePassword:
     """Test the change_password method."""
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.verify_password")
-    @patch("src.services.auth_service.hash_password")
+    @patch("services.auth_service.verify_password")
+    @patch("services.auth_service.hash_password")
     async def test_change_password_success(
         self,
         mock_hash_password,
@@ -650,7 +650,7 @@ class TestChangePassword:
             )
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.verify_password")
+    @patch("services.auth_service.verify_password")
     async def test_change_password_wrong_current_password(
         self,
         mock_verify_password,
@@ -678,9 +678,9 @@ class TestGenerateTokens:
     """Test the _generate_tokens internal method."""
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.create_access_token")
-    @patch("src.services.auth_service.create_refresh_token")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.create_access_token")
+    @patch("services.auth_service.create_refresh_token")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_generate_tokens_new_family(
         self,
         mock_hash_refresh,
@@ -722,9 +722,9 @@ class TestGenerateTokens:
         assert token_create_call["token_hash"] == "refresh_hash"
 
     @pytest.mark.asyncio
-    @patch("src.services.auth_service.create_access_token")
-    @patch("src.services.auth_service.create_refresh_token")
-    @patch("src.services.auth_service.hash_refresh_token")
+    @patch("services.auth_service.create_access_token")
+    @patch("services.auth_service.create_refresh_token")
+    @patch("services.auth_service.hash_refresh_token")
     async def test_generate_tokens_existing_family(
         self,
         mock_hash_refresh,

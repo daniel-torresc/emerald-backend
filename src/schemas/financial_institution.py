@@ -16,7 +16,7 @@ from pydantic_extra_types.country import CountryAlpha2
 from pydantic_extra_types.routing_number import ABARoutingNumber
 from schwifty import BIC
 
-from src.models.enums import InstitutionType
+from models.enums import InstitutionType
 
 
 class FinancialInstitutionBase(BaseModel):

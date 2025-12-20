@@ -16,9 +16,9 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from src.api.dependencies import AdminUser, CurrentUser, FinancialInstitutionServiceDep
-from src.schemas.common import PaginatedResponse, PaginationParams
-from src.schemas.financial_institution import (
+from api.dependencies import AdminUser, CurrentUser, FinancialInstitutionServiceDep
+from schemas.common import PaginatedResponse, PaginationParams
+from schemas.financial_institution import (
     FinancialInstitutionCreate,
     FinancialInstitutionFilterParams,
     FinancialInstitutionListItem,

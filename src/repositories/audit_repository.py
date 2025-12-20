@@ -13,8 +13,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import AuditAction, AuditStatus
-from src.models.audit_log import AuditLog
+from models import AuditAction, AuditStatus
+from models.audit_log import AuditLog
 
 
 class AuditLogRepository:

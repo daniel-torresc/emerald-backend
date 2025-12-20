@@ -14,8 +14,8 @@ import logging
 
 from fastapi import APIRouter
 
-from src.api.dependencies import CurrencyServiceDep
-from src.schemas import CurrenciesResponse
+from api.dependencies import CurrencyServiceDep
+from schemas import CurrenciesResponse
 
 logger = logging.getLogger(__name__)
 

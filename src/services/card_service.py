@@ -9,23 +9,23 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import AuthorizationError, NotFoundError
-from src.models import AuditAction, AuditStatus
-from src.models.user import User
-from src.repositories.account_repository import AccountRepository
-from src.repositories.card_repository import CardRepository
-from src.repositories.financial_institution_repository import (
+from core.exceptions import AuthorizationError, NotFoundError
+from models import AuditAction, AuditStatus
+from models.user import User
+from repositories.account_repository import AccountRepository
+from repositories.card_repository import CardRepository
+from repositories.financial_institution_repository import (
     FinancialInstitutionRepository,
 )
-from src.schemas.card import (
+from schemas.card import (
     CardCreate,
     CardFilterParams,
     CardListItem,
     CardResponse,
     CardUpdate,
 )
-from src.schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
-from src.services.audit_service import AuditService
+from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
+from services.audit_service import AuditService
 
 
 class CardService:

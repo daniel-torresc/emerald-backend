@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from src.core.config import settings
+from core.config import settings
 
 
 def setup_logging() -> None:

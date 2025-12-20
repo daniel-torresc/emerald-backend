@@ -22,10 +22,10 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import InsufficientPermissionsError, NotFoundError
-from src.models.enums import PermissionLevel
-from src.repositories.account_repository import AccountRepository
-from src.repositories.account_share_repository import AccountShareRepository
+from core.exceptions import InsufficientPermissionsError, NotFoundError
+from models.enums import PermissionLevel
+from repositories.account_repository import AccountRepository
+from repositories.account_share_repository import AccountShareRepository
 
 
 class PermissionService:

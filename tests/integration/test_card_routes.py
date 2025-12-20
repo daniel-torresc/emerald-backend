@@ -17,10 +17,10 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.account import Account
-from src.models.card import Card
-from src.models.enums import CardType
-from src.models.financial_institution import FinancialInstitution
+from models.account import Account
+from models.card import Card
+from models.enums import CardType
+from models.financial_institution import FinancialInstitution
 
 
 @pytest.mark.asyncio
@@ -218,7 +218,7 @@ class TestListCards:
         user_token: dict,
     ):
         """Test listing cards filtered by card type."""
-        from src.repositories.card_repository import CardRepository
+        from repositories.card_repository import CardRepository
 
         repo = CardRepository(db_session)
         await repo.create(

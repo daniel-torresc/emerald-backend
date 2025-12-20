@@ -16,8 +16,8 @@ from typing import Optional
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.models.base import Base
-from src.models.mixins import TimestampMixin
+from models.base import Base
+from models.mixins import TimestampMixin
 
 
 class AccountType(Base, TimestampMixin):

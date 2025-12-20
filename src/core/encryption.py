@@ -18,8 +18,8 @@ from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-from src.core.config import settings
-from src.exceptions import EncryptionError
+from core.config import settings
+from core.exceptions import EncryptionError
 
 logger = logging.getLogger(__name__)
 

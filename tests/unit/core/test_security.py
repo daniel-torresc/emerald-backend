@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 from jose import JWTError
 
-from src.core import security
+from core import security
 
 
 class TestPasswordHashing:
@@ -263,7 +263,7 @@ class TestDecodeToken:
         assert payload["sub"] == "user_123"
         assert payload["type"] == "access"
 
-    @patch("src.core.security.jwt.decode")
+    @patch("core.security.jwt.decode")
     def test_decode_invalid_token_raises_error(self, mock_decode):
         """Test that decode_token raises JWTError for invalid token."""
         mock_decode.side_effect = JWTError("Invalid token")
@@ -271,8 +271,8 @@ class TestDecodeToken:
         with pytest.raises(JWTError):
             security.decode_token("invalid_token")
 
-    @patch("src.core.security.jwt.decode")
-    @patch("src.core.security.logger")
+    @patch("core.security.jwt.decode")
+    @patch("core.security.logger")
     def test_decode_logs_jwt_errors(self, mock_logger, mock_decode):
         """Test that decode_token logs JWTError."""
         mock_decode.side_effect = JWTError("Token expired")
