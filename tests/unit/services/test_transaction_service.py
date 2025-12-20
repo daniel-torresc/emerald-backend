@@ -17,14 +17,14 @@ from decimal import Decimal
 
 import pytest
 
-from src.exceptions import (
+from core.exceptions import (
     AuthorizationError,
     NotFoundError,
     ValidationError,
 )
-from src.models.enums import TransactionType
-from src.repositories.account_repository import AccountRepository
-from src.services.transaction_service import TransactionService
+from models.enums import TransactionType
+from repositories.account_repository import AccountRepository
+from services.transaction_service import TransactionService
 
 
 @pytest.mark.asyncio
@@ -324,8 +324,8 @@ class TestTransactionServiceUpdate:
         self, db_session, test_user, test_account, test_engine
     ):
         """Test that non-creator/owner cannot update transaction."""
-        from src.models.user import User
-        from src.core.security import hash_password
+        from models.user import User
+        from core.security import hash_password
         from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
         service = TransactionService(db_session)
@@ -725,8 +725,8 @@ class TestTransactionServiceCardValidation:
         self, db_session, test_user, test_account, admin_user
     ):
         """Test that using another user's card raises NotFoundError."""
-        from src.models.card import Card
-        from src.models.enums import CardType
+        from models.card import Card
+        from models.enums import CardType
 
         # Create card for admin user
         admin_account = await AccountRepository(db_session).create(

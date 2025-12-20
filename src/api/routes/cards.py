@@ -13,15 +13,15 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from src.api.dependencies import CardServiceDep, CurrentUser
-from src.schemas.card import (
+from api.dependencies import CardServiceDep, CurrentUser
+from schemas.card import (
     CardCreate,
     CardFilterParams,
     CardListItem,
     CardResponse,
     CardUpdate,
 )
-from src.schemas.common import PaginatedResponse, PaginationParams
+from schemas.common import PaginatedResponse, PaginationParams
 
 router = APIRouter(prefix="/cards", tags=["Cards"])
 

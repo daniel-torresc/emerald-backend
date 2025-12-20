@@ -6,7 +6,7 @@ import logging
 
 from fastapi import APIRouter
 
-from src.core.config import settings
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 

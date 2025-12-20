@@ -15,8 +15,8 @@ import uuid
 
 from fastapi import APIRouter, Request, status
 
-from src.api.dependencies import AccountTypeServiceDep, AdminUser, CurrentUser
-from src.schemas.account_type import (
+from api.dependencies import AccountTypeServiceDep, AdminUser, CurrentUser
+from schemas.account_type import (
     AccountTypeCreate,
     AccountTypeListItem,
     AccountTypeResponse,

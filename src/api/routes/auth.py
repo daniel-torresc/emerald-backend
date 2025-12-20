@@ -12,25 +12,21 @@ This module provides REST endpoints for:
 import logging
 
 from fastapi import APIRouter, Request, status
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
-from src.api.dependencies import AuditServiceDep, AuthServiceDep, CurrentUser, DbSession
-from src.core.config import settings
-from src.models import AuditAction, AuditStatus
-from src.schemas.auth import (
+from api.dependencies import AuditServiceDep, AuthServiceDep, CurrentUser, DbSession
+from core.config import settings
+from core.rate_limit import limiter
+from models import AuditAction, AuditStatus
+from schemas.auth import (
     AccessTokenResponse,
     LoginRequest,
     LogoutRequest,
     RefreshTokenRequest,
     TokenResponse,
 )
-from src.schemas.user import UserCreate, UserPasswordChange, UserResponse
+from schemas.user import UserCreate, UserPasswordChange, UserResponse
 
 logger = logging.getLogger(__name__)
-
-# Initialize rate limiter for this router
-limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -264,7 +260,7 @@ async def refresh(
         )
 
         # Extract user_id from the new access token for logging
-        from src.core.security import decode_token
+        from core.security import decode_token
 
         token_data = decode_token(tokens.access_token)
         user_id_str = token_data.get("sub")
@@ -348,7 +344,7 @@ async def logout(
     request_id = getattr(request.state, "request_id", None)
 
     # Extract user_id before logout
-    from src.core.security import decode_token
+    from core.security import decode_token
 
     try:
         token_data = decode_token(logout_request.refresh_token)

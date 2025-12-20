@@ -11,10 +11,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.models.account import Account
-from src.models.card import Card
-from src.models.enums import CardType
-from src.repositories.base import BaseRepository
+from models.account import Account
+from models.card import Card
+from models.enums import CardType
+from repositories.base import BaseRepository
 
 
 class CardRepository(BaseRepository[Card]):

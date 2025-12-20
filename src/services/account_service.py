@@ -16,28 +16,28 @@ from decimal import Decimal
 from pydantic import HttpUrl
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.encryption import EncryptionService
-from src.exceptions import (
+from core.encryption import EncryptionService
+from core.exceptions import (
     AlreadyExistsError,
     AuthorizationError,
     EncryptionError,
     NotFoundError,
     ValidationError,
 )
-from src.models.account import Account, AccountShare
-from src.models import AuditAction
-from src.models.enums import PermissionLevel
-from src.models.user import User
-from src.repositories import FinancialInstitutionRepository
-from src.repositories.account_repository import AccountRepository
-from src.repositories.account_share_repository import AccountShareRepository
-from src.repositories.account_type_repository import AccountTypeRepository
-from src.repositories.user_repository import UserRepository
-from src.schemas.account import AccountFilterParams, AccountListItem
-from src.schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
-from src.services.audit_service import AuditService
-from src.services.currency_service import CurrencyService
-from src.services.permission_service import PermissionService
+from models.account import Account, AccountShare
+from models import AuditAction
+from models.enums import PermissionLevel
+from models.user import User
+from repositories import FinancialInstitutionRepository
+from repositories.account_repository import AccountRepository
+from repositories.account_share_repository import AccountShareRepository
+from repositories.account_type_repository import AccountTypeRepository
+from repositories.user_repository import UserRepository
+from schemas.account import AccountFilterParams, AccountListItem
+from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
+from services.audit_service import AuditService
+from services.currency_service import CurrencyService
+from services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
 
@@ -1049,7 +1049,7 @@ class AccountService:
                 print(f"Balance mismatch: cached={cached}, calculated={calculated}")
         """
         # Import here to avoid circular dependency
-        from src.repositories.transaction_repository import TransactionRepository
+        from repositories.transaction_repository import TransactionRepository
 
         # Check permission (VIEWER or higher can view balance)
         await self.permission_service.require_permission(

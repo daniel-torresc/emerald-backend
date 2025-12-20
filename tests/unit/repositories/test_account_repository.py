@@ -15,7 +15,7 @@ from decimal import Decimal
 
 import pytest
 
-from src.repositories.account_repository import AccountRepository
+from repositories.account_repository import AccountRepository
 
 
 @pytest.mark.asyncio

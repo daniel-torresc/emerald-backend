@@ -16,16 +16,16 @@ import uuid
 
 from fastapi import APIRouter, Depends, Path, Request, status
 
-from src.api.dependencies import CurrentUser, TransactionServiceDep
-from src.schemas.common import PaginatedResponse, PaginationParams
-from src.schemas.transaction import (
+from api.dependencies import CurrentUser, TransactionServiceDep
+from schemas.common import PaginatedResponse, PaginationParams
+from schemas.transaction import (
     TransactionCreate,
     TransactionFilterParams,
     TransactionResponse,
     TransactionSplitRequest,
     TransactionUpdate,
 )
-from src.services.transaction_service import UNSET
+from services.transaction_service import UNSET
 
 logger = logging.getLogger(__name__)
 

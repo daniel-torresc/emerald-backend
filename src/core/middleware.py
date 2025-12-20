@@ -35,7 +35,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     - Error responses (for debugging)
     """
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:  # type: ignore
         """
         Process request and add request ID.
 
@@ -58,7 +58,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         # Add request ID to response headers
         response.headers["X-Request-ID"] = request_id
 
-        return response
+        return response  # type: ignore
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -87,7 +87,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.enable_hsts = enable_hsts
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:  # type: ignore
         """
         Process request and add security headers.
 
@@ -135,7 +135,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "max-age=31536000; includeSubDomains; preload"
             )
 
-        return response
+        return response  # type: ignore
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -156,7 +156,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     - ERROR: Server errors (5xx)
     """
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:  # type: ignore
         """
         Process request and log details.
 
@@ -212,4 +212,4 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         # Add response time header
         response.headers["X-Response-Time"] = f"{duration:.3f}s"
 
-        return response
+        return response  # type: ignore

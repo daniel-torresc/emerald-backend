@@ -23,7 +23,7 @@ from argon2.exceptions import (
 )
 from jose import JWTError, jwt
 
-from src.core.config import settings
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 

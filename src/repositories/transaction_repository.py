@@ -17,10 +17,10 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.models.card import Card
-from src.models.enums import CardType, TransactionType
-from src.models.transaction import Transaction
-from src.repositories.base import BaseRepository
+from models.card import Card
+from models.enums import CardType, TransactionType
+from models.transaction import Transaction
+from repositories.base import BaseRepository
 
 
 class TransactionRepository(BaseRepository[Transaction]):

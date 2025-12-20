@@ -9,16 +9,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.exceptions import (
+from core.exceptions import (
     AlreadyExistsError,
     InsufficientPermissionsError,
     NotFoundError,
 )
-from src.models.audit_log import AuditAction
-from src.models.user import User
-from src.schemas.common import PaginationParams
-from src.schemas.user import UserFilterParams, UserUpdate
-from src.services.user_service import UserService
+from models.audit_log import AuditAction
+from models.user import User
+from schemas.common import PaginationParams
+from schemas.user import UserFilterParams, UserUpdate
+from services.user_service import UserService
 
 
 @pytest.fixture
@@ -53,14 +53,12 @@ def mock_audit_service():
 def user_service(mock_session, mock_user_repo, mock_token_repo, mock_audit_service):
     """Create UserService with mocked dependencies."""
     with (
-        patch("src.services.user_service.UserRepository", return_value=mock_user_repo),
+        patch("services.user_service.UserRepository", return_value=mock_user_repo),
         patch(
-            "src.services.user_service.RefreshTokenRepository",
+            "services.user_service.RefreshTokenRepository",
             return_value=mock_token_repo,
         ),
-        patch(
-            "src.services.user_service.AuditService", return_value=mock_audit_service
-        ),
+        patch("services.user_service.AuditService", return_value=mock_audit_service),
     ):
         service = UserService(mock_session)
     return service

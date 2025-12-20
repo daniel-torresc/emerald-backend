@@ -13,8 +13,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.models.account import Account, AccountShare
-from src.repositories.base import BaseRepository
+from models.account import Account, AccountShare
+from repositories.base import BaseRepository
 
 
 class AccountRepository(BaseRepository[Account]):

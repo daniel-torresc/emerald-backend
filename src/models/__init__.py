@@ -5,23 +5,23 @@ This module exports all SQLAlchemy models and the declarative base.
 Import models from this module to ensure proper initialization.
 """
 
-from src.models.account import Account, AccountShare
-from src.models.account_type import AccountType
-from src.models.audit_log import AuditLog
-from src.models.base import Base
-from src.models.card import Card
-from src.models.enums import (
+from models.account import Account, AccountShare
+from models.account_type import AccountType
+from models.audit_log import AuditLog
+from models.base import Base
+from models.card import Card
+from models.enums import (
     AuditAction,
     AuditStatus,
     CardType,
     PermissionLevel,
     TransactionType,
 )
-from src.models.financial_institution import FinancialInstitution
-from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
-from src.models.refresh_token import RefreshToken
-from src.models.transaction import Transaction
-from src.models.user import User
+from models.financial_institution import FinancialInstitution
+from models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
+from models.refresh_token import RefreshToken
+from models.transaction import Transaction
+from models.user import User
 
 __all__ = [
     # Base

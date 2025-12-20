@@ -9,8 +9,8 @@ Tests the CurrencyService and Currency model to ensure:
 
 import pytest
 
-from src.schemas.currency import Currency
-from src.services.currency_service import CurrencyService
+from schemas.currency import Currency
+from services.currency_service import CurrencyService
 
 
 class TestCurrency:

@@ -12,7 +12,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from src.models.enums import PermissionLevel
+from models.enums import PermissionLevel
 
 
 class AccountShareCreate(BaseModel):

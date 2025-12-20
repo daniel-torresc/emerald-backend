@@ -15,8 +15,8 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.audit_log import AuditAction, AuditLog, AuditStatus
-from src.repositories.audit_repository import AuditLogRepository
+from models.audit_log import AuditAction, AuditLog, AuditStatus
+from repositories.audit_repository import AuditLogRepository
 
 logger = logging.getLogger(__name__)
 

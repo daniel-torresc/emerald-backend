@@ -44,6 +44,7 @@ dev = [
 
 [tool.mypy]
 strict = true
+mypy_path = "src"
 
 # Ignore missing type hints for specific libraries
 [[tool.mypy.overrides]]

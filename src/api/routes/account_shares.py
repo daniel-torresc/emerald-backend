@@ -12,8 +12,8 @@ import uuid
 
 from fastapi import APIRouter, Request, status
 
-from src.api.dependencies import AccountServiceDep, CurrentUser
-from src.schemas.account_share import (
+from api.dependencies import AccountServiceDep, CurrentUser
+from schemas.account_share import (
     AccountShareCreate,
     AccountShareResponse,
     AccountShareUpdate,

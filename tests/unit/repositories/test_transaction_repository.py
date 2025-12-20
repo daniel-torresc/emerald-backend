@@ -17,9 +17,9 @@ from decimal import Decimal
 
 import pytest
 
-from src.models.enums import TransactionType
-from src.models.transaction import Transaction
-from src.repositories.transaction_repository import TransactionRepository
+from models.enums import TransactionType
+from models.transaction import Transaction
+from repositories.transaction_repository import TransactionRepository
 
 
 @pytest.mark.asyncio

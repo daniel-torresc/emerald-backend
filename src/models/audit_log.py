@@ -18,8 +18,8 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import Base
-from src.models.enums import AuditAction, AuditStatus
+from models.base import Base
+from models.enums import AuditAction, AuditStatus
 
 
 class AuditLog(Base):

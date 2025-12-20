@@ -24,13 +24,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.models.base import Base
-from src.models.enums import CardType
-from src.models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
+from models.base import Base
+from models.enums import CardType
+from models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 
 if TYPE_CHECKING:
-    from src.models.account import Account
-    from src.models.financial_institution import FinancialInstitution
+    from models.account import Account
+    from models.financial_institution import FinancialInstitution
 
 
 class Card(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):

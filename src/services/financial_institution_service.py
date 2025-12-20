@@ -16,21 +16,21 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.exceptions import AlreadyExistsError, NotFoundError
-from src.models import AuditAction
-from src.models.user import User
-from src.repositories.financial_institution_repository import (
+from core.exceptions import AlreadyExistsError, NotFoundError
+from models import AuditAction
+from models.user import User
+from repositories.financial_institution_repository import (
     FinancialInstitutionRepository,
 )
-from src.schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
-from src.schemas.financial_institution import (
+from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
+from schemas.financial_institution import (
     FinancialInstitutionCreate,
     FinancialInstitutionFilterParams,
     FinancialInstitutionListItem,
     FinancialInstitutionResponse,
     FinancialInstitutionUpdate,
 )
-from src.services.audit_service import AuditService
+from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 

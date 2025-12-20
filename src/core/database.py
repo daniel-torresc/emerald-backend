@@ -2,8 +2,7 @@
 Database connection and session management.
 
 This module provides async database session management using SQLAlchemy 2.0
-with PostgreSQL and asyncpg driver. Implements connection pooling and
-dependency injection for FastAPI routes.
+with PostgreSQL and asyncpg driver. Implements connection pooling.
 """
 
 import logging
@@ -14,7 +13,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 
-from src.core.config import settings
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,9 @@ def create_database_engine(database_url: str | None = None) -> AsyncEngine:
         - pool_pre_ping: Test connection before use (default: True)
         - pool_recycle: Recycle connections after N seconds (default: 3600)
     """
-    url = database_url or str(settings.database_url)
+    url = database_url or settings.database_url_str
+
+    logger.info("Initializing database engine...")
 
     engine = create_async_engine(
         url,

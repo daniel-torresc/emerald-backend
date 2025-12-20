@@ -1,5 +1,5 @@
 """
-Custom exception classes for the Emerald Finance Platform.
+Custom exception classes.
 
 This module defines a hierarchy of custom exceptions that map to HTTP status codes
 and provide consistent error responses across the API.
@@ -25,6 +25,8 @@ Exception hierarchy:
 
 from typing import Any
 
+from starlette import status
+
 
 class AppException(Exception):
     """
@@ -43,7 +45,7 @@ class AppException(Exception):
     def __init__(
         self,
         message: str,
-        status_code: int = 500,
+        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
         error_code: str = "INTERNAL_ERROR",
         details: dict[str, Any] | None = None,
     ) -> None:
@@ -94,7 +96,7 @@ class AuthenticationError(AppException):
     ) -> None:
         super().__init__(
             message=message,
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             error_code=error_code,
             details=details,
         )
@@ -176,7 +178,7 @@ class AuthorizationError(AppException):
     ) -> None:
         super().__init__(
             message=message,
-            status_code=403,
+            status_code=status.HTTP_403_FORBIDDEN,
             error_code=error_code,
             details=details,
         )

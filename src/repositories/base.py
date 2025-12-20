@@ -14,7 +14,7 @@ from typing import Any, Generic, TypeVar
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.base import Base
+from models.base import Base
 
 # Type variable for the model class
 ModelType = TypeVar("ModelType", bound=Base)

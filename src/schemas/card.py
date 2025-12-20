@@ -15,9 +15,9 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from src.models.enums import CardType
-from src.schemas import FinancialInstitutionListItem
-from src.schemas.account import AccountListItem
+from models.enums import CardType
+from schemas import FinancialInstitutionListItem
+from schemas.account import AccountListItem
 
 
 class CardBase(BaseModel):

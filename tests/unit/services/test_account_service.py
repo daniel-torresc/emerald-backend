@@ -14,8 +14,8 @@ from decimal import Decimal
 
 import pytest
 
-from src.exceptions import AlreadyExistsError, NotFoundError
-from src.services.account_service import AccountService
+from core.exceptions import AlreadyExistsError, NotFoundError
+from services.account_service import AccountService
 
 
 @pytest.mark.asyncio
