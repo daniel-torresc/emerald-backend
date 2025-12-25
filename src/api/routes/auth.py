@@ -53,7 +53,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 )
 @limiter.limit(settings.rate_limit_register)
 async def register(
-    user_data: UserCreate,
+    data: UserCreate,
     request: Request,
     auth_service: AuthServiceDep,
     audit_service: AuditServiceDep,
@@ -62,7 +62,7 @@ async def register(
     Register a new user.
 
     Args:
-        user_data: User registration data (email, username, password)
+        data: User registration data (email, username, password)
         request: FastAPI request object
         auth_service: Injected AuthService instance
         audit_service: Injected AuditService instance
@@ -81,13 +81,13 @@ async def register(
 
     # Register user
     user, tokens = await auth_service.register(
-        data=user_data,
+        data=data,
         ip_address=ip_address,
         user_agent=user_agent,
     )
 
     # Log registration
-    await audit_service.log_data_change(
+    await audit_service.log_event(
         user_id=user.id,
         action=AuditAction.CREATE,
         entity_type="user",

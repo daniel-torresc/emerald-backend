@@ -26,7 +26,6 @@ from schemas.transaction import (
     TransactionSplitRequest,
     TransactionUpdate,
 )
-from services.transaction_service import UNSET
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +59,7 @@ router = APIRouter(tags=["Transactions"])
 async def create_transaction(
     request: Request,
     account_id: uuid.UUID,
-    transaction_data: TransactionCreate,
+    data: TransactionCreate,
     current_user: CurrentUser,
     transaction_service: TransactionServiceDep,
 ) -> TransactionResponse:
@@ -86,7 +85,7 @@ async def create_transaction(
     """
     transaction = await transaction_service.create_transaction(
         account_id=account_id,
-        data=transaction_data,
+        data=data,
         current_user=current_user,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
@@ -228,9 +227,9 @@ async def get_transaction(
 async def update_transaction(
     request: Request,
     current_user: CurrentUser,
+    transaction_id: uuid.UUID,
+    data: TransactionUpdate,
     transaction_service: TransactionServiceDep,
-    transaction_id: uuid.UUID = Path(description="Transaction UUID"),
-    transaction_data: TransactionUpdate = ...,
 ) -> TransactionResponse:
     """
     Update transaction fields.
@@ -252,22 +251,10 @@ async def update_transaction(
         - Valid access token
         - Creator, OWNER permission, or Admin role
     """
-    # Check if card_id was in the request body to distinguish
-    # "not provided" (UNSET) from "explicitly null" (None)
-    request_body = await request.json()
-    card_id_param = transaction_data.card_id if "card_id" in request_body else UNSET
-
     transaction = await transaction_service.update_transaction(
         transaction_id=transaction_id,
+        data=data,
         current_user=current_user,
-        transaction_date=transaction_data.transaction_date,
-        amount=transaction_data.amount,
-        description=transaction_data.description,
-        merchant=transaction_data.merchant,
-        card_id=card_id_param,
-        transaction_type=transaction_data.transaction_type,
-        user_notes=transaction_data.user_notes,
-        value_date=transaction_data.value_date,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),

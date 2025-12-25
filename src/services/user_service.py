@@ -120,7 +120,7 @@ class UserService:
     async def update_user_profile(
         self,
         user_id: uuid.UUID,
-        update_data: UserUpdate,
+        data: UserUpdate,
         current_user: User,
         request_id: str | None = None,
         ip_address: str | None = None,
@@ -137,7 +137,7 @@ class UserService:
 
         Args:
             user_id: User ID to update
-            update_data: UserUpdate schema with fields to update
+            data: UserUpdate schema with fields to update
             current_user: Currently authenticated user
             request_id: Request ID for audit logging
             ip_address: Client IP address
@@ -174,30 +174,39 @@ class UserService:
         }
 
         # Check email uniqueness if changing email
-        if update_data.email and update_data.email != user.email:
-            existing_user = await self.user_repo.get_by_email(update_data.email)
+        if data.email and data.email != user.email:
+            existing_user = await self.user_repo.get_by_email(data.email)
             if existing_user:
                 logger.warning(
-                    f"Email {update_data.email} already in use by user {existing_user.id}"
+                    f"Email {data.email} already in use by user {existing_user.id}"
                 )
                 raise AlreadyExistsError(
-                    f"Email {update_data.email} is already registered"
+                    f"Email {data.email} is already registered"
                 )
 
         # Check username uniqueness if changing username
-        if update_data.username and update_data.username != user.username:
-            existing_user = await self.user_repo.get_by_username(update_data.username)
+        if data.username and data.username != user.username:
+            existing_user = await self.user_repo.get_by_username(data.username)
             if existing_user:
                 logger.warning(
-                    f"Username {update_data.username} already in use by user {existing_user.id}"
+                    f"Username {data.username} already in use by user {existing_user.id}"
                 )
                 raise AlreadyExistsError(
-                    f"Username {update_data.username} is already taken"
+                    f"Username {data.username} is already taken"
                 )
 
         # Update user fields
-        update_dict = update_data.model_dump(exclude_unset=True)
-        updated_user = await self.user_repo.update(user, **update_dict)
+        update_dict = data.model_dump(exclude_unset=True)
+
+        if not update_dict:
+            return user  # Nothing to update
+
+        # Apply changes to model instance
+        for key, value in update_dict.items():
+            setattr(user, key, value)
+
+        # Persist changes
+        updated_user = await self.user_repo.update(user)
 
         # Capture new values for audit log
         new_values: dict[str, Any] = {
@@ -206,18 +215,22 @@ class UserService:
         }
 
         # Log audit event
-        await self.audit_service.log_data_change(
+        await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.UPDATE,
             entity_type="user",
             entity_id=user_id,
             old_values=old_values,
             new_values=new_values,
+            extra_metadata={"changed_fields": list(update_dict.keys())},
             description=f"User {current_user.username} updated profile",
             ip_address=ip_address,
             user_agent=user_agent,
             request_id=request_id,
         )
+
+        # Commit transaction
+        await self.session.commit()
 
         logger.info(f"User {user_id} profile updated by {current_user.id}")
 
@@ -360,7 +373,7 @@ class UserService:
         await self.token_repo.revoke_user_tokens(user_id)
 
         # Log audit event
-        await self.audit_service.log_data_change(
+        await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.DELETE,
             entity_type="user",
@@ -435,7 +448,7 @@ class UserService:
         await self.token_repo.revoke_user_tokens(user_id)
 
         # Log audit event
-        await self.audit_service.log_data_change(
+        await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.DELETE,
             entity_type="user",

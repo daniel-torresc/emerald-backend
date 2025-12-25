@@ -71,7 +71,7 @@ router = APIRouter(prefix="/accounts", tags=["Accounts"])
 async def create_account(
     request: Request,
     current_user: CurrentUser,
-    account_data: AccountCreate,
+    data: AccountCreate,
     account_service: AccountServiceDep,
 ) -> AccountResponse:
     """
@@ -102,7 +102,7 @@ async def create_account(
     """
     account = await account_service.create_account(
         user=current_user,
-        data=account_data,
+        data=data,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
@@ -279,7 +279,7 @@ async def update_account(
     request: Request,
     current_user: CurrentUser,
     account_id: uuid.UUID,
-    update_data: AccountUpdate,
+    data: AccountUpdate,
     account_service: AccountServiceDep,
 ) -> AccountResponse:
     """
@@ -314,13 +314,8 @@ async def update_account(
     """
     account = await account_service.update_account(
         account_id=account_id,
+        data=data,
         current_user=current_user,
-        account_name=update_data.account_name,
-        account_type_id=update_data.account_type_id,
-        financial_institution_id=update_data.financial_institution_id,
-        color_hex=update_data.color_hex,
-        icon_url=update_data.icon_url,
-        notes=update_data.notes,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),

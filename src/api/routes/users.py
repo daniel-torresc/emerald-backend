@@ -64,7 +64,7 @@ async def get_current_user_profile(
 )
 async def update_current_user_profile(
     request: Request,
-    update_data: UserUpdate,
+    data: UserUpdate,
     current_user: CurrentUser,
     user_service: UserServiceDep,
 ) -> UserResponse:
@@ -89,7 +89,7 @@ async def update_current_user_profile(
 
     user = await user_service.update_user_profile(
         user_id=current_user.id,
-        update_data=update_data,
+        data=data,
         current_user=current_user,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,

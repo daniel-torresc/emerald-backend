@@ -13,8 +13,6 @@ This module provides:
 
 import logging
 import uuid
-from dataclasses import dataclass
-from datetime import date
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +23,7 @@ from core.exceptions import (
     ValidationError,
 )
 from models import AuditAction
-from models.enums import PermissionLevel, TransactionType
+from models.enums import PermissionLevel
 from models.transaction import Transaction
 from models.user import User
 from repositories.account_repository import AccountRepository
@@ -36,21 +34,13 @@ from schemas.transaction import (
     TransactionCreate,
     TransactionFilterParams,
     TransactionListItem,
+    TransactionUpdate,
 )
 from services.audit_service import AuditService
 from services.currency_service import CurrencyService
 from services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
-
-
-# Sentinel value to distinguish "not provided" from "explicitly None"
-@dataclass
-class _UNSET:
-    pass
-
-
-UNSET = _UNSET()
 
 
 class TransactionService:
@@ -372,15 +362,8 @@ class TransactionService:
     async def update_transaction(
         self,
         transaction_id: uuid.UUID,
+        data: TransactionUpdate,
         current_user: User,
-        transaction_date: date | None = None,
-        amount: Decimal | None = None,
-        description: str | None = None,
-        merchant: str | None = None,
-        card_id: uuid.UUID | None | _UNSET = UNSET,
-        transaction_type: TransactionType | None = None,
-        user_notes: str | None = None,
-        value_date: date | None = None,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -391,22 +374,17 @@ class TransactionService:
         Steps:
         1. Get existing transaction
         2. Check user can edit (creator, admin, or account owner)
-        3. Calculate balance delta (new_amount - old_amount)
-        4. Update transaction
-        5. Update account balance by delta
-        6. Log audit with old/new values
+        3. Validate provided fields
+        4. Calculate balance delta if amount changing
+        5. Apply changes and persist
+        6. Update account balance by delta
+        7. Log audit with old/new values
+        8. Commit transaction
 
         Args:
             transaction_id: UUID of transaction to update
+            data: TransactionUpdate schema with fields to update
             current_user: Currently authenticated user
-            transaction_date: New date (optional)
-            amount: New amount (optional)
-            description: New description (optional)
-            merchant: New merchant (optional)
-            card_id: New card_id (optional, can be None to clear)
-            transaction_type: New type (optional)
-            user_notes: New notes (optional)
-            value_date: New value date (optional)
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
@@ -415,25 +393,24 @@ class TransactionService:
             Updated Transaction instance
 
         Raises:
-            NotFoundError: If transaction not found
+            NotFoundError: If transaction or card not found
             AuthorizationError: If user doesn't have edit permission
             ValidationError: If amount is zero
 
         Example:
             transaction = await transaction_service.update_transaction(
                 transaction_id=transaction.id,
+                data=TransactionUpdate(amount=Decimal("-60.00")),
                 current_user=user,
-                amount=Decimal("-60.00"),
-                description="Updated description",
             )
         """
-        # Get existing transaction
+        # 1. Get existing transaction
         existing = await self.transaction_repo.get_by_id(transaction_id)
         if existing is None:
             logger.warning(f"Transaction {transaction_id} not found")
             raise NotFoundError("Transaction")
 
-        # Permission check: creator, admin, or account owner
+        # 2. Permission check: creator, admin, or account owner
         is_creator = existing.created_by == current_user.id
         is_admin = current_user.is_admin
         is_owner = await self.permission_service.check_permission(
@@ -450,89 +427,74 @@ class TransactionService:
                 "You don't have permission to edit this transaction"
             )
 
-        # Validate amount if provided
-        if amount is not None and amount == 0:
+        # 3. Get only provided fields
+        update_dict = data.model_dump(exclude_unset=True)
+
+        if not update_dict:
+            return existing  # Nothing to update
+
+        # 4. Business validations
+        if "amount" in update_dict and update_dict["amount"] == 0:
             raise ValidationError("Transaction amount cannot be zero")
 
         # Validate card if being updated
         # card_id can be:
-        #   - UNSET: don't update card (leave as is)
-        #   - UUID: validate and set to this card
-        #   - None: clear the card (set to NULL)
-        if not isinstance(card_id, _UNSET):
-            if card_id is not None:  # UUID provided, validate it
+        #   - Not in update_dict: don't update card (leave as is)
+        #   - UUID in update_dict: validate and set to this card
+        #   - None in update_dict: clear the card (set to NULL)
+        if "card_id" in update_dict:
+            new_card_id = update_dict["card_id"]
+            if new_card_id is not None:  # UUID provided, validate it
                 card = await self.card_repo.get_by_id_for_user(
-                    card_id=card_id,
+                    card_id=new_card_id,
                     user_id=current_user.id,
                 )
                 if card is None:
                     logger.warning(
-                        f"Card {card_id} not found or unauthorized for user {current_user.id}"
+                        f"Card {new_card_id} not found or unauthorized for user {current_user.id}"
                     )
                     raise NotFoundError("Card")
             # If card_id is None, we allow it (clearing the card)
 
-        # Calculate balance delta
+        # 5. Calculate balance delta before applying changes
         old_amount = existing.amount
-        new_amount = amount if amount is not None else old_amount
+        new_amount = update_dict.get("amount", old_amount)
         balance_delta = new_amount - old_amount
 
-        # Track changes for audit
-        old_values = {}
-        new_values = {}
+        # 6. Capture old values for audit
+        old_values = {
+            "transaction_date": str(existing.transaction_date),
+            "amount": str(existing.amount),
+            "description": existing.description,
+            "merchant": existing.merchant,
+            "card_id": str(existing.card_id) if existing.card_id else None,
+            "transaction_type": existing.transaction_type.value,
+            "user_notes": existing.user_notes,
+            "value_date": str(existing.value_date) if existing.value_date else None,
+        }
 
-        # Use database transaction for atomicity
-        # Transaction managed by caller
-        # Update transaction fields
-        if transaction_date is not None:
-            old_values["transaction_date"] = str(existing.transaction_date)
-            new_values["transaction_date"] = str(transaction_date)
-            existing.transaction_date = transaction_date
-
-        if amount is not None:
-            old_values["amount"] = str(existing.amount)
-            new_values["amount"] = str(amount)
-            existing.amount = amount
-
-        if description is not None:
-            old_values["description"] = existing.description
-            new_values["description"] = description
-            existing.description = description
-
-        if merchant is not None:
-            old_values["merchant"] = existing.merchant
-            new_values["merchant"] = merchant
-            existing.merchant = merchant
-
-        # Update card_id if provided (UNSET means don't change)
-        if not isinstance(card_id, _UNSET):
-            old_values["card_id"] = str(existing.card_id) if existing.card_id else None
-            new_values["card_id"] = str(card_id) if card_id else None
-            existing.card_id = card_id
-
-        if transaction_type is not None:
-            old_values["transaction_type"] = existing.transaction_type.value
-            new_values["transaction_type"] = transaction_type.value
-            existing.transaction_type = transaction_type
-
-        if user_notes is not None:
-            old_values["user_notes"] = existing.user_notes
-            new_values["user_notes"] = user_notes
-            existing.user_notes = user_notes
-
-        if value_date is not None:
-            old_values["value_date"] = (
-                str(existing.value_date) if existing.value_date else None
-            )
-            new_values["value_date"] = str(value_date)
-            existing.value_date = value_date
-
+        # 7. Apply changes to model instance
+        for key, value in update_dict.items():
+            setattr(existing, key, value)
         existing.updated_by = current_user.id
 
+        # 8. Persist
         updated = await self.transaction_repo.update(existing)
 
-        # Update balance if amount changed
-        if balance_delta != 0:
+        # 9. Capture new values for audit
+        new_values = {
+            "transaction_date": str(updated.transaction_date),
+            "amount": str(updated.amount),
+            "description": updated.description,
+            "merchant": updated.merchant,
+            "card_id": str(updated.card_id) if updated.card_id else None,
+            "transaction_type": updated.transaction_type.value,
+            "user_notes": updated.user_notes,
+            "value_date": str(updated.value_date) if updated.value_date else None,
+        }
+
+        # 10. Update balance if amount changed
+        if balance_delta != Decimal(0):
             account = await self.account_repo.get_for_update(existing.account_id)
             old_balance = account.current_balance
             account.current_balance += balance_delta
@@ -544,23 +506,26 @@ class TransactionService:
                 f"new balance: {old_balance} -> {new_balance}"
             )
 
-        # Audit log
+        # 11. Audit log with old/new values
         await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.UPDATE,
             entity_type="transaction",
             entity_id=transaction_id,
-            description=f"Updated transaction: {existing.description}",
             old_values=old_values,
             new_values=new_values,
             extra_metadata={
                 "account_id": str(existing.account_id),
                 "balance_delta": str(balance_delta),
+                "changed_fields": list(update_dict.keys()),
             },
             ip_address=ip_address,
             user_agent=user_agent,
             request_id=request_id,
         )
+
+        # 12. Commit transaction
+        await self.session.commit()
 
         return updated
 
