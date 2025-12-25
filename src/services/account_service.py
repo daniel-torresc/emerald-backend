@@ -38,7 +38,7 @@ from schemas.account import (
     AccountListItem,
     AccountUpdate,
 )
-from schemas.account_share import AccountShareCreate
+from schemas.account_share import AccountShareCreate, AccountShareUpdate
 from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
 from services.audit_service import AuditService
 from services.currency_service import CurrencyService
@@ -762,7 +762,7 @@ class AccountService:
         self,
         account_id: uuid.UUID,
         share_id: uuid.UUID,
-        permission_level: PermissionLevel,
+        data: AccountShareUpdate,
         current_user: User,
         request_id: str | None = None,
         ip_address: str | None = None,
@@ -776,7 +776,7 @@ class AccountService:
         Args:
             account_id: ID of the account
             share_id: ID of the share to update
-            permission_level: New permission level
+            data: AccountShareUpdate schema with new permission level
             current_user: Currently authenticated user (must be owner)
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
@@ -794,7 +794,7 @@ class AccountService:
             updated_share = await account_service.update_share(
                 account_id=account.id,
                 share_id=share.id,
-                permission_level=PermissionLevel.EDITOR,
+                data=AccountShareUpdate(permission_level=PermissionLevel.EDITOR),
                 current_user=owner
             )
         """
@@ -808,37 +808,47 @@ class AccountService:
         if not share or share.account_id != account_id:
             raise NotFoundError("Share not found")
 
-        # Cannot grant owner permission
-        if permission_level == PermissionLevel.owner:
-            raise ValidationError(
-                "Cannot grant owner permission. Each account has exactly one owner."
-            )
+        # Get update dict using exclude_unset pattern
+        update_dict = data.model_dump(exclude_unset=True)
 
-        # Cannot change own owner permission
-        if (
-            share.user_id == current_user.id
-            and share.permission_level == PermissionLevel.owner
-        ):
-            raise ValidationError("Cannot change your own owner permission")
+        if not update_dict:
+            return share  # Nothing to update
 
-        # Store old permission for audit
-        old_permission = share.permission_level
+        # Business validation for permission_level
+        if "permission_level" in update_dict:
+            new_permission = update_dict["permission_level"]
+
+            # Cannot grant owner permission
+            if new_permission == PermissionLevel.owner:
+                raise ValidationError(
+                    "Cannot grant owner permission. Each account has exactly one owner."
+                )
+
+            # Cannot change own owner permission
+            if (
+                share.user_id == current_user.id
+                and share.permission_level == PermissionLevel.owner
+            ):
+                raise ValidationError("Cannot change your own owner permission")
 
         # Capture old values for audit
-        old_values = {"permission_level": old_permission.value}
+        old_values = {"permission_level": share.permission_level.value}
 
-        # Update permission
-        share.permission_level = permission_level
+        # Apply changes to model instance
+        for key, value in update_dict.items():
+            setattr(share, key, value)
+
         share.updated_by = current_user.id
 
+        # Persist changes
         updated_share = await self.share_repo.update(share)
 
         # Capture new values for audit
         new_values = {"permission_level": updated_share.permission_level.value}
 
         logger.info(
-            f"User {current_user.id} updated share {share_id} permission "
-            f"from {old_permission.value} to {permission_level.value}"
+            f"User {current_user.id} updated share {share_id} "
+            f"(changed fields: {list(update_dict.keys())})"
         )
 
         # Log audit event with old/new values
@@ -852,6 +862,7 @@ class AccountService:
             extra_metadata={
                 "account_id": str(account_id),
                 "share_user_id": str(share.user_id),
+                "changed_fields": list(update_dict.keys()),
             },
             ip_address=ip_address,
             user_agent=user_agent,

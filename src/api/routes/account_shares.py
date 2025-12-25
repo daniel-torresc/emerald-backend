@@ -184,7 +184,7 @@ async def update_share(
     updated_share = await account_service.update_share(
         account_id=account_id,
         share_id=share_id,
-        permission_level=data.permission_level,
+        data=data,
         current_user=current_user,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
