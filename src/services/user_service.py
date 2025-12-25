@@ -180,9 +180,7 @@ class UserService:
                 logger.warning(
                     f"Email {data.email} already in use by user {existing_user.id}"
                 )
-                raise AlreadyExistsError(
-                    f"Email {data.email} is already registered"
-                )
+                raise AlreadyExistsError(f"Email {data.email} is already registered")
 
         # Check username uniqueness if changing username
         if data.username and data.username != user.username:
@@ -191,9 +189,7 @@ class UserService:
                 logger.warning(
                     f"Username {data.username} already in use by user {existing_user.id}"
                 )
-                raise AlreadyExistsError(
-                    f"Username {data.username} is already taken"
-                )
+                raise AlreadyExistsError(f"Username {data.username} is already taken")
 
         # Update user fields
         update_dict = data.model_dump(exclude_unset=True)

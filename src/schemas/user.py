@@ -6,14 +6,30 @@ This module provides:
 - User response schemas
 - Password change schemas
 - User filtering and listing schemas
+- User sort field enum
 """
 
 import uuid
 from datetime import datetime
+from enum import Enum
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from core.security import validate_password_strength
+
+
+class UserSortField(str, Enum):
+    """
+    Allowed sort fields for user list queries.
+
+    Whitelists fields that can be used for sorting to prevent SQL injection.
+    Values must match SQLAlchemy model attribute names exactly.
+    """
+
+    USERNAME = "username"
+    EMAIL = "email"
+    CREATED_AT = "created_at"
+    LAST_LOGIN_AT = "last_login_at"
 
 
 class UserBase(BaseModel):
@@ -67,6 +83,16 @@ class UserCreate(UserBase):
             )
         return value
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "email": "user@example.com",
+                "username": "johndoe",
+                "password": "SecurePass123!",
+            }
+        }
+    )
+
 
 class UserUpdate(BaseModel):
     """
@@ -115,6 +141,16 @@ class UserUpdate(BaseModel):
                 return None
         return value
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "email": "newemail@example.com",
+                "username": "newusername",
+                "full_name": "John Doe",
+            }
+        }
+    )
+
 
 class UserPasswordChange(BaseModel):
     """
@@ -139,6 +175,15 @@ class UserPasswordChange(BaseModel):
         if not is_valid:
             raise ValueError(error_message)
         return value
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "current_password": "OldSecurePass123!",
+                "new_password": "NewSecurePass456!",
+            }
+        }
+    )
 
 
 class UserResponse(BaseModel):
@@ -170,7 +215,37 @@ class UserResponse(BaseModel):
         description="Last login timestamp",
     )
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "email": "user@example.com",
+                "username": "johndoe",
+                "full_name": "John Doe",
+                "is_admin": False,
+                "created_at": "2024-01-15T10:30:00Z",
+                "updated_at": "2024-01-15T10:30:00Z",
+                "last_login_at": "2024-01-20T08:15:00Z",
+            }
+        },
+    )
+
+
+class UserEmbedded(BaseModel):
+    """
+    Minimal user representation for embedding in other entities.
+
+    Used in AccountShare and other responses to show user info
+    without sensitive details.
+    """
+
+    id: uuid.UUID = Field(description="User UUID")
+    username: str = Field(description="Username")
+    email: str = Field(description="Email address")
+    full_name: str | None = Field(default=None, description="Full name")
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserListItem(BaseModel):
@@ -191,7 +266,17 @@ class UserListItem(BaseModel):
     username: str = Field(description="User's username")
     created_at: datetime = Field(description="Account creation timestamp")
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "email": "user@example.com",
+                "username": "johndoe",
+                "created_at": "2024-01-15T10:30:00Z",
+            }
+        },
+    )
 
 
 class UserFilterParams(BaseModel):
@@ -212,4 +297,13 @@ class UserFilterParams(BaseModel):
         min_length=1,
         max_length=100,
         description="Search in email or username",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "is_superuser": False,
+                "search": "john",
+            }
+        }
     )

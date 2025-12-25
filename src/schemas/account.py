@@ -5,18 +5,34 @@ This module provides:
 - Account creation and update schemas
 - Account response schemas
 - Account filtering schemas
+- Account sort field enum
 """
 
 import re
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from schwifty import IBAN
 
 from schemas.account_type import AccountTypeListItem
 from schemas.financial_institution import FinancialInstitutionResponse
+
+
+class AccountSortField(str, Enum):
+    """
+    Allowed sort fields for account list queries.
+
+    Whitelists fields that can be used for sorting to prevent SQL injection.
+    Values must match SQLAlchemy model attribute names exactly.
+    """
+
+    ACCOUNT_NAME = "account_name"
+    CURRENT_BALANCE = "current_balance"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
 
 
 class AccountBase(BaseModel):
@@ -357,7 +373,22 @@ class AccountResponse(AccountBase):
     created_at: datetime = Field(description="When account was created")
     updated_at: datetime = Field(description="When account was last updated")
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AccountEmbedded(BaseModel):
+    """
+    Minimal account representation for embedding in other entities.
+
+    Used in Card responses to show the linked account without
+    requiring a separate API call.
+    """
+
+    id: uuid.UUID = Field(description="Account UUID")
+    account_name: str = Field(description="Account display name")
+    currency: str = Field(description="ISO 4217 currency code")
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AccountListItem(BaseModel):
@@ -393,7 +424,7 @@ class AccountListItem(BaseModel):
     financial_institution: FinancialInstitutionResponse
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AccountFilterParams(BaseModel):

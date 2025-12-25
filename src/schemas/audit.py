@@ -4,15 +4,30 @@ Audit log Pydantic schemas for API request/response handling.
 This module provides:
 - Audit log response schemas
 - Audit log filtering parameters
+- Audit log sort field enum
 - Event type definitions
 """
 
 from datetime import datetime
+from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from models import AuditAction, AuditStatus
+
+
+class AuditLogSortField(str, Enum):
+    """
+    Allowed sort fields for audit log list queries.
+
+    Whitelists fields that can be used for sorting to prevent SQL injection.
+    Values must match SQLAlchemy model attribute names exactly.
+    """
+
+    CREATED_AT = "created_at"
+    ACTION = "action"
+    ENTITY_TYPE = "entity_type"
 
 
 class AuditLogResponse(BaseModel):
@@ -77,7 +92,28 @@ class AuditLogResponse(BaseModel):
     )
     created_at: datetime = Field(description="Timestamp of the action")
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "user_id": "123e4567-e89b-12d3-a456-426614174001",
+                "action": "USER_UPDATE",
+                "entity_type": "user",
+                "entity_id": "123e4567-e89b-12d3-a456-426614174001",
+                "old_values": {"email": "old@example.com"},
+                "new_values": {"email": "new@example.com"},
+                "description": "User updated their email address",
+                "ip_address": "192.168.1.100",
+                "user_agent": "Mozilla/5.0",
+                "request_id": "req-abc123",
+                "status": "SUCCESS",
+                "error_message": None,
+                "extra_metadata": None,
+                "created_at": "2024-01-15T10:30:00Z",
+            }
+        },
+    )
 
 
 class AuditLogFilterParams(BaseModel):
@@ -117,4 +153,17 @@ class AuditLogFilterParams(BaseModel):
     end_date: datetime | None = Field(
         default=None,
         description="Filter logs before this date",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "user_id": "123e4567-e89b-12d3-a456-426614174001",
+                "action": "USER_UPDATE",
+                "entity_type": "user",
+                "status": "SUCCESS",
+                "start_date": "2024-01-01T00:00:00Z",
+                "end_date": "2024-12-31T23:59:59Z",
+            }
+        }
     )

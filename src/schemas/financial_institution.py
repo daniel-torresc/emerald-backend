@@ -5,18 +5,34 @@ This module provides:
 - Institution creation and update schemas
 - Institution response schemas
 - Institution filtering and listing schemas
+- Institution sort field enum
 - SWIFT code and routing number validation
 """
 
 import uuid
 from datetime import datetime
+from enum import Enum
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic_extra_types.country import CountryAlpha2
 from pydantic_extra_types.routing_number import ABARoutingNumber
 from schwifty import BIC
 
 from models.enums import InstitutionType
+
+
+class FinancialInstitutionSortField(str, Enum):
+    """
+    Allowed sort fields for financial institution list queries.
+
+    Whitelists fields that can be used for sorting to prevent SQL injection.
+    Values must match SQLAlchemy model attribute names exactly.
+    """
+
+    NAME = "name"
+    SHORT_NAME = "short_name"
+    COUNTRY_CODE = "country_code"
+    CREATED_AT = "created_at"
 
 
 class FinancialInstitutionBase(BaseModel):
@@ -324,7 +340,23 @@ class FinancialInstitutionResponse(FinancialInstitutionBase):
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FinancialInstitutionEmbedded(BaseModel):
+    """
+    Minimal financial institution representation for embedding.
+
+    Used in Account and Card responses to show the institution
+    without full details.
+    """
+
+    id: uuid.UUID = Field(description="Institution UUID")
+    name: str = Field(description="Official institution name")
+    short_name: str = Field(description="Display name")
+    logo_url: str | None = Field(default=None, description="Logo URL")
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FinancialInstitutionListItem(BaseModel):
@@ -352,7 +384,7 @@ class FinancialInstitutionListItem(BaseModel):
     institution_type: InstitutionType = Field(description="Institution type")
     logo_url: str | None = Field(description="Logo URL")
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FinancialInstitutionFilterParams(BaseModel):

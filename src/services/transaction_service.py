@@ -29,7 +29,12 @@ from models.user import User
 from repositories.account_repository import AccountRepository
 from repositories.card_repository import CardRepository
 from repositories.transaction_repository import TransactionRepository
-from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
+from schemas.common import (
+    PaginatedResponse,
+    PaginationMeta,
+    PaginationParams,
+    SortParams,
+)
 from schemas.transaction import (
     TransactionCreate,
     TransactionFilterParams,
@@ -279,6 +284,7 @@ class TransactionService:
         current_user: User,
         pagination: PaginationParams,
         filters: TransactionFilterParams,
+        sorting: SortParams | None = None,
     ) -> PaginatedResponse[TransactionListItem]:
         """
         Search transactions with pagination and filters.
@@ -288,6 +294,7 @@ class TransactionService:
             current_user: Currently authenticated user
             pagination: Pagination parameters (page, page_size)
             filters: Filter parameters (dates, amounts, description, etc.)
+            sorting: Sort parameters (sort_by, sort_order)
 
         Returns:
             PaginatedResponse with TransactionResponse objects and metadata
@@ -303,7 +310,8 @@ class TransactionService:
                 filters=TransactionFilterParams(
                     description="grocery",
                     amount_min=Decimal("10.00")
-                )
+                ),
+                sorting=SortParams(sort_by="transaction_date", sort_order="desc")
             )
         """
         # Check user has account access (VIEWER or higher)
@@ -321,6 +329,10 @@ class TransactionService:
                 "You don't have permission to view transactions for this account"
             )
 
+        # Use default sorting if not provided
+        sort_by = sorting.sort_by if sorting else "transaction_date"
+        sort_order = sorting.sort_order.value if sorting else "desc"
+
         # Delegate to repository
         transactions, total = await self.transaction_repo.search_transactions(
             account_id=account_id,
@@ -333,8 +345,8 @@ class TransactionService:
             transaction_type=filters.transaction_type,
             card_id=filters.card_id,
             card_type=filters.card_type,
-            sort_by=filters.sort_by,
-            sort_order=filters.sort_order,
+            sort_by=sort_by,
+            sort_order=sort_order,
             offset=pagination.offset,
             limit=pagination.page_size,
         )

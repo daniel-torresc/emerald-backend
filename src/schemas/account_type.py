@@ -12,7 +12,7 @@ import re
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 
 class AccountTypeBase(BaseModel):
@@ -215,7 +215,7 @@ class AccountTypeResponse(AccountTypeBase):
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AccountTypeListItem(BaseModel):
@@ -239,4 +239,4 @@ class AccountTypeListItem(BaseModel):
     icon_url: HttpUrl | None = Field(description="Icon URL")
     sort_order: int = Field(description="Display order")
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)

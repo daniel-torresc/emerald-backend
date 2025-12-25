@@ -10,7 +10,7 @@ This module provides:
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from models.enums import PermissionLevel
 
@@ -34,6 +34,15 @@ class AccountShareCreate(BaseModel):
         examples=[PermissionLevel.viewer, PermissionLevel.editor],
     )
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "user_id": "550e8400-e29b-41d4-a716-446655440000",
+                "permission_level": "viewer",
+            }
+        }
+    )
+
 
 class AccountShareUpdate(BaseModel):
     """
@@ -48,6 +57,14 @@ class AccountShareUpdate(BaseModel):
     permission_level: PermissionLevel = Field(
         description="New permission level (owner, editor, viewer)",
         examples=[PermissionLevel.editor, PermissionLevel.viewer],
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "permission_level": "editor",
+            }
+        }
     )
 
 
@@ -67,7 +84,7 @@ class UserSummary(BaseModel):
     email: str = Field(description="Email address")
     full_name: str | None = Field(description="Full name (optional)")
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AccountShareResponse(BaseModel):
@@ -94,7 +111,25 @@ class AccountShareResponse(BaseModel):
     updated_at: datetime = Field(description="When share was last updated")
     user: UserSummary = Field(description="User details")
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "account_id": "123e4567-e89b-12d3-a456-426614174001",
+                "user_id": "123e4567-e89b-12d3-a456-426614174002",
+                "permission_level": "viewer",
+                "created_at": "2024-01-15T10:30:00Z",
+                "updated_at": "2024-01-15T10:30:00Z",
+                "user": {
+                    "id": "123e4567-e89b-12d3-a456-426614174002",
+                    "username": "johndoe",
+                    "email": "john@example.com",
+                    "full_name": "John Doe",
+                },
+            }
+        },
+    )
 
 
 class AccountShareListItem(BaseModel):
@@ -117,4 +152,4 @@ class AccountShareListItem(BaseModel):
     created_at: datetime
     user: UserSummary
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)

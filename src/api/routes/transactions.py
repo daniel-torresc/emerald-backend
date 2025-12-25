@@ -17,7 +17,7 @@ import uuid
 from fastapi import APIRouter, Depends, Path, Request, status
 
 from api.dependencies import CurrentUser, TransactionServiceDep
-from schemas.common import PaginatedResponse, PaginationParams
+from schemas.common import PaginatedResponse, PaginationParams, SortParams
 from schemas.transaction import (
     TransactionCreate,
     TransactionFilterParams,
@@ -126,6 +126,7 @@ async def list_transactions(
     account_id: uuid.UUID = Path(description="Account UUID"),
     pagination: PaginationParams = Depends(),
     filters: TransactionFilterParams = Depends(),
+    sorting: SortParams = Depends(),
 ) -> PaginatedResponse[TransactionListItem]:
     """
     List and search transactions for an account.
@@ -157,6 +158,7 @@ async def list_transactions(
         current_user=current_user,
         pagination=pagination,
         filters=filters,
+        sorting=sorting,
     )
 
 

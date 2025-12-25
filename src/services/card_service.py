@@ -295,7 +295,9 @@ class CardService:
         old_values = {
             "name": card.name,
             "last_four_digits": card.last_four_digits,
-            "card_network": old_card_network.value if hasattr(old_card_network, "value") else old_card_network,
+            "card_network": old_card_network.value
+            if hasattr(old_card_network, "value")
+            else old_card_network,
             "expiry_month": card.expiry_month,
             "expiry_year": card.expiry_year,
             "credit_limit": str(card.credit_limit) if card.credit_limit else None,
@@ -318,7 +320,9 @@ class CardService:
         new_values = {
             "name": card.name,
             "last_four_digits": card.last_four_digits,
-            "card_network": new_card_network.value if hasattr(new_card_network, "value") else new_card_network,
+            "card_network": new_card_network.value
+            if hasattr(new_card_network, "value")
+            else new_card_network,
             "expiry_month": card.expiry_month,
             "expiry_year": card.expiry_year,
             "credit_limit": str(card.credit_limit) if card.credit_limit else None,
