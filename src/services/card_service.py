@@ -10,7 +10,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AuthorizationError, NotFoundError
-from models import AuditAction, AuditStatus
+from models import AuditAction, AuditStatus, Card
 from models.user import User
 from repositories.account_repository import AccountRepository
 from repositories.card_repository import CardRepository
@@ -104,7 +104,7 @@ class CardService:
                 raise NotFoundError("Financial institution")
 
         # 3. Create card
-        card = await self.card_repo.create(
+        card = Card(
             account_id=data.account_id,
             financial_institution_id=data.financial_institution_id,
             card_type=data.card_type,
@@ -118,6 +118,8 @@ class CardService:
             created_by=current_user.id,
             updated_by=current_user.id,
         )
+        card = await self.card_repo.add(card)
+        await self.session.commit()
 
         # 4. Audit log
         await self.audit_service.log_event(
@@ -197,7 +199,7 @@ class CardService:
                 raise AuthorizationError("Account does not belong to you")
 
         # Get cards
-        cards = await self.card_repo.search(
+        cards = await self.card_repo.search_by_user(
             user_id=current_user.id,
             card_type=filters.card_type,
             account_id=filters.account_id,
@@ -205,7 +207,7 @@ class CardService:
             limit=pagination.page_size,
         )
 
-        total_count = await self.card_repo.search_count(
+        total_count = await self.card_repo.search_count_by_user(
             user_id=current_user.id,
             card_type=filters.card_type,
             account_id=filters.account_id,

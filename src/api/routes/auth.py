@@ -13,7 +13,7 @@ import logging
 
 from fastapi import APIRouter, Request, status
 
-from api.dependencies import AuditServiceDep, AuthServiceDep, CurrentUser, DbSession
+from api.dependencies import AuditServiceDep, AuthServiceDep, CurrentUser
 from core.config import settings
 from core.rate_limit import limiter
 from models import AuditAction, AuditStatus
@@ -57,7 +57,6 @@ async def register(
     request: Request,
     auth_service: AuthServiceDep,
     audit_service: AuditServiceDep,
-    db: DbSession,
 ) -> UserResponse:
     """
     Register a new user.
@@ -67,7 +66,6 @@ async def register(
         request: FastAPI request object
         auth_service: Injected AuthService instance
         audit_service: Injected AuditService instance
-        db: Database session
 
     Returns:
         UserResponse with created user data
@@ -83,7 +81,7 @@ async def register(
 
     # Register user
     user, tokens = await auth_service.register(
-        user_data=user_data,
+        data=user_data,
         ip_address=ip_address,
         user_agent=user_agent,
     )
@@ -103,8 +101,6 @@ async def register(
         user_agent=user_agent,
         request_id=request_id,
     )
-
-    await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
     logger.info(f"User registered: {user.id} ({user.email})")
 
@@ -135,7 +131,6 @@ async def login(
     request: Request,
     auth_service: AuthServiceDep,
     audit_service: AuditServiceDep,
-    db: DbSession,
 ) -> TokenResponse:
     """
     Login and receive authentication tokens.
@@ -145,7 +140,6 @@ async def login(
         request: FastAPI request object
         auth_service: Injected AuthService instance
         audit_service: Injected AuditService instance
-        db: Database session
 
     Returns:
         TokenResponse with access and refresh tokens
@@ -176,8 +170,6 @@ async def login(
             success=True,
         )
 
-        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
-
         logger.info(f"User logged in: {user.id} ({user.email})")
 
         return tokens
@@ -196,8 +188,6 @@ async def login(
             status=AuditStatus.FAILURE,
             error_message=str(e),
         )
-
-        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
         logger.warning(f"Failed login attempt for {credentials.email}")
 
@@ -228,7 +218,6 @@ async def refresh(
     request: Request,
     auth_service: AuthServiceDep,
     audit_service: AuditServiceDep,
-    db: DbSession,
 ) -> AccessTokenResponse:
     """
     Refresh access token using refresh token.
@@ -238,7 +227,6 @@ async def refresh(
         request: FastAPI request object
         auth_service: Injected AuthService instance
         audit_service: Injected AuditService instance
-        db: Database session
 
     Returns:
         AccessTokenResponse with new access and refresh tokens
@@ -279,8 +267,6 @@ async def refresh(
                 success=True,
             )
 
-        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
-
         logger.info("Token refreshed successfully")
 
         return tokens
@@ -298,8 +284,6 @@ async def refresh(
             status=AuditStatus.FAILURE,
             error_message=str(e),
         )
-
-        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
         logger.warning("Failed token refresh attempt")
 
@@ -323,7 +307,6 @@ async def logout(
     request: Request,
     auth_service: AuthServiceDep,
     audit_service: AuditServiceDep,
-    db: DbSession,
 ) -> None:
     """
     Logout user by revoking refresh token.
@@ -333,7 +316,6 @@ async def logout(
         request: FastAPI request object
         auth_service: Injected AuthService instance
         audit_service: Injected AuditService instance
-        db: Database session
 
     Raises:
         401: Invalid refresh token
@@ -367,8 +349,6 @@ async def logout(
             request_id=request_id,
         )
 
-    await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
-
     logger.info("User logged out")
 
 
@@ -392,7 +372,6 @@ async def change_password(
     current_user: CurrentUser,
     auth_service: AuthServiceDep,
     audit_service: AuditServiceDep,
-    db: DbSession,
 ) -> None:
     """
     Change user password.
@@ -403,7 +382,6 @@ async def change_password(
         current_user: Authenticated user (from dependency)
         auth_service: Injected AuthService instance
         audit_service: Injected AuditService instance
-        db: Database session
 
     Raises:
         401: Invalid current password
@@ -431,8 +409,6 @@ async def change_password(
             success=True,
         )
 
-        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
-
         logger.info(f"Password changed for user {current_user.id}")
 
     except Exception as e:
@@ -445,8 +421,6 @@ async def change_password(
             success=False,
             error_message=str(e),
         )
-
-        await db.commit()  # TODO is this commit necessary? Both auth and audit services perform their corresponding commits
 
         logger.warning(f"Failed password change for user {current_user.id}")
 

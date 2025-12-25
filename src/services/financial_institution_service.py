@@ -17,7 +17,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AlreadyExistsError, NotFoundError
-from models import AuditAction
+from models import AuditAction, FinancialInstitution
 from models.user import User
 from repositories.financial_institution_repository import (
     FinancialInstitutionRepository,
@@ -126,7 +126,7 @@ class FinancialInstitutionService:
                 )
 
         # Create institution
-        institution = await self.institution_repo.create(
+        institution = FinancialInstitution(
             name=data.name,
             short_name=data.short_name,
             swift_code=data.swift_code,
@@ -136,6 +136,7 @@ class FinancialInstitutionService:
             logo_url=str(data.logo_url) if data.logo_url else None,
             website_url=str(data.website_url) if data.website_url else None,
         )
+        institution = await self.institution_repo.add(institution)
 
         # Commit transaction
         await self.session.commit()

@@ -25,7 +25,7 @@ from models.user import User
 from repositories.refresh_token_repository import RefreshTokenRepository
 from repositories.user_repository import UserRepository
 from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
-from schemas.user import UserFilterParams, UserListItem, UserResponse, UserUpdate
+from schemas.user import UserFilterParams, UserListItem, UserUpdate
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ class UserService:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> UserResponse:
+    ) -> User:
         """
         Get user profile by ID.
 
@@ -80,7 +80,7 @@ class UserService:
             user_agent: Client user agent
 
         Returns:
-            UserResponse with user data
+            User with user data
 
         Raises:
             NotFoundError: If user not found
@@ -115,7 +115,7 @@ class UserService:
                 request_id=request_id,
             )
 
-        return UserResponse.model_validate(user)
+        return user
 
     async def update_user_profile(
         self,
@@ -125,7 +125,7 @@ class UserService:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> UserResponse:
+    ) -> User:
         """
         Update user profile.
 
@@ -144,7 +144,7 @@ class UserService:
             user_agent: Client user agent
 
         Returns:
-            UserResponse with updated user data
+            User with updated user data
 
         Raises:
             NotFoundError: If user not found
@@ -221,7 +221,7 @@ class UserService:
 
         logger.info(f"User {user_id} profile updated by {current_user.id}")
 
-        return UserResponse.model_validate(updated_user)
+        return updated_user
 
     async def list_users(
         self,
@@ -266,7 +266,7 @@ class UserService:
         users = await self.user_repo.filter_users(
             is_admin=filters.is_superuser,
             search=filters.search,
-            skip=(pagination.page - 1) * pagination.page_size,
+            offset=pagination.offset,
             limit=pagination.page_size,
         )
 
@@ -308,7 +308,7 @@ class UserService:
             ),
         )
 
-    async def deactivate_user(
+    async def delete_user(
         self,
         user_id: uuid.UUID,
         current_user: User,
@@ -353,7 +353,7 @@ class UserService:
             logger.warning(f"User {user_id} not found")
             raise NotFoundError(f"User with ID {user_id}")
 
-        # Soft delete the user
+        # Delete the user
         await self.user_repo.delete(user)
 
         # Revoke all refresh tokens
@@ -375,7 +375,7 @@ class UserService:
 
         logger.info(f"User {user_id} deactivated by admin {current_user.id}")
 
-    async def soft_delete_user(
+    async def deactivate_user(
         self,
         user_id: uuid.UUID,
         current_user: User,

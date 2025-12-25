@@ -265,3 +265,34 @@ class CardFilterParams(BaseModel):
         default=None,
         description="Filter by account ID",
     )
+
+
+class CardEmbedded(BaseModel):
+    """
+    Minimal card representation embedded in transaction responses.
+
+    This schema provides essential card details without requiring
+    a separate API call. Used in transaction responses to show
+    which card was used for payment.
+
+    Attributes:
+        id: Card UUID
+        name: Card display name
+        card_type: Type of card (credit_card or debit_card)
+        last_four_digits: Last 4 digits of card number
+        card_network: Card network (Visa, Mastercard, etc.)
+    """
+
+    id: uuid.UUID = Field(description="Card UUID")
+    name: str = Field(description="Card display name")
+    card_type: CardType = Field(description="Type of card")
+    last_four_digits: str | None = Field(
+        default=None,
+        description="Last 4 digits of card number",
+    )
+    card_network: str | None = Field(
+        default=None,
+        description="Card network (Visa, Mastercard, Amex, etc.)",
+    )
+
+    model_config = {"from_attributes": True}
