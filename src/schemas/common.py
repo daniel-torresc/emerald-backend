@@ -3,17 +3,88 @@ Common Pydantic schemas for API request/response handling.
 
 This module provides:
 - Pagination parameters and response models
+- Sorting parameters and enums
+- Search result containers
 - Common response wrappers
 - Shared schema utilities
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Type variable for generic paginated responses
 DataT = TypeVar("DataT")
+
+
+class SortOrder(str, Enum):
+    """
+    Sort direction for list queries.
+
+    Values:
+        ASC: Ascending order (A-Z, 0-9, oldest first)
+        DESC: Descending order (Z-A, 9-0, newest first)
+    """
+
+    ASC = "asc"
+    DESC = "desc"
+
+
+class SortParams(BaseModel):
+    """
+    Common sorting parameters for list endpoints.
+
+    Used via Depends() in routes alongside entity-specific FilterParams.
+    The sort_by field should be validated against an entity-specific
+    SortField enum in the route layer.
+
+    Attributes:
+        sort_by: Field name to sort by (validated against entity SortField enum)
+        sort_order: Sort direction (ascending or descending)
+    """
+
+    sort_by: str | None = Field(None, description="Field to sort by")
+    sort_order: SortOrder = Field(SortOrder.DESC, description="Sort direction")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "sort_by": "created_at",
+                "sort_order": "desc",
+            }
+        }
+    )
+
+
+class SearchResult(BaseModel, Generic[DataT]):
+    """
+    Internal search result container.
+
+    Used for service-to-route communication. Not exposed directly to API.
+    Routes convert this to PaginatedResponse for HTTP responses.
+
+    Type Parameters:
+        DataT: Type of items in the items list (typically SQLAlchemy models)
+
+    Attributes:
+        items: List of model instances for current page
+        total: Total count of items matching filters (without pagination)
+
+    Example:
+        >>> result = await service.list_users(filters, pagination, sorting)
+        >>> # result is SearchResult[User]
+        >>> response = PaginatedResponse(
+        ...     data=[UserListItem.model_validate(u) for u in result.items],
+        ...     meta=PaginationMeta(total=result.total, ...)
+        ... )
+    """
+
+    items: list[DataT]
+    total: int
+
+    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
 
 
 class PaginationParams(BaseModel):
@@ -31,6 +102,15 @@ class PaginationParams(BaseModel):
         ge=1,
         le=100,
         description="Number of items per page (max 100)",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "page": 1,
+                "page_size": 20,
+            }
+        }
     )
 
     @field_validator("page_size")

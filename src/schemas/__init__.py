@@ -28,6 +28,9 @@ from schemas.common import (
     PaginationMeta,
     PaginationParams,
     ResponseMeta,
+    SearchResult,
+    SortOrder,
+    SortParams,
     SuccessResponse,
 )
 from schemas.currency import (
@@ -37,6 +40,7 @@ from schemas.currency import (
 )
 from schemas.financial_institution import (
     FinancialInstitutionCreate,
+    FinancialInstitutionEmbedded,
     FinancialInstitutionFilterParams,
     FinancialInstitutionListItem,
     FinancialInstitutionResponse,
@@ -44,11 +48,15 @@ from schemas.financial_institution import (
 )
 from schemas.user import (
     UserCreate,
+    UserEmbedded,
     UserFilterParams,
     UserListItem,
     UserPasswordChange,
     UserResponse,
     UserUpdate,
+)
+from schemas.account import (
+    AccountEmbedded,
 )
 
 __all__ = [
@@ -60,6 +68,9 @@ __all__ = [
     "SuccessResponse",
     "ErrorDetail",
     "ErrorResponse",
+    "SortOrder",
+    "SortParams",
+    "SearchResult",
     # Currency schemas
     "Currency",
     "CurrencyResponse",
@@ -91,4 +102,9 @@ __all__ = [
     "FinancialInstitutionResponse",
     "FinancialInstitutionListItem",
     "FinancialInstitutionFilterParams",
+    "FinancialInstitutionEmbedded",
+    # Account schemas
+    "AccountEmbedded",
+    # User schemas (additional)
+    "UserEmbedded",
 ]

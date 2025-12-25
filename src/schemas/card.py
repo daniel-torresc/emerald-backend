@@ -7,17 +7,33 @@ This module defines request and response schemas for card operations:
 - CardUpdate: Schema for PATCH /api/v1/cards/{id}
 - CardResponse: Schema for GET /api/v1/cards/{id}
 - CardListItem: Schema for GET /api/v1/cards (list endpoint)
+- CardSortField: Allowed sort fields enum
 """
 
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from models.enums import CardType
-from schemas import FinancialInstitutionListItem
-from schemas.account import AccountListItem
+from schemas.account import AccountEmbedded
+from schemas.financial_institution import FinancialInstitutionEmbedded
+
+
+class CardSortField(str, Enum):
+    """
+    Allowed sort fields for card list queries.
+
+    Whitelists fields that can be used for sorting to prevent SQL injection.
+    Values must match SQLAlchemy model attribute names exactly.
+    """
+
+    NAME = "name"
+    LAST_FOUR_DIGITS = "last_four_digits"
+    EXPIRY_YEAR = "expiry_year"
+    CREATED_AT = "created_at"
 
 
 class CardBase(BaseModel):
@@ -208,10 +224,10 @@ class CardResponse(BaseModel):
     notes: str | None = Field(description="User's personal notes")
 
     # Relationships (always present for required FK, optional for nullable FK)
-    account: AccountListItem = Field(
+    account: AccountEmbedded = Field(
         description="Account this card is linked to (always present)"
     )
-    financial_institution: FinancialInstitutionListItem | None = Field(
+    financial_institution: FinancialInstitutionEmbedded | None = Field(
         description="Financial institution that issued the card (optional)"
     )
 
@@ -237,8 +253,8 @@ class CardListItem(BaseModel):
     card_network: str | None = Field(description="Payment network")
 
     # Simplified relationships
-    account: AccountListItem = Field(description="Account this card is linked to")
-    financial_institution: FinancialInstitutionListItem | None = Field(
+    account: AccountEmbedded = Field(description="Account this card is linked to")
+    financial_institution: FinancialInstitutionEmbedded | None = Field(
         description="Financial institution that issued the card"
     )
 
@@ -295,4 +311,4 @@ class CardEmbedded(BaseModel):
         description="Card network (Visa, Mastercard, Amex, etc.)",
     )
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)

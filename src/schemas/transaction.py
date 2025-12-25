@@ -6,16 +6,32 @@ This module provides:
 - Transaction response schemas
 - Transaction list and pagination schemas
 - Transaction split schemas
+- Transaction sort field enum
 """
 
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from models.enums import CardType, TransactionType
 from schemas.card import CardEmbedded
+
+
+class TransactionSortField(str, Enum):
+    """
+    Allowed sort fields for transaction list queries.
+
+    Whitelists fields that can be used for sorting to prevent SQL injection.
+    Values must match SQLAlchemy model attribute names exactly.
+    """
+
+    TRANSACTION_DATE = "transaction_date"
+    AMOUNT = "amount"
+    DESCRIPTION = "description"
+    CREATED_AT = "created_at"
 
 
 class TransactionBase(BaseModel):
@@ -361,7 +377,7 @@ class TransactionResponse(TransactionBase):
             return CardEmbedded.model_validate(card)
         return card
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TransactionListItem(BaseModel):
@@ -404,7 +420,7 @@ class TransactionListItem(BaseModel):
             return CardEmbedded.model_validate(card)
         return card
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SplitItem(BaseModel):
@@ -491,109 +507,12 @@ class TransactionSplitRequest(BaseModel):
         return value
 
 
-class TransactionSearchParams(BaseModel):
-    """
-    DEPRECATED: Use TransactionFilterParams + PaginationParams instead.
-
-    Query parameters for transaction search/filtering.
-
-    All fields are optional - if not provided, no filter is applied.
-
-    Attributes:
-        date_from: Filter from this date (inclusive)
-        date_to: Filter to this date (inclusive)
-        amount_min: Minimum amount (inclusive)
-        amount_max: Maximum amount (inclusive)
-        description: Fuzzy search on description
-        merchant: Fuzzy search on merchant
-        transaction_type: Filter by type
-        card_id: Filter by specific card UUID
-        card_type: Filter by card type (credit_card or debit_card)
-        sort_by: Sort field (transaction_date, amount, description, created_at)
-        sort_order: Sort order (asc or desc)
-        skip: Number of records to skip
-        limit: Maximum records to return
-    """
-
-    date_from: date | None = Field(
-        default=None,
-        description="Filter from this date (inclusive)",
-    )
-
-    date_to: date | None = Field(
-        default=None,
-        description="Filter to this date (inclusive)",
-    )
-
-    amount_min: Decimal | None = Field(
-        default=None,
-        description="Minimum amount (inclusive)",
-    )
-
-    amount_max: Decimal | None = Field(
-        default=None,
-        description="Maximum amount (inclusive)",
-    )
-
-    description: str | None = Field(
-        default=None,
-        max_length=500,
-        description="Fuzzy search on description (handles typos)",
-    )
-
-    merchant: str | None = Field(
-        default=None,
-        max_length=100,
-        description="Fuzzy search on merchant (handles typos)",
-    )
-
-    transaction_type: TransactionType | None = Field(
-        default=None,
-        description="Filter by transaction type",
-    )
-
-    card_id: uuid.UUID | None = Field(
-        default=None,
-        description="Filter by specific card UUID",
-    )
-
-    card_type: CardType | None = Field(
-        default=None,
-        description="Filter by card type (credit_card or debit_card)",
-    )
-
-    sort_by: str = Field(
-        default="transaction_date",
-        pattern="^(transaction_date|amount|description|created_at)$",
-        description="Sort field",
-    )
-
-    sort_order: str = Field(
-        default="desc",
-        pattern="^(asc|desc)$",
-        description="Sort order",
-    )
-
-    skip: int = Field(
-        default=0,
-        ge=0,
-        description="Number of records to skip (pagination)",
-    )
-
-    limit: int = Field(
-        default=20,
-        ge=1,
-        le=100,
-        description="Maximum records to return (max 100)",
-    )
-
-
 class TransactionFilterParams(BaseModel):
     """
     Query parameters for filtering transactions.
 
     All fields are optional - if not provided, no filter is applied.
-    Pagination is handled separately via PaginationParams.
+    Pagination and sorting are handled separately via PaginationParams and SortParams.
 
     Attributes:
         date_from: Filter from this date (inclusive)
@@ -605,8 +524,6 @@ class TransactionFilterParams(BaseModel):
         transaction_type: Filter by type
         card_id: Filter by specific card UUID
         card_type: Filter by card type (credit_card or debit_card)
-        sort_by: Sort field (transaction_date, amount, description, created_at)
-        sort_order: Sort order (asc or desc)
     """
 
     date_from: date | None = Field(
@@ -654,16 +571,4 @@ class TransactionFilterParams(BaseModel):
     card_type: CardType | None = Field(
         default=None,
         description="Filter by card type (credit_card or debit_card)",
-    )
-
-    sort_by: str = Field(
-        default="transaction_date",
-        pattern="^(transaction_date|amount|description|created_at)$",
-        description="Sort field",
-    )
-
-    sort_order: str = Field(
-        default="desc",
-        pattern="^(asc|desc)$",
-        description="Sort order",
     )
