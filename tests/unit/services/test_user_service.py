@@ -481,7 +481,7 @@ class TestDeactivateUser:
         mock_user_repo.get_by_id.return_value = regular_user
 
         # Execute
-        await user_service.deactivate_user(
+        await user_service.delete_user(
             user_id=regular_user.id,
             current_user=admin_user,
         )
@@ -505,7 +505,7 @@ class TestDeactivateUser:
         with pytest.raises(
             InsufficientPermissionsError, match="Administrator privileges required"
         ):
-            await user_service.deactivate_user(
+            await user_service.delete_user(
                 user_id=uuid.uuid4(),
                 current_user=regular_user,
             )
@@ -523,7 +523,7 @@ class TestDeactivateUser:
 
         # Execute & Verify
         with pytest.raises(NotFoundError):
-            await user_service.deactivate_user(
+            await user_service.delete_user(
                 user_id=uuid.uuid4(),
                 current_user=admin_user,
             )
@@ -557,7 +557,7 @@ class TestSoftDeleteUser:
         mock_user_repo.soft_delete.return_value = deleted_user
 
         # Execute
-        await user_service.soft_delete_user(
+        await user_service.deactivate_user(
             user_id=regular_user.id,
             current_user=admin_user,
         )
@@ -581,7 +581,7 @@ class TestSoftDeleteUser:
         with pytest.raises(
             InsufficientPermissionsError, match="Administrator privileges required"
         ):
-            await user_service.soft_delete_user(
+            await user_service.deactivate_user(
                 user_id=uuid.uuid4(),
                 current_user=regular_user,
             )
@@ -599,7 +599,7 @@ class TestSoftDeleteUser:
 
         # Execute & Verify
         with pytest.raises(NotFoundError):
-            await user_service.soft_delete_user(
+            await user_service.deactivate_user(
                 user_id=uuid.uuid4(),
                 current_user=admin_user,
             )

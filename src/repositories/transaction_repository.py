@@ -51,37 +51,6 @@ class TransactionRepository(BaseRepository[Transaction]):
         """
         super().__init__(Transaction, session)
 
-    async def create(self, transaction: Transaction) -> Transaction:
-        """
-        Create a new transaction.
-
-        Args:
-            transaction: Transaction instance to create
-
-        Returns:
-            Created transaction with all relationships loaded
-
-        Example:
-            transaction = Transaction(
-                account_id=account.id,
-                transaction_date=date.today(),
-                amount=Decimal("-50.25"),
-                currency="USD",
-                description="Grocery Shopping",
-                transaction_type=TransactionType.DEBIT,
-                created_by=user.id,
-                updated_by=user.id,
-            )
-            created = await repo.create(transaction)
-        """
-        self.session.add(transaction)
-        await self.session.flush()
-        await self.session.refresh(
-            transaction,
-            ["account", "parent_transaction", "child_transactions", "card"],
-        )
-        return transaction
-
     async def get_by_id(self, transaction_id: uuid.UUID) -> Transaction | None:
         """
         Get transaction by ID with all relationships loaded.
@@ -117,7 +86,7 @@ class TransactionRepository(BaseRepository[Transaction]):
     async def get_by_account_id(
         self,
         account_id: uuid.UUID,
-        skip: int = 0,
+        offset: int = 0,
         limit: int = 20,
     ) -> list[Transaction]:
         """
@@ -125,7 +94,7 @@ class TransactionRepository(BaseRepository[Transaction]):
 
         Args:
             account_id: UUID of the account
-            skip: Number of records to skip (pagination)
+            offset: Number of records to skip (pagination)
             limit: Maximum number of records to return
 
         Returns:
@@ -148,7 +117,7 @@ class TransactionRepository(BaseRepository[Transaction]):
             .order_by(
                 Transaction.transaction_date.desc(), Transaction.created_at.desc()
             )
-            .offset(skip)
+            .offset(offset)
             .limit(limit)
         )
         query = self._apply_soft_delete_filter(query)
@@ -193,7 +162,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         card_type: CardType | None = None,
         sort_by: str = "transaction_date",
         sort_order: str = "desc",
-        skip: int = 0,
+        offset: int = 0,
         limit: int = 20,
     ) -> tuple[list[Transaction], int]:
         """
@@ -215,7 +184,7 @@ class TransactionRepository(BaseRepository[Transaction]):
             card_type: Filter by card type (credit_card or debit_card)
             sort_by: Field to sort by (transaction_date, amount, description, created_at)
             sort_order: Sort order (asc or desc)
-            skip: Number of records to skip (pagination)
+            offset: Number of records to skip (pagination)
             limit: Maximum number of records to return (max 100)
 
         Returns:
@@ -314,7 +283,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         query = query.order_by(Transaction.created_at.desc())
 
         # Apply pagination
-        query = query.offset(skip).limit(min(limit, 100))  # Cap at 100
+        query = query.offset(offset).limit(min(limit, 100))  # Cap at 100
 
         # Execute query
         result = await self.session.execute(query)

@@ -101,17 +101,8 @@ async def create_account(
         - 422 Unprocessable Entity: If validation fails (invalid IBAN, color format, etc.)
     """
     account = await account_service.create_account(
-        user_id=current_user.id,
-        account_name=account_data.account_name,
-        account_type_id=account_data.account_type_id,
-        currency=account_data.currency,
-        opening_balance=account_data.opening_balance,
-        financial_institution_id=account_data.financial_institution_id,
-        current_user=current_user,
-        iban=account_data.iban,
-        color_hex=account_data.color_hex,
-        icon_url=account_data.icon_url,
-        notes=account_data.notes,
+        user=current_user,
+        data=account_data,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),

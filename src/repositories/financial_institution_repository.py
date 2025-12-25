@@ -88,8 +88,8 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
         query_text: str | None = None,
         country_code: CountryAlpha2 | None = None,
         institution_type: InstitutionType | None = None,
-        limit: int = 20,
         offset: int = 0,
+        limit: int = 20,
     ) -> list[FinancialInstitution]:
         """
         Search and filter financial institutions.
@@ -106,8 +106,8 @@ class FinancialInstitutionRepository(BaseRepository[FinancialInstitution]):
             query_text: Search term for name/short_name (optional)
             country_code: ISO 3166-1 alpha-2 country code (optional)
             institution_type: Institution type filter (optional)
-            limit: Maximum number of results (default: 20, max: 100)
             offset: Number of results to skip (default: 0)
+            limit: Maximum number of results (default: 20, max: 100)
 
         Returns:
             List of matching FinancialInstitution instances

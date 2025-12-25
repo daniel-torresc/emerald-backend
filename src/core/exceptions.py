@@ -64,21 +64,6 @@ class AppException(Exception):
         self.error_code = error_code
         self.details = details or {}
 
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Convert exception to dictionary for JSON response.
-
-        Returns:
-            Dictionary with error information
-        """
-        return {
-            "error": {
-                "code": self.error_code,
-                "message": self.message,
-                "details": self.details,
-            }
-        }
-
 
 # =============================================================================
 # Authentication Errors (401 Unauthorized)

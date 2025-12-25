@@ -15,37 +15,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator
 
 from models.enums import CardType, TransactionType
-
-
-class CardEmbedded(BaseModel):
-    """
-    Minimal card representation embedded in transaction responses.
-
-    This schema provides essential card details without requiring
-    a separate API call. Used in transaction responses to show
-    which card was used for payment.
-
-    Attributes:
-        id: Card UUID
-        name: Card display name
-        card_type: Type of card (credit_card or debit_card)
-        last_four_digits: Last 4 digits of card number
-        card_network: Card network (Visa, Mastercard, etc.)
-    """
-
-    id: uuid.UUID = Field(description="Card UUID")
-    name: str = Field(description="Card display name")
-    card_type: CardType = Field(description="Type of card")
-    last_four_digits: str | None = Field(
-        default=None,
-        description="Last 4 digits of card number",
-    )
-    card_network: str | None = Field(
-        default=None,
-        description="Card network (Visa, Mastercard, Amex, etc.)",
-    )
-
-    model_config = {"from_attributes": True}
+from schemas.card import CardEmbedded
 
 
 class TransactionBase(BaseModel):
@@ -435,25 +405,6 @@ class TransactionListItem(BaseModel):
         return card
 
     model_config = {"from_attributes": True}
-
-
-class TransactionListResponse(BaseModel):
-    """
-    Response schema for transaction list endpoint.
-
-    Attributes:
-        items: List of transactions
-        total: Total count of transactions
-        skip: Number of records skipped
-        limit: Maximum records returned
-    """
-
-    items: list[TransactionResponse] = Field(
-        description="List of transactions for current page"
-    )
-    total: int = Field(description="Total count of transactions matching filters")
-    skip: int = Field(description="Number of records skipped (pagination)")
-    limit: int = Field(description="Maximum records returned")
 
 
 class SplitItem(BaseModel):

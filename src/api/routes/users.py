@@ -45,14 +45,15 @@ async def get_current_user_profile(
         - Valid access token
         - Active user account
     """
-
-    return await user_service.get_user_profile(
+    user = await user_service.get_user_profile(
         user_id=current_user.id,
         current_user=current_user,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
+
+    return UserResponse.model_validate(user)
 
 
 @router.patch(
@@ -86,7 +87,7 @@ async def update_current_user_profile(
         - 422 Unprocessable Entity: If validation fails
     """
 
-    return await user_service.update_user_profile(
+    user = await user_service.update_user_profile(
         user_id=current_user.id,
         update_data=update_data,
         current_user=current_user,
@@ -94,6 +95,8 @@ async def update_current_user_profile(
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
+
+    return UserResponse.model_validate(user)
 
 
 # ============================================================================
@@ -131,14 +134,15 @@ async def get_user_by_id(
         - 403 Forbidden: If non-admin user tries to view another user
         - 404 Not Found: If user not found
     """
-
-    return await user_service.get_user_profile(
+    user = await user_service.get_user_profile(
         user_id=user_id,
         current_user=current_user,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
     )
+
+    return UserResponse.model_validate(user)
 
 
 @router.get(
@@ -230,8 +234,8 @@ async def deactivate_user(
 @router.delete(
     "/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Soft delete user",
-    description="Soft delete a user account (admin only)",
+    summary="Delete user",
+    description="Delete a user account (admin only)",
 )
 async def delete_user(
     request: Request,
@@ -240,7 +244,7 @@ async def delete_user(
     user_service: UserServiceDep,
 ) -> None:
     """
-    Soft delete a user account.
+    Delete a user account.
 
     Path parameters:
         - user_id: UUID of user to delete
@@ -262,7 +266,7 @@ async def delete_user(
         - 404 Not Found: If user not found
     """
 
-    await user_service.soft_delete_user(
+    await user_service.delete_user(
         user_id=user_id,
         current_user=current_user,
         request_id=getattr(request.state, "request_id", None),

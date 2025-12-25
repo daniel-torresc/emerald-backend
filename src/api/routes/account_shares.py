@@ -73,10 +73,9 @@ async def create_share(
         422: Validation error
     """
     share = await account_service.share_account(
-        account_id=account_id,
-        target_user_id=share_data.user_id,
-        permission_level=share_data.permission_level,
         current_user=current_user,
+        account_id=account_id,
+        data=share_data,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
         request_id=request.state.request_id

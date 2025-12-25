@@ -37,13 +37,13 @@ class CardRepository(BaseRepository[Card]):
         """
         super().__init__(Card, session)
 
-    async def search(
+    async def search_by_user(
         self,
         user_id: uuid.UUID,
         card_type: CardType | None = None,
         account_id: uuid.UUID | None = None,
-        limit: int = 100,
         offset: int = 0,
+        limit: int = 100,
     ) -> list[Card]:
         """
         Get all cards for a user (via account ownership).
@@ -95,12 +95,12 @@ class CardRepository(BaseRepository[Card]):
         query = query.order_by(Card.created_at.desc())
 
         # Apply pagination
-        query = query.limit(limit).offset(offset)
+        query = query.offset(offset).limit(limit)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def search_count(
+    async def search_count_by_user(
         self,
         user_id: uuid.UUID,
         card_type: CardType | None = None,
