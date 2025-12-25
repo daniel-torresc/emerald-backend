@@ -130,32 +130,26 @@ class BaseRepository(Generic[ModelType]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def update(
-        self,
-        instance: ModelType,
-        **kwargs: Any,
-    ) -> ModelType:
+    async def update(self, instance: ModelType) -> ModelType:
         """
-        Update a record.
+        Persist changes to an already-modified model instance.
+
+        The caller is responsible for modifying the instance attributes
+        before calling this method. This method only handles persistence
+        (flush + refresh).
 
         Args:
-            instance: Model instance to update
-            **kwargs: Attributes to update
+            instance: Model instance with changes already applied
 
         Returns:
-            Updated model instance
+            Updated model instance (with refreshed timestamps)
 
         Example:
             user = await user_repo.get_by_id(user_id)
-            user = await user_repo.update(
-                user,
-                full_name="New Name",
-                email="new@example.com"
-            )
+            user.full_name = "New Name"
+            user.email = "new@example.com"
+            user = await user_repo.update(user)
         """
-        for key, value in kwargs.items():
-            setattr(instance, key, value)
-
         await self.session.flush()
         await self.session.refresh(instance)
         return instance

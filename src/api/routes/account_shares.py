@@ -48,7 +48,7 @@ router = APIRouter(prefix="/accounts", tags=["Account Shares"])
 )
 async def create_share(
     account_id: uuid.UUID,
-    share_data: AccountShareCreate,
+    data: AccountShareCreate,
     request: Request,
     current_user: CurrentUser,
     account_service: AccountServiceDep,
@@ -58,7 +58,7 @@ async def create_share(
 
     Args:
         account_id: UUID of the account to share
-        share_data: Share creation data (user_id and permission_level)
+        data: Share creation data (user_id and permission_level)
         request: HTTP request object (for audit logging)
         current_user: Authenticated user (must be owner)
         account_service: Account service dependency
@@ -75,7 +75,7 @@ async def create_share(
     share = await account_service.share_account(
         current_user=current_user,
         account_id=account_id,
-        data=share_data,
+        data=data,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
         request_id=request.state.request_id
@@ -156,7 +156,7 @@ async def list_shares(
 async def update_share(
     account_id: uuid.UUID,
     share_id: uuid.UUID,
-    share_data: AccountShareUpdate,
+    data: AccountShareUpdate,
     request: Request,
     current_user: CurrentUser,
     account_service: AccountServiceDep,
@@ -167,7 +167,7 @@ async def update_share(
     Args:
         account_id: UUID of the account
         share_id: UUID of the share to update
-        share_data: New permission level
+        data: New permission level
         request: HTTP request object (for audit logging)
         current_user: Authenticated user (must be owner)
         account_service: Account service dependency
@@ -184,7 +184,7 @@ async def update_share(
     updated_share = await account_service.update_share(
         account_id=account_id,
         share_id=share_id,
-        permission_level=share_data.permission_level,
+        permission_level=data.permission_level,
         current_user=current_user,
         ip_address=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),

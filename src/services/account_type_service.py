@@ -260,63 +260,66 @@ class AccountTypeService:
                 current_user=admin_user
             )
         """
-        # Get existing account type
+        # 1. Get existing account type
         account_type = await self.account_type_repo.get_by_id(account_type_id)
         if not account_type:
             raise NotFoundError(f"Account type with ID {account_type_id} not found")
 
-        # Track what changed (for audit log)
-        changes = {}
+        # 2. Get only provided fields
+        update_dict = data.model_dump(exclude_unset=True)
 
-        # Update fields (key is immutable, not included in AccountTypeUpdate schema)
-        if data.name is not None and data.name != account_type.name:
-            changes["name"] = {"old": account_type.name, "new": data.name}
-            account_type.name = data.name
+        if not update_dict:
+            return AccountTypeResponse.model_validate(account_type)  # Nothing to update
 
-        if data.description is not None:
-            changes["description"] = {
-                "old": account_type.description,
-                "new": data.description,
-            }
-            account_type.description = data.description
+        # 3. Capture old values for audit
+        old_values = {
+            "name": account_type.name,
+            "description": account_type.description,
+            "icon_url": account_type.icon_url,
+            "sort_order": account_type.sort_order,
+        }
 
-        if data.icon_url is not None:
-            changes["icon_url"] = {
-                "old": account_type.icon_url,
-                "new": str(data.icon_url) if data.icon_url else None,
-            }
-            account_type.icon_url = str(data.icon_url) if data.icon_url else None
+        # 4. Apply changes to model instance
+        for key, value in update_dict.items():
+            # Handle icon_url conversion to string
+            if key == "icon_url" and value is not None:
+                value = str(value)
+            setattr(account_type, key, value)
 
-        if data.sort_order is not None:
-            changes["sort_order"] = {
-                "old": account_type.sort_order,
-                "new": data.sort_order,
-            }
-            account_type.sort_order = data.sort_order
+        # 5. Persist
+        await self.account_type_repo.update(account_type)
 
-        # Commit transaction
-        await self.session.commit()
-        await self.session.refresh(account_type)
+        # 6. Capture new values for audit
+        new_values = {
+            "name": account_type.name,
+            "description": account_type.description,
+            "icon_url": account_type.icon_url,
+            "sort_order": account_type.sort_order,
+        }
 
         logger.info(
             f"Account type updated: {account_type.id} ('{account_type.key}') by admin {current_user.id}"
         )
 
-        # Log to audit trail
+        # 7. Log to audit trail with old/new values
         await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.UPDATE_ACCOUNT_TYPE,
             entity_type="account_type",
             entity_id=account_type.id,
+            old_values=old_values,
+            new_values=new_values,
             extra_metadata={
                 "key": account_type.key,
-                "name": account_type.name,
-                "changes": changes,
+                "changed_fields": list(update_dict.keys()),
             },
             request_id=request_id,
             ip_address=ip_address,
             user_agent=user_agent,
         )
+
+        # 8. Commit transaction
+        await self.session.commit()
 
         return AccountTypeResponse.model_validate(account_type)
 

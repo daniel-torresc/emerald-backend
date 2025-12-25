@@ -13,7 +13,6 @@ import logging
 import uuid
 from decimal import Decimal
 
-from pydantic import HttpUrl
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.encryption import EncryptionService
@@ -33,7 +32,12 @@ from repositories.account_repository import AccountRepository
 from repositories.account_share_repository import AccountShareRepository
 from repositories.account_type_repository import AccountTypeRepository
 from repositories.user_repository import UserRepository
-from schemas.account import AccountCreate, AccountFilterParams, AccountListItem
+from schemas.account import (
+    AccountCreate,
+    AccountFilterParams,
+    AccountListItem,
+    AccountUpdate,
+)
 from schemas.account_share import AccountShareCreate
 from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
 from services.audit_service import AuditService
@@ -359,13 +363,8 @@ class AccountService:
     async def update_account(
         self,
         account_id: uuid.UUID,
+        data: AccountUpdate,
         current_user: User,
-        account_name: str | None = None,
-        account_type_id: uuid.UUID | None = None,
-        financial_institution_id: uuid.UUID | None = None,
-        color_hex: str | None = None,
-        icon_url: HttpUrl | None = None,
-        notes: str | None = None,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -381,13 +380,8 @@ class AccountService:
 
         Args:
             account_id: ID of the account to update
+            data: AccountUpdate schema with fields to update
             current_user: Currently authenticated user
-            account_name: New account name (optional, validates uniqueness)
-            account_type_id: New account type ID (optional, validates exists and accessible)
-            financial_institution_id: New institution (optional, validates exists)
-            color_hex: New color hex (optional)
-            icon_url: New icon URL (optional)
-            notes: New notes (optional)
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
@@ -399,18 +393,15 @@ class AccountService:
             NotFoundError: If account or account type not found or user has no access
             AlreadyExistsError: If new account name already exists for user
             ValidationError: If institution not found
-            AuthorizationError: If user cannot access the account type (custom type owned by another user)
 
         Example:
             account = await account_service.update_account(
                 account_id=account.id,
+                data=AccountUpdate(account_name="New Name"),
                 current_user=user,
-                account_name="New Name",
-                account_type_id=new_type_id,
-                financial_institution_id=new_institution_id
             )
         """
-        # Get account and check permission
+        # 1. Get account and check permission
         account = await self.get_account(account_id, current_user, request_id)
 
         # Phase 2A: Only owner can update
@@ -420,112 +411,107 @@ class AccountService:
             )
             raise NotFoundError("Account")
 
-        # Track changes for audit log
-        changes = {}
+        # 2. Get only provided fields
+        update_dict = data.model_dump(exclude_unset=True)
 
-        # Update account name if provided
-        if account_name is not None and account_name != account.account_name:
-            # Validate name uniqueness
+        if not update_dict:
+            return account  # Nothing to update
+
+        # 3. Business validations (only for changing fields)
+        if (
+            "account_name" in update_dict
+            and update_dict["account_name"] != account.account_name
+        ):
             if await self.account_repo.exists_by_name(
-                account.user_id, account_name, exclude_id=account_id
+                account.user_id, update_dict["account_name"], exclude_id=account_id
             ):
                 logger.warning(
-                    f"User {account.user_id} attempted to rename account to duplicate name: {account_name}"
+                    f"User {account.user_id} attempted to rename account to duplicate name: {update_dict['account_name']}"
                 )
                 raise AlreadyExistsError(
-                    f"Account name '{account_name}' already exists. Please choose a different name."
+                    f"Account name '{update_dict['account_name']}' already exists. Please choose a different name."
                 )
 
-            changes["account_name"] = {
-                "old": account.account_name,
-                "new": account_name,
-            }
-            account.account_name = account_name
-
-        # Update account type if provided
-        if account_type_id is not None and account_type_id != account.account_type_id:
-            # Validate account type exists and is active
-            account_type = await self.account_type_repo.get_by_id(account_type_id)
+        if "account_type_id" in update_dict:
+            account_type = await self.account_type_repo.get_by_id(
+                update_dict["account_type_id"]
+            )
             if not account_type:
                 logger.warning(
                     f"User {current_user.id} attempted to update account {account_id} "
-                    f"with non-existent account type: {account_type_id}"
+                    f"with non-existent account type: {update_dict['account_type_id']}"
                 )
                 raise NotFoundError("Account type not found")
 
-            # Note: All account types are system-wide and accessible to all users
-            # No per-user custom types - all types are managed globally
-
-            changes["account_type_id"] = {
-                "old": str(account.account_type_id),
-                "new": str(account_type_id),
-            }
-            account.account_type_id = account_type_id
-
-        # Update financial institution if provided
-        if (
-            financial_institution_id is not None
-            and financial_institution_id != account.financial_institution_id
-        ):
-            # Validate new institution exists
-            financial_institution = await self.financial_institution_repo.exists(
-                financial_institution_id
-            )
-            if not financial_institution:
+        if "financial_institution_id" in update_dict:
+            if not await self.financial_institution_repo.exists(
+                update_dict["financial_institution_id"]
+            ):
                 logger.warning(
                     f"User {current_user.id} attempted to update account {account_id} "
-                    f"with non existent institution: {financial_institution_id}"
+                    f"with non existent institution: {update_dict['financial_institution_id']}"
                 )
                 raise ValidationError(
                     "Financial institution not found. "
                     "Please select a different institution."
                 )
 
-            changes["financial_institution_id"] = {
-                "old": str(account.financial_institution_id),
-                "new": str(financial_institution_id),
-            }
-            account.financial_institution_id = financial_institution_id
+        # 4. Capture old values for audit
+        old_values = {
+            "account_name": account.account_name,
+            "account_type_id": str(account.account_type_id)
+            if account.account_type_id
+            else None,
+            "financial_institution_id": str(account.financial_institution_id)
+            if account.financial_institution_id
+            else None,
+            "color_hex": account.color_hex,
+            "icon_url": str(account.icon_url) if account.icon_url else None,
+            "notes": account.notes,
+        }
 
-        # Update color_hex if provided
-        if color_hex is not None and color_hex != account.color_hex:
-            changes["color_hex"] = {"old": account.color_hex, "new": color_hex}
-            account.color_hex = color_hex
-
-        # Update icon_url if provided
-        if icon_url is not None and icon_url != account.icon_url:
-            changes["icon_url"] = {"old": account.icon_url, "new": icon_url}
-            account.icon_url = icon_url
-
-        # Update notes if provided
-        if notes is not None and notes != account.notes:
-            changes["notes"] = {"old": account.notes, "new": notes}
-            account.notes = notes
-
-        # If no changes, return account as-is
-        if not changes:
-            return account
-
-        # Update audit fields
+        # 5. Apply changes to model instance
+        for key, value in update_dict.items():
+            setattr(account, key, value)
         account.updated_by = current_user.id
 
-        # Save changes
+        # 6. Persist
         account = await self.account_repo.update(account)
 
-        logger.info(f"Updated account {account.id}: {changes}")
+        # 7. Capture new values for audit
+        new_values = {
+            "account_name": account.account_name,
+            "account_type_id": str(account.account_type_id)
+            if account.account_type_id
+            else None,
+            "financial_institution_id": str(account.financial_institution_id)
+            if account.financial_institution_id
+            else None,
+            "color_hex": account.color_hex,
+            "icon_url": str(account.icon_url) if account.icon_url else None,
+            "notes": account.notes,
+        }
 
-        # Log audit event
+        logger.info(
+            f"Updated account {account.id}: changed_fields={list(update_dict.keys())}"
+        )
+
+        # 8. Audit log with old/new values
         await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.UPDATE,
             entity_type="account",
             entity_id=account.id,
-            description=f"Updated account '{account.account_name}'",
-            extra_metadata={"changes": changes},
+            old_values=old_values,
+            new_values=new_values,
+            extra_metadata={"changed_fields": list(update_dict.keys())},
             ip_address=ip_address,
             user_agent=user_agent,
             request_id=request_id,
         )
+
+        # 9. Commit transaction
+        await self.session.commit()
 
         return account
 
@@ -835,8 +821,11 @@ class AccountService:
         ):
             raise ValidationError("Cannot change your own owner permission")
 
-        # Store old permission for audit log
+        # Store old permission for audit
         old_permission = share.permission_level
+
+        # Capture old values for audit
+        old_values = {"permission_level": old_permission.value}
 
         # Update permission
         share.permission_level = permission_level
@@ -844,28 +833,33 @@ class AccountService:
 
         updated_share = await self.share_repo.update(share)
 
+        # Capture new values for audit
+        new_values = {"permission_level": updated_share.permission_level.value}
+
         logger.info(
             f"User {current_user.id} updated share {share_id} permission "
             f"from {old_permission.value} to {permission_level.value}"
         )
 
-        # Log audit event
+        # Log audit event with old/new values
         await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.UPDATE,
             entity_type="account_share",
             entity_id=share_id,
-            description=f"Updated share permission from {old_permission.value} to {permission_level.value}",
+            old_values=old_values,
+            new_values=new_values,
             extra_metadata={
                 "account_id": str(account_id),
                 "share_user_id": str(share.user_id),
-                "old_permission": old_permission.value,
-                "new_permission": permission_level.value,
             },
             ip_address=ip_address,
             user_agent=user_agent,
             request_id=request_id,
         )
+
+        # Commit transaction
+        await self.session.commit()
 
         return updated_share
 

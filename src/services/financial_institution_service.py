@@ -356,110 +356,105 @@ class FinancialInstitutionService:
                 current_user=admin_user
             )
         """
-        # Get existing institution
+        # 1. Get existing institution
         institution = await self.institution_repo.get_by_id(institution_id)
         if not institution:
             raise NotFoundError(f"Institution with ID {institution_id} not found")
 
-        # Track what changed (for audit log)
-        changes = {}
+        # 2. Get only provided fields
+        update_dict = data.model_dump(exclude_unset=True)
 
-        # Check for SWIFT code conflicts (if changed)
-        if data.swift_code is not None and data.swift_code != institution.swift_code:
-            exists = await self.institution_repo.exists_by_swift_code(data.swift_code)
-            if exists:
-                raise AlreadyExistsError(
-                    f"Institution with SWIFT code {data.swift_code} already exists"
-                )
-            changes["swift_code"] = {
-                "old": institution.swift_code,
-                "new": data.swift_code,
-            }
-            institution.swift_code = data.swift_code
+        if not update_dict:
+            return FinancialInstitutionResponse.model_validate(
+                institution
+            )  # Nothing to update
 
-        # Check for routing number conflicts (if changed)
+        # 3. Business validations (only for changing fields)
         if (
-            data.routing_number is not None
-            and data.routing_number != institution.routing_number
+            "swift_code" in update_dict
+            and update_dict["swift_code"] != institution.swift_code
         ):
-            exists = await self.institution_repo.exists_by_routing_number(
-                data.routing_number
+            exists = await self.institution_repo.exists_by_swift_code(
+                update_dict["swift_code"]
             )
             if exists:
                 raise AlreadyExistsError(
-                    f"Institution with routing number {data.routing_number} already exists"
+                    f"Institution with SWIFT code {update_dict['swift_code']} already exists"
                 )
-            changes["routing_number"] = {
-                "old": institution.routing_number,
-                "new": data.routing_number,
-            }
-            institution.routing_number = data.routing_number
-
-        # Update other fields
-        if data.name is not None and data.name != institution.name:
-            changes["name"] = {"old": institution.name, "new": data.name}
-            institution.name = data.name
-
-        if data.short_name is not None and data.short_name != institution.short_name:
-            changes["short_name"] = {
-                "old": institution.short_name,
-                "new": data.short_name,
-            }
-            institution.short_name = data.short_name
 
         if (
-            data.country_code is not None
-            and data.country_code != institution.country_code
+            "routing_number" in update_dict
+            and update_dict["routing_number"] != institution.routing_number
         ):
-            changes["country_code"] = {
-                "old": institution.country_code,
-                "new": data.country_code,
-            }
-            institution.country_code = data.country_code
+            exists = await self.institution_repo.exists_by_routing_number(
+                update_dict["routing_number"]
+            )
+            if exists:
+                raise AlreadyExistsError(
+                    f"Institution with routing number {update_dict['routing_number']} already exists"
+                )
 
-        if data.institution_type is not None:
-            changes["institution_type"] = {
-                "old": institution.institution_type.value,
-                "new": data.institution_type.value,
-            }
-            institution.institution_type = data.institution_type
+        # 4. Capture old values for audit
+        old_values = {
+            "name": institution.name,
+            "short_name": institution.short_name,
+            "swift_code": institution.swift_code,
+            "routing_number": institution.routing_number,
+            "country_code": institution.country_code,
+            "institution_type": institution.institution_type.value
+            if institution.institution_type
+            else None,
+            "logo_url": institution.logo_url,
+            "website_url": institution.website_url,
+        }
 
-        if data.logo_url is not None:
-            changes["logo_url"] = {
-                "old": institution.logo_url,
-                "new": str(data.logo_url),
-            }
-            institution.logo_url = str(data.logo_url)
+        # 5. Apply changes to model instance
+        for key, value in update_dict.items():
+            # Handle URL conversions to string
+            if key in ("logo_url", "website_url") and value is not None:
+                value = str(value)
+            setattr(institution, key, value)
 
-        if data.website_url is not None:
-            changes["website_url"] = {
-                "old": institution.website_url,
-                "new": str(data.website_url),
-            }
-            institution.website_url = str(data.website_url)
+        # 6. Persist
+        await self.institution_repo.update(institution)
 
-        # Commit transaction
-        await self.session.commit()
-        await self.session.refresh(institution)
+        # 7. Capture new values for audit
+        new_values = {
+            "name": institution.name,
+            "short_name": institution.short_name,
+            "swift_code": institution.swift_code,
+            "routing_number": institution.routing_number,
+            "country_code": institution.country_code,
+            "institution_type": institution.institution_type.value
+            if institution.institution_type
+            else None,
+            "logo_url": institution.logo_url,
+            "website_url": institution.website_url,
+        }
 
         logger.info(
             f"Institution updated: {institution.id} ({institution.short_name}) by admin {current_user.id}"
         )
 
-        # Log to audit trail
+        # 8. Log to audit trail with old/new values
         await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.UPDATE_FINANCIAL_INSTITUTION,
             entity_type="financial_institution",
             entity_id=institution.id,
+            old_values=old_values,
+            new_values=new_values,
             extra_metadata={
                 "institution_name": institution.short_name,
-                "changes": changes,
+                "changed_fields": list(update_dict.keys()),
             },
             request_id=request_id,
             ip_address=ip_address,
             user_agent=user_agent,
         )
+
+        # 9. Commit transaction
+        await self.session.commit()
 
         return FinancialInstitutionResponse.model_validate(institution)
 

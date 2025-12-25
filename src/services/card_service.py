@@ -284,23 +284,66 @@ class CardService:
             if not institution:
                 raise NotFoundError("Financial institution")
 
-        # 3. Update only provided fields
-        update_data = data.model_dump(exclude_unset=True)
-        update_data["updated_by"] = current_user.id
+        # 3. Get only provided fields
+        update_dict = data.model_dump(exclude_unset=True)
 
-        card = await self.card_repo.update(card, **update_data)
+        if not update_dict:
+            return CardResponse.model_validate(card)  # Nothing to update
 
-        # 4. Audit log
+        # 4. Capture old values for audit (handle enum safely)
+        old_card_network = card.card_network
+        old_values = {
+            "name": card.name,
+            "last_four_digits": card.last_four_digits,
+            "card_network": old_card_network.value if hasattr(old_card_network, "value") else old_card_network,
+            "expiry_month": card.expiry_month,
+            "expiry_year": card.expiry_year,
+            "credit_limit": str(card.credit_limit) if card.credit_limit else None,
+            "financial_institution_id": str(card.financial_institution_id)
+            if card.financial_institution_id
+            else None,
+            "notes": card.notes,
+        }
+
+        # 5. Apply changes to model instance
+        for key, value in update_dict.items():
+            setattr(card, key, value)
+        card.updated_by = current_user.id
+
+        # 6. Persist
+        card = await self.card_repo.update(card)
+
+        # 7. Capture new values for audit (handle enum safely)
+        new_card_network = card.card_network
+        new_values = {
+            "name": card.name,
+            "last_four_digits": card.last_four_digits,
+            "card_network": new_card_network.value if hasattr(new_card_network, "value") else new_card_network,
+            "expiry_month": card.expiry_month,
+            "expiry_year": card.expiry_year,
+            "credit_limit": str(card.credit_limit) if card.credit_limit else None,
+            "financial_institution_id": str(card.financial_institution_id)
+            if card.financial_institution_id
+            else None,
+            "notes": card.notes,
+        }
+
+        # 8. Audit log with old/new values
         await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.UPDATE,
             entity_type="card",
             entity_id=card.id,
-            status=AuditStatus.SUCCESS,
+            old_values=old_values,
+            new_values=new_values,
+            extra_metadata={"changed_fields": list(update_dict.keys())},
             ip_address=ip_address,
             user_agent=user_agent,
             request_id=request_id,
         )
+
+        # 9. Commit transaction
+        await self.session.commit()
 
         return CardResponse.model_validate(card)
 
