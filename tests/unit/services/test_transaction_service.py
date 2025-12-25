@@ -191,39 +191,6 @@ class TestTransactionServiceRead:
         with pytest.raises(AuthorizationError):
             await service.get_transaction(created.id, admin_user)
 
-    async def test_search_transactions(self, db_session, test_user, test_account):
-        """Test searching transactions with filters."""
-        service = TransactionService(db_session)
-
-        # Create test transactions
-        amounts = [
-            Decimal("-10.00"),
-            Decimal("-25.00"),
-            Decimal("-50.00"),
-            Decimal("100.00"),
-        ]
-        for amount in amounts:
-            await service.create_transaction(
-                account_id=test_account.id,
-                transaction_date=date.today(),
-                amount=amount,
-                currency="USD",
-                description="Test",
-                transaction_type=(
-                    TransactionType.income if amount > 0 else TransactionType.expense
-                ),
-                current_user=test_user,
-            )
-
-        # Search for debit transactions
-        results, total = await service.search_transactions(
-            account_id=test_account.id,
-            current_user=test_user,
-            transaction_type=TransactionType.expense,
-        )
-
-        assert total == 3  # Three debit transactions
-
 
 @pytest.mark.asyncio
 class TestTransactionServiceUpdate:
@@ -729,14 +696,20 @@ class TestTransactionServiceCardValidation:
         from models.enums import CardType
 
         # Create card for admin user
-        admin_account = await AccountRepository(db_session).create(
+        from models.account import Account
+
+        admin_account = Account(
             account_name="Admin Account",
             currency="USD",
             opening_balance=Decimal("0"),
+            current_balance=Decimal("0"),
             user_id=admin_user.id,
             account_type_id=test_account.account_type_id,
             financial_institution_id=test_account.financial_institution_id,
+            created_by=admin_user.id,
+            updated_by=admin_user.id,
         )
+        admin_account = await AccountRepository(db_session).add(admin_account)
 
         admin_card = Card(
             account_id=admin_account.id,

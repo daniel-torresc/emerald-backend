@@ -9,6 +9,7 @@ Type Parameters:
 """
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar
 
 from sqlalchemy import Select, func, select
@@ -51,7 +52,7 @@ class BaseRepository(Generic[ModelType]):
         self.model = model
         self.session = session
 
-    def _apply_soft_delete_filter(self, query: Select) -> Select:
+    def _apply_soft_delete_filter(self, query: Select[Any]) -> Select[Any]:
         """
         Apply soft delete filter to query if model supports it.
 
@@ -65,24 +66,16 @@ class BaseRepository(Generic[ModelType]):
             query = query.where(self.model.deleted_at.is_(None))
         return query
 
-    async def create(self, **kwargs: Any) -> ModelType:
+    async def add(self, instance: ModelType) -> ModelType:
         """
-        Create a new record.
+        Persist a model instance.
 
         Args:
-            **kwargs: Model attributes
+            instance: Model instance to persist
 
         Returns:
-            Created model instance
-
-        Example:
-            user = await user_repo.create(
-                username="john",
-                email="john@example.com",
-                password_hash="..."
-            )
+            Persisted model instance (with ID and timestamps populated)
         """
-        instance = self.model(**kwargs)
         self.session.add(instance)
         await self.session.flush()
         await self.session.refresh(instance)
@@ -113,7 +106,7 @@ class BaseRepository(Generic[ModelType]):
 
     async def get_all(
         self,
-        skip: int = 0,
+        offset: int = 0,
         limit: int = 100,
     ) -> list[ModelType]:
         """
@@ -122,7 +115,7 @@ class BaseRepository(Generic[ModelType]):
         Automatically filters out soft-deleted records.
 
         Args:
-            skip: Number of records to skip
+            offset: Number of records to skip
             limit: Maximum number of records to return
 
         Returns:
@@ -131,7 +124,7 @@ class BaseRepository(Generic[ModelType]):
         Example:
             users = await user_repo.get_all(skip=0, limit=20)
         """
-        query = select(self.model).offset(skip).limit(limit)
+        query = select(self.model).offset(offset).limit(limit)
         query = self._apply_soft_delete_filter(query)
 
         result = await self.session.execute(query)
@@ -189,8 +182,6 @@ class BaseRepository(Generic[ModelType]):
         if not hasattr(instance, "deleted_at"):
             raise AttributeError(f"{self.model.__name__} does not support soft delete")
 
-        from datetime import UTC, datetime
-
         instance.deleted_at = datetime.now(UTC)
 
         await self.session.flush()
@@ -214,12 +205,9 @@ class BaseRepository(Generic[ModelType]):
         await self.session.delete(instance)
         await self.session.flush()
 
-    async def count(self, include_deleted: bool = False) -> int:
+    async def count(self) -> int:
         """
         Count total records.
-
-        Args:
-            include_deleted: Whether to include soft-deleted records
 
         Returns:
             Total count
@@ -229,9 +217,7 @@ class BaseRepository(Generic[ModelType]):
             total_including_deleted = await user_repo.count(include_deleted=True)
         """
         query = select(func.count()).select_from(self.model)
-
-        if not include_deleted:
-            query = self._apply_soft_delete_filter(query)
+        query = self._apply_soft_delete_filter(query)
 
         result = await self.session.execute(query)
         return result.scalar_one()

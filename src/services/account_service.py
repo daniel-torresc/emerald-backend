@@ -24,8 +24,8 @@ from core.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from models.account import Account, AccountShare
 from models import AuditAction
+from models.account import Account, AccountShare
 from models.enums import PermissionLevel
 from models.user import User
 from repositories import FinancialInstitutionRepository
@@ -33,7 +33,8 @@ from repositories.account_repository import AccountRepository
 from repositories.account_share_repository import AccountShareRepository
 from repositories.account_type_repository import AccountTypeRepository
 from repositories.user_repository import UserRepository
-from schemas.account import AccountFilterParams, AccountListItem
+from schemas.account import AccountCreate, AccountFilterParams, AccountListItem
+from schemas.account_share import AccountShareCreate
 from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
 from services.audit_service import AuditService
 from services.currency_service import CurrencyService
@@ -77,17 +78,8 @@ class AccountService:
 
     async def create_account(
         self,
-        user_id: uuid.UUID,
-        account_name: str,
-        account_type_id: uuid.UUID,
-        currency: str,
-        opening_balance: Decimal,
-        financial_institution_id: uuid.UUID,
-        current_user: User,
-        iban: str | None = None,
-        color_hex: str = "#818E8F",
-        icon_url: HttpUrl | None = None,
-        notes: str | None = None,
+        user: User,
+        data: AccountCreate,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -100,17 +92,8 @@ class AccountService:
         Financial institution is mandatory (all accounts must be linked to an institution).
 
         Args:
-            user_id: ID of user who will own the account
-            account_name: Descriptive account name (1-100 characters, unique per user)
-            account_type_id: Account type ID (must reference active account type)
-            currency: ISO 4217 currency code (3 uppercase letters)
-            opening_balance: Initial account balance (can be negative for loans)
-            financial_institution_id: Financial institution ID (REQUIRED, must be active)
-            current_user: Currently authenticated user (for audit logging)
-            iban: IBAN number (optional, will be encrypted)
-            color_hex: Hex color for UI (optional, default #818E8F)
-            icon_url: Account icon URL (optional)
-            notes: User notes (optional)
+            user: User who will own the account
+            data: Account details
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
@@ -126,30 +109,25 @@ class AccountService:
 
         Example:
             account = await account_service.create_account(
-                user_id=user.id,
-                account_name="Chase Checking",
-                account_type_id=checking_type_id,
-                currency="USD",
-                opening_balance=Decimal("1000.00"),
-                financial_institution_id=chase_id,
-                current_user=user
+                user=user,
+                data=data
             )
         """
         # Validate account name uniqueness
-        if await self.account_repo.exists_by_name(user_id, account_name):
+        if await self.account_repo.exists_by_name(user.id, data.account_name):
             logger.warning(
-                f"User {user_id} attempted to create account with duplicate name: {account_name}"
+                f"User {user.id} attempted to create account with duplicate name: {data.account_name}"
             )
             raise AlreadyExistsError(
-                f"Account name '{account_name}' already exists. Please choose a different name."
+                f"Account name '{data.account_name}' already exists. Please choose a different name."
             )
 
         # Validate account type exists and is active
-        account_type = await self.account_type_repo.get_by_id(account_type_id)
+        account_type = await self.account_type_repo.get_by_id(data.account_type_id)
         if not account_type:
             logger.warning(
-                f"User {user_id} attempted to create account with non-existent "
-                f"account type: {account_type_id}"
+                f"User {user.id} attempted to create account with non-existent "
+                f"account type: {data.account_type_id}"
             )
             raise NotFoundError("Account type not found")
 
@@ -157,24 +135,24 @@ class AccountService:
         # No per-user custom types - all types are managed globally
 
         # Validate currency is supported (ISO 4217 currency codes)
-        if not self.currency_service.is_supported(currency):
+        if not self.currency_service.is_supported(data.currency):
             supported_codes = ", ".join(self.currency_service.get_supported_codes())
             logger.warning(
-                f"User {user_id} attempted to create account with unsupported currency: {currency}"
+                f"User {user.id} attempted to create account with unsupported currency: {data.currency}"
             )
             raise ValidationError(
-                f"Unsupported currency code '{currency}'. "
+                f"Unsupported currency code '{data.currency}'. "
                 f"Supported currencies: {supported_codes}"
             )
 
         # Validate financial institution exists
         financial_institution = await self.financial_institution_repo.exists(
-            financial_institution_id
+            data.financial_institution_id
         )
         if not financial_institution:
             logger.warning(
-                f"User {user_id} attempted to create account with non existent "
-                f"institution: {financial_institution_id}"
+                f"User {user.id} attempted to create account with non existent "
+                f"institution: {data.financial_institution_id}"
             )
             raise ValidationError(
                 "Financial institution not found. "
@@ -184,12 +162,12 @@ class AccountService:
         # Process IBAN if provided
         encrypted_iban = None
         iban_last_four = None
-        if iban:
+        if data.iban:
             try:
                 # Encrypt full IBAN
-                encrypted_iban = self.encryption_service.encrypt(iban)
+                encrypted_iban = self.encryption_service.encrypt(data.iban)
                 # Extract last 4 digits for display
-                iban_last_four = iban[-4:] if len(iban) >= 4 else iban
+                iban_last_four = data.iban[-4:] if len(data.iban) >= 4 else data.iban
                 logger.info("IBAN encrypted successfully for account creation")
             except Exception as e:
                 logger.error(f"IBAN encryption failed: {e}")
@@ -197,42 +175,44 @@ class AccountService:
 
         # Create account
         # Phase 2: current_balance = opening_balance (no transactions yet)
-        account = await self.account_repo.create(
-            user_id=user_id,
-            financial_institution_id=financial_institution_id,
-            account_name=account_name,
-            account_type_id=account_type_id,
-            currency=currency,
-            opening_balance=opening_balance,
-            current_balance=opening_balance,  # Initially same as opening balance
-            color_hex=color_hex,
-            icon_url=icon_url,
+        account = Account(
+            user_id=user.id,
+            financial_institution_id=data.financial_institution_id,
+            account_name=data.account_name,
+            account_type_id=data.account_type_id,
+            currency=data.currency,
+            opening_balance=data.opening_balance,
+            current_balance=data.opening_balance,  # Initially same as opening balance
+            color_hex=data.color_hex,
+            icon_url=data.icon_url,
             iban=encrypted_iban,
             iban_last_four=iban_last_four,
-            notes=notes,
-            created_by=current_user.id,
-            updated_by=current_user.id,
+            notes=data.notes,
+            created_by=user.id,
+            updated_by=user.id,
         )
+        account = await self.account_repo.add(account)
+        await self.session.commit()
 
         logger.info(
-            f"Created account {account.id} ({account.account_name}) for user {user_id}"
+            f"Created account {account.id} ({account.account_name}) for user {user.id}"
         )
 
         # Log audit event
         await self.audit_service.log_event(
-            user_id=current_user.id,
+            user_id=user.id,
             action=AuditAction.CREATE,
             entity_type="account",
             entity_id=account.id,
             description=f"Created account '{account.account_name}' at {account.financial_institution.short_name} ({account.account_type.name}, {account.currency})",
             extra_metadata={
                 "account_name": account.account_name,
-                "account_type_id": str(account_type_id),
+                "account_type_id": str(data.account_type_id),
                 "account_type_key": account.account_type.key,
                 "account_type_name": account.account_type.name,
                 "currency": account.currency,
-                "opening_balance": str(opening_balance),
-                "financial_institution_id": str(financial_institution_id),
+                "opening_balance": str(data.opening_balance),
+                "financial_institution_id": str(data.financial_institution_id),
                 "financial_institution_name": account.financial_institution.short_name,
             },
             ip_address=ip_address,
@@ -325,11 +305,9 @@ class AccountService:
             )
             raise PermissionError("You can only list your own accounts")
 
-        # Get owned accounts (without pagination - we'll paginate the combined results)
+        # Get owned accounts
         owned_accounts = await self.account_repo.get_by_user(
             user_id=user_id,
-            skip=0,
-            limit=100,  # Get all owned accounts (up to 100)
             account_type_id=filters.account_type_id,
             financial_institution_id=filters.financial_institution_id,
         )
@@ -649,10 +627,9 @@ class AccountService:
 
     async def share_account(
         self,
-        account_id: uuid.UUID,
-        target_user_id: uuid.UUID,
-        permission_level: PermissionLevel,
         current_user: User,
+        account_id: uuid.UUID,
+        data: AccountShareCreate,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -664,10 +641,9 @@ class AccountService:
         Only the account owner can share accounts.
 
         Args:
-            account_id: ID of account to share
-            target_user_id: ID of user to share with
-            permission_level: Permission level to grant (editor or viewer, not owner)
             current_user: Currently authenticated user (must be owner)
+            account_id: ID of account to share
+            data: Account share data
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
@@ -700,38 +676,40 @@ class AccountService:
         )
 
         # Validate target user exists and is not deleted
-        target_user = await self.user_repo.get_by_id(target_user_id)
+        target_user = await self.user_repo.get_by_id(data.user_id)
         if not target_user:
             raise NotFoundError("User to share with not found")
 
         # Cannot share with self
-        if target_user_id == current_user.id:
+        if data.user_id == current_user.id:
             raise ValidationError("Cannot share account with yourself")
 
         # Cannot grant owner permission (only one owner per account)
-        if permission_level == PermissionLevel.owner:
+        if data.permission_level == PermissionLevel.owner:
             raise ValidationError(
                 "Cannot grant owner permission. Each account has exactly one owner."
             )
 
         # Check if share already exists
-        if await self.share_repo.exists_share(target_user_id, account_id):
+        if await self.share_repo.exists_share(data.user_id, account_id):
             raise AlreadyExistsError(
                 f"Account already shared with user {target_user.username}"
             )
 
         # Create share
-        created_share = await self.share_repo.create(
+        account_share = AccountShare(
             account_id=account_id,
-            user_id=target_user_id,
-            permission_level=permission_level,
+            user_id=data.user_id,
+            permission_level=data.permission_level,
             created_by=current_user.id,
             updated_by=current_user.id,
         )
+        created_share = await self.share_repo.add(account_share)
+        await self.session.commit()
 
         logger.info(
             f"User {current_user.id} shared account {account_id} with "
-            f"user {target_user_id} ({permission_level.value})"
+            f"user {data.user_id} ({data.permission_level.value})"
         )
 
         # Log audit event
@@ -740,13 +718,13 @@ class AccountService:
             action=AuditAction.CREATE,
             entity_type="account_share",
             entity_id=created_share.id,
-            description=f"Shared account '{account.account_name}' with {target_user.username} ({permission_level.value})",
+            description=f"Shared account '{account.account_name}' with {target_user.username} ({data.permission_level.value})",
             extra_metadata={
                 "account_id": str(account_id),
                 "account_name": account.account_name,
-                "target_user_id": str(target_user_id),
+                "target_user_id": str(data.user_id),
                 "target_username": target_user.username,
-                "permission_level": permission_level.value,
+                "permission_level": data.permission_level.value,
             },
             ip_address=ip_address,
             user_agent=user_agent,

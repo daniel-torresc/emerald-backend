@@ -21,6 +21,7 @@ from schemas.common import PaginatedResponse, PaginationParams
 from schemas.transaction import (
     TransactionCreate,
     TransactionFilterParams,
+    TransactionListItem,
     TransactionResponse,
     TransactionSplitRequest,
     TransactionUpdate,
@@ -58,10 +59,10 @@ router = APIRouter(tags=["Transactions"])
 )
 async def create_transaction(
     request: Request,
+    account_id: uuid.UUID,
+    transaction_data: TransactionCreate,
     current_user: CurrentUser,
     transaction_service: TransactionServiceDep,
-    account_id: uuid.UUID = Path(description="Account UUID"),
-    transaction_data: TransactionCreate = ...,
 ) -> TransactionResponse:
     """
     Create new transaction for an account.
@@ -85,15 +86,7 @@ async def create_transaction(
     """
     transaction = await transaction_service.create_transaction(
         account_id=account_id,
-        transaction_date=transaction_data.transaction_date,
-        amount=transaction_data.amount,
-        currency=transaction_data.currency,
-        description=transaction_data.description,
-        transaction_type=transaction_data.transaction_type,
-        merchant=transaction_data.merchant,
-        card_id=transaction_data.card_id,
-        value_date=transaction_data.value_date,
-        user_notes=transaction_data.user_notes,
+        data=transaction_data,
         current_user=current_user,
         request_id=getattr(request.state, "request_id", None),
         ip_address=request.client.host if request.client else None,
@@ -134,7 +127,7 @@ async def list_transactions(
     account_id: uuid.UUID = Path(description="Account UUID"),
     pagination: PaginationParams = Depends(),
     filters: TransactionFilterParams = Depends(),
-) -> PaginatedResponse[TransactionResponse]:
+) -> PaginatedResponse[TransactionListItem]:
     """
     List and search transactions for an account.
 
@@ -160,7 +153,7 @@ async def list_transactions(
         - Valid access token
         - VIEWER or higher permission on account
     """
-    return await transaction_service.search_transactions_paginated(
+    return await transaction_service.search(
         account_id=account_id,
         current_user=current_user,
         pagination=pagination,

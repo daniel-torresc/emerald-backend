@@ -41,8 +41,6 @@ class AccountRepository(BaseRepository[Account]):
     async def get_by_user(
         self,
         user_id: uuid.UUID,
-        skip: int = 0,
-        limit: int = 100,
         account_type_id: uuid.UUID | None = None,
         financial_institution_id: uuid.UUID | None = None,
     ) -> list[Account]:
@@ -54,8 +52,6 @@ class AccountRepository(BaseRepository[Account]):
 
         Args:
             user_id: ID of the user who owns the accounts
-            skip: Number of records to skip (pagination)
-            limit: Maximum number of records to return (max 100)
             account_type_id: Filter by account type ID (None = all types)
             financial_institution_id: Filter by financial institution (None = all)
 
@@ -88,9 +84,6 @@ class AccountRepository(BaseRepository[Account]):
             query = query.where(
                 Account.financial_institution_id == financial_institution_id
             )
-
-        # Apply pagination
-        query = query.offset(skip).limit(limit)
 
         # Order by created_at descending (newest first)
         query = query.order_by(Account.created_at.desc())

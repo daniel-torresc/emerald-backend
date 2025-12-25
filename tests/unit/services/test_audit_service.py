@@ -543,7 +543,7 @@ class TestGetUserAuditLogs:
             status=AuditStatus.SUCCESS,
             start_date=start_date,
             end_date=end_date,
-            skip=0,
+            offset=0,
             limit=20,
         )
 
@@ -557,7 +557,7 @@ class TestGetUserAuditLogs:
             status=AuditStatus.SUCCESS,
             start_date=start_date,
             end_date=end_date,
-            skip=0,
+            offset=0,
             limit=20,
         )
         mock_audit_repo.count_user_logs.assert_called_once_with(
@@ -591,7 +591,7 @@ class TestGetUserAuditLogs:
         # Execute - second page
         logs, total = await audit_service.get_user_audit_logs(
             user_id=user_id,
-            skip=10,
+            offset=10,
             limit=10,
         )
 
@@ -655,7 +655,7 @@ class TestGetAllAuditLogs:
             action=AuditAction.LOGIN_FAILED,
             status=AuditStatus.FAILURE,
             start_date=start_date,
-            skip=0,
+            offset=0,
             limit=50,
         )
 
@@ -668,7 +668,7 @@ class TestGetAllAuditLogs:
             status=AuditStatus.FAILURE,
             start_date=start_date,
             end_date=None,
-            skip=0,
+            offset=0,
             limit=50,
         )
         mock_audit_repo.count_all_logs.assert_called_once_with(
@@ -730,7 +730,7 @@ class TestGetAllAuditLogs:
         # Execute
         logs, total = await audit_service.get_all_audit_logs(
             entity_type="transaction",
-            skip=0,
+            offset=0,
             limit=20,
         )
 

@@ -68,7 +68,7 @@ async def list_user_audit_logs(
         status=filters.status,
         start_date=filters.start_date,
         end_date=filters.end_date,
-        skip=pagination.offset,
+        offset=pagination.offset,
         limit=pagination.page_size,
     )
 
@@ -133,7 +133,7 @@ async def get_all_audit_logs(
         status=filters.status,
         start_date=filters.start_date,
         end_date=filters.end_date,
-        skip=pagination.offset,
+        offset=pagination.offset,
         limit=pagination.page_size,
     )
 

@@ -8,7 +8,6 @@ creation and reading, not updates or deletes.
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,102 +40,22 @@ class AuditLogRepository:
         """
         self.session = session
 
-    async def create(
-        self,
-        user_id: uuid.UUID | None,
-        action: AuditAction,
-        entity_type: str,
-        entity_id: uuid.UUID | None = None,
-        old_values: dict[str, Any] | None = None,
-        new_values: dict[str, Any] | None = None,
-        description: str | None = None,
-        ip_address: str | None = None,
-        user_agent: str | None = None,
-        request_id: str | None = None,
-        status: AuditStatus = AuditStatus.SUCCESS,
-        error_message: str | None = None,
-        extra_metadata: dict[str, Any] | None = None,
-    ) -> AuditLog:
+    async def add(self, instance: AuditLog) -> AuditLog:
         """
-        Create a new audit log entry.
+        Persist a new audit log entry.
 
         This is the ONLY way to add audit logs. They cannot be modified after creation.
 
         Args:
-            user_id: User who performed the action (None for system actions)
-            action: Type of action performed
-            entity_type: Type of entity affected (e.g., "user", "transaction")
-            entity_id: UUID of affected entity
-            old_values: Values before the action (for UPDATE/DELETE)
-            new_values: Values after the action (for CREATE/UPDATE)
-            description: Human-readable description
-            ip_address: Client IP address
-            user_agent: Client user agent
-            request_id: Correlation ID for request tracing
-            status: Status of the action (SUCCESS, FAILURE, PARTIAL)
-            error_message: Error message if status is FAILURE
-            extra_metadata: Additional context as JSONB
+            instance: AuditLog instance to persist
 
         Returns:
-            Created AuditLog instance
-
-        Example:
-            # Log successful login
-            audit_log = await audit_repo.create(
-                user_id=user.id,
-                action=AuditAction.LOGIN,
-                entity_type="user",
-                entity_id=user.id,
-                description="User logged in successfully",
-                ip_address="192.168.1.100",
-                user_agent="Mozilla/5.0...",
-                request_id=request.state.request_id,
-                status=AuditStatus.SUCCESS,
-            )
-
-            # Log data modification
-            audit_log = await audit_repo.create(
-                user_id=current_user.id,
-                action=AuditAction.UPDATE,
-                entity_type="user",
-                entity_id=target_user.id,
-                old_values={"email": "old@example.com"},
-                new_values={"email": "new@example.com"},
-                description="User email updated",
-                status=AuditStatus.SUCCESS,
-            )
-
-            # Log failed action
-            audit_log = await audit_repo.create(
-                user_id=user.id,
-                action=AuditAction.DELETE,
-                entity_type="transaction",
-                entity_id=transaction_id,
-                description="Attempted to delete transaction",
-                status=AuditStatus.FAILURE,
-                error_message="Insufficient permissions",
-            )
+            Persisted AuditLog instance
         """
-        audit_log = AuditLog(
-            user_id=user_id,
-            action=action,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            old_values=old_values,
-            new_values=new_values,
-            description=description,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            request_id=request_id,
-            status=status,
-            error_message=error_message,
-            extra_metadata=extra_metadata,
-        )
-
-        self.session.add(audit_log)
+        self.session.add(instance)
         await self.session.flush()
-        await self.session.refresh(audit_log)
-        return audit_log
+        await self.session.refresh(instance)
+        return instance
 
     async def get_user_logs(
         self,
@@ -146,7 +65,7 @@ class AuditLogRepository:
         status: AuditStatus | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        skip: int = 0,
+        offset: int = 0,
         limit: int = 100,
     ) -> list[AuditLog]:
         """
@@ -163,7 +82,7 @@ class AuditLogRepository:
             status: Filter by status
             start_date: Filter logs after this date
             end_date: Filter logs before this date
-            skip: Number of records to skip (pagination)
+            offset: Number of records to skip (pagination)
             limit: Maximum number of records to return
 
         Returns:
@@ -208,7 +127,7 @@ class AuditLogRepository:
         query = query.order_by(AuditLog.created_at.desc())
 
         # Apply pagination
-        query = query.offset(skip).limit(limit)
+        query = query.offset(offset).limit(limit)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
@@ -218,7 +137,7 @@ class AuditLogRepository:
         entity_type: str,
         entity_id: uuid.UUID,
         action: AuditAction | None = None,
-        skip: int = 0,
+        offset: int = 0,
         limit: int = 100,
     ) -> list[AuditLog]:
         """
@@ -230,7 +149,7 @@ class AuditLogRepository:
             entity_type: Type of entity (e.g., "user", "transaction")
             entity_id: UUID of the entity
             action: Filter by action type
-            skip: Number of records to skip (pagination)
+            offset: Number of records to skip (pagination)
             limit: Maximum number of records to return
 
         Returns:
@@ -262,7 +181,7 @@ class AuditLogRepository:
         query = query.order_by(AuditLog.created_at.desc())
 
         # Apply pagination
-        query = query.offset(skip).limit(limit)
+        query = query.offset(offset).limit(limit)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
@@ -376,7 +295,7 @@ class AuditLogRepository:
         status: AuditStatus | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        skip: int = 0,
+        offset: int = 0,
         limit: int = 100,
     ) -> list[AuditLog]:
         """
@@ -388,7 +307,7 @@ class AuditLogRepository:
             status: Filter by status
             start_date: Filter logs after this date
             end_date: Filter logs before this date
-            skip: Number of records to skip (pagination)
+            offset: Number of records to skip (pagination)
             limit: Maximum number of records to return
 
         Returns:
@@ -423,7 +342,7 @@ class AuditLogRepository:
         query = query.order_by(AuditLog.created_at.desc())
 
         # Apply pagination
-        query = query.offset(skip).limit(limit)
+        query = query.offset(offset).limit(limit)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())

@@ -106,7 +106,7 @@ class UserRepository(BaseRepository[User]):
         self,
         search: str | None = None,
         is_admin: bool | None = None,
-        skip: int = 0,
+        offset: int = 0,
         limit: int = 100,
     ) -> list[User]:
         """
@@ -118,7 +118,7 @@ class UserRepository(BaseRepository[User]):
         Args:
             search: Search term for username, email, or full_name
             is_admin: Filter by admin status
-            skip: Number of records to skip (pagination)
+            offset: Number of records to skip (pagination)
             limit: Maximum number of records to return
 
         Returns:
@@ -152,7 +152,7 @@ class UserRepository(BaseRepository[User]):
             query = query.where(User.is_admin.is_(is_admin))
 
         # Apply pagination
-        query = query.offset(skip).limit(limit)
+        query = query.offset(offset).limit(limit)
 
         # Order by created_at descending (newest first)
         query = query.order_by(User.created_at.desc())

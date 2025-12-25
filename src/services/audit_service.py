@@ -97,7 +97,7 @@ class AuditService:
                 status=AuditStatus.SUCCESS,
             )
         """
-        audit_log = await self.audit_repo.create(
+        audit_log = AuditLog(
             user_id=user_id,
             action=action,
             entity_type=entity_type,
@@ -112,8 +112,8 @@ class AuditService:
             error_message=error_message,
             extra_metadata=extra_metadata,
         )
-
-        await self.session.flush()
+        audit_log = await self.audit_repo.add(audit_log)
+        await self.session.commit()
 
         logger.debug(
             f"Audit log created: user={user_id}, action={action.value}, "
@@ -397,7 +397,7 @@ class AuditService:
         status: AuditStatus | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        skip: int = 0,
+        offset: int = 0,
         limit: int = 100,
     ) -> tuple[list[AuditLog], int]:
         """
@@ -414,7 +414,7 @@ class AuditService:
             status: Filter by status
             start_date: Filter logs after this date
             end_date: Filter logs before this date
-            skip: Number of records to skip (pagination)
+            offset: Number of records to skip (pagination)
             limit: Maximum number of records to return
 
         Returns:
@@ -425,7 +425,7 @@ class AuditService:
             logs, total = await audit_service.get_user_audit_logs(
                 user_id=user.id,
                 action=AuditAction.LOGIN,
-                skip=0,
+                offset=0,
                 limit=20
             )
         """
@@ -436,7 +436,7 @@ class AuditService:
             status=status,
             start_date=start_date,
             end_date=end_date,
-            skip=skip,
+            offset=offset,
             limit=limit,
         )
 
@@ -458,7 +458,7 @@ class AuditService:
         status: AuditStatus | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        skip: int = 0,
+        offset: int = 0,
         limit: int = 100,
     ) -> tuple[list[AuditLog], int]:
         """
@@ -470,7 +470,7 @@ class AuditService:
             status: Filter by status
             start_date: Filter logs after this date
             end_date: Filter logs before this date
-            skip: Number of records to skip (pagination)
+            offset: Number of records to skip (pagination)
             limit: Maximum number of records to return
 
         Returns:
@@ -489,7 +489,7 @@ class AuditService:
             status=status,
             start_date=start_date,
             end_date=end_date,
-            skip=skip,
+            offset=offset,
             limit=limit,
         )
 

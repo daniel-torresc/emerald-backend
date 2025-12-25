@@ -38,13 +38,6 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False)
 
     # -------------------------------------------------------------------------
-    # Server Configuration
-    # -------------------------------------------------------------------------
-    host: str = Field(default="0.0.0.0")
-    port: int = Field(default=8000, ge=1, le=65535)
-    reload: bool = Field(default=False)
-
-    # -------------------------------------------------------------------------
     # Security Settings
     # -------------------------------------------------------------------------
     secret_key: str = Field(

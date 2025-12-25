@@ -17,7 +17,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AlreadyExistsError, NotFoundError
-from models import AuditAction
+from models import AccountType, AuditAction
 from models.user import User
 from repositories.account_type_repository import AccountTypeRepository
 from schemas.account_type import (
@@ -107,13 +107,14 @@ class AccountTypeService:
             )
 
         # Create account type
-        account_type = await self.account_type_repo.create(
+        account_type = AccountType(
             key=data.key,
             name=data.name,
             description=data.description,
             icon_url=str(data.icon_url) if data.icon_url else None,
             sort_order=data.sort_order,
         )
+        account_type = await self.account_type_repo.add(account_type)
 
         # Commit transaction
         await self.session.commit()

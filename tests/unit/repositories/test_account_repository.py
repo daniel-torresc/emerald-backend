@@ -15,30 +15,60 @@ from decimal import Decimal
 
 import pytest
 
+from models.account import Account
 from repositories.account_repository import AccountRepository
+
+
+def create_account_instance(
+    user_id,
+    financial_institution_id,
+    account_name,
+    account_type_id,
+    currency="USD",
+    opening_balance=Decimal("1000.00"),
+    current_balance=None,
+    created_by=None,
+    updated_by=None,
+):
+    """Helper to create Account instances for tests."""
+    if current_balance is None:
+        current_balance = opening_balance
+    if created_by is None:
+        created_by = user_id
+    if updated_by is None:
+        updated_by = user_id
+    return Account(
+        user_id=user_id,
+        financial_institution_id=financial_institution_id,
+        account_name=account_name,
+        account_type_id=account_type_id,
+        currency=currency,
+        opening_balance=opening_balance,
+        current_balance=current_balance,
+        created_by=created_by,
+        updated_by=updated_by,
+    )
 
 
 @pytest.mark.asyncio
 class TestAccountRepository:
     """Test suite for AccountRepository."""
 
-    async def test_create_account(
+    async def test_add_account(
         self, db_session, test_user, test_financial_institution, savings_account_type
     ):
-        """Test creating an account."""
+        """Test adding an account."""
         repo = AccountRepository(db_session)
 
-        account = await repo.create(
+        account = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Test Savings",
             account_type_id=savings_account_type.id,
             currency="USD",
             opening_balance=Decimal("1000.00"),
-            current_balance=Decimal("1000.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        account = await repo.add(account)
 
         assert account.id is not None
         assert account.account_name == "Test Savings"
@@ -46,7 +76,6 @@ class TestAccountRepository:
         assert account.currency == "USD"
         assert account.opening_balance == Decimal("1000.00")
         assert account.current_balance == Decimal("1000.00")
-
         assert account.deleted_at is None
 
     async def test_get_by_id(
@@ -56,24 +85,21 @@ class TestAccountRepository:
         repo = AccountRepository(db_session)
 
         # Create account
-        created = await repo.create(
+        account = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Test Account",
             account_type_id=savings_account_type.id,
-            currency="USD",
             opening_balance=Decimal("500.00"),
-            current_balance=Decimal("500.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        created = await repo.add(account)
 
         # Retrieve by ID
-        account = await repo.get_by_id(created.id)
+        found = await repo.get_by_id(created.id)
 
-        assert account is not None
-        assert account.id == created.id
-        assert account.account_name == "Test Account"
+        assert found is not None
+        assert found.id == created.id
+        assert found.account_name == "Test Account"
 
     async def test_get_by_user(
         self,
@@ -87,29 +113,22 @@ class TestAccountRepository:
         repo = AccountRepository(db_session)
 
         # Create multiple accounts
-        await repo.create(
+        account1 = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Savings",
             account_type_id=savings_account_type.id,
-            currency="USD",
-            opening_balance=Decimal("1000.00"),
-            current_balance=Decimal("1000.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        await repo.add(account1)
 
-        await repo.create(
+        account2 = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Credit Card",
             account_type_id=other_account_type.id,
-            currency="USD",
             opening_balance=Decimal("-500.00"),
-            current_balance=Decimal("-500.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        await repo.add(account2)
 
         # Get all accounts for user
         accounts = await repo.get_by_user(user_id=test_user.id)
@@ -128,45 +147,36 @@ class TestAccountRepository:
         """Test getting accounts with filters."""
         repo = AccountRepository(db_session)
 
-        # Create accounts with different types and statuses
-        await repo.create(
+        # Create accounts with different types
+        account1 = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Active Savings",
             account_type_id=savings_account_type.id,
-            currency="USD",
-            opening_balance=Decimal("1000.00"),
-            current_balance=Decimal("1000.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        await repo.add(account1)
 
-        await repo.create(
+        account2 = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Inactive Savings",
             account_type_id=savings_account_type.id,
-            currency="USD",
             opening_balance=Decimal("500.00"),
-            current_balance=Decimal("500.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        await repo.add(account2)
 
-        await repo.create(
+        account3 = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Active Other",
             account_type_id=other_account_type.id,
-            currency="USD",
             opening_balance=Decimal("-200.00"),
-            current_balance=Decimal("-200.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        await repo.add(account3)
 
-        active_accounts = await repo.get_by_user(user_id=test_user.id)
-        assert len(active_accounts) == 2
+        # Get all accounts
+        all_accounts = await repo.get_by_user(user_id=test_user.id)
+        assert len(all_accounts) == 3
 
         # Filter by account_type_id
         savings_accounts = await repo.get_by_user(
@@ -177,46 +187,6 @@ class TestAccountRepository:
             acc.account_type_id == savings_account_type.id for acc in savings_accounts
         )
 
-        # Filter by both
-        active_savings = await repo.get_by_user(
-            user_id=test_user.id,
-            account_type_id=savings_account_type.id,
-        )
-        assert len(active_savings) == 1
-        assert active_savings[0].account_name == "Active Savings"
-
-    async def test_get_by_user_pagination(
-        self, db_session, test_user, test_financial_institution, savings_account_type
-    ):
-        """Test pagination for get_by_user."""
-        repo = AccountRepository(db_session)
-
-        # Create 5 accounts
-        for i in range(5):
-            await repo.create(
-                user_id=test_user.id,
-                financial_institution_id=test_financial_institution.id,
-                account_name=f"Account {i}",
-                account_type_id=savings_account_type.id,
-                currency="USD",
-                opening_balance=Decimal("100.00"),
-                current_balance=Decimal("100.00"),
-                created_by=test_user.id,
-                updated_by=test_user.id,
-            )
-
-        # Get first page
-        page1 = await repo.get_by_user(user_id=test_user.id, skip=0, limit=2)
-        assert len(page1) == 2
-
-        # Get second page
-        page2 = await repo.get_by_user(user_id=test_user.id, skip=2, limit=2)
-        assert len(page2) == 2
-
-        # Get third page
-        page3 = await repo.get_by_user(user_id=test_user.id, skip=4, limit=2)
-        assert len(page3) == 1
-
     async def test_get_by_name(
         self, db_session, test_user, test_financial_institution, savings_account_type
     ):
@@ -224,37 +194,29 @@ class TestAccountRepository:
         repo = AccountRepository(db_session)
 
         # Create account
-        await repo.create(
+        account = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="My Savings",
             account_type_id=savings_account_type.id,
-            currency="USD",
-            opening_balance=Decimal("1000.00"),
-            current_balance=Decimal("1000.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        await repo.add(account)
 
         # Get by exact name
-        account = await repo.get_by_name(
-            user_id=test_user.id, account_name="My Savings"
-        )
-        assert account is not None
-        assert account.account_name == "My Savings"
+        found = await repo.get_by_name(user_id=test_user.id, account_name="My Savings")
+        assert found is not None
+        assert found.account_name == "My Savings"
 
         # Get by case-insensitive name
-        account = await repo.get_by_name(
-            user_id=test_user.id, account_name="my savings"
-        )
-        assert account is not None
-        assert account.account_name == "My Savings"
+        found = await repo.get_by_name(user_id=test_user.id, account_name="my savings")
+        assert found is not None
+        assert found.account_name == "My Savings"
 
         # Get non-existent
-        account = await repo.get_by_name(
+        found = await repo.get_by_name(
             user_id=test_user.id, account_name="Non Existent"
         )
-        assert account is None
+        assert found is None
 
     async def test_exists_by_name(
         self, db_session, test_user, test_financial_institution, savings_account_type
@@ -263,17 +225,13 @@ class TestAccountRepository:
         repo = AccountRepository(db_session)
 
         # Create account
-        await repo.create(
+        account = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Existing Account",
             account_type_id=savings_account_type.id,
-            currency="USD",
-            opening_balance=Decimal("1000.00"),
-            current_balance=Decimal("1000.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        await repo.add(account)
 
         # Check exists
         exists = await repo.exists_by_name(
@@ -300,29 +258,22 @@ class TestAccountRepository:
         repo = AccountRepository(db_session)
 
         # Create two accounts
-        account1 = await repo.create(
+        account1 = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Account One",
             account_type_id=savings_account_type.id,
-            currency="USD",
-            opening_balance=Decimal("1000.00"),
-            current_balance=Decimal("1000.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        account1 = await repo.add(account1)
 
-        await repo.create(
+        account2 = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="Account Two",
             account_type_id=savings_account_type.id,
-            currency="USD",
             opening_balance=Decimal("2000.00"),
-            current_balance=Decimal("2000.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        await repo.add(account2)
 
         # Check if "Account Two" exists (excluding account1)
         exists = await repo.exists_by_name(
@@ -346,44 +297,20 @@ class TestAccountRepository:
         count = await repo.count_user_accounts(user_id=test_user.id)
         assert count == 0
 
-        # Create active accounts
+        # Create accounts
         for i in range(3):
-            await repo.create(
+            account = create_account_instance(
                 user_id=test_user.id,
                 financial_institution_id=test_financial_institution.id,
-                account_name=f"Active {i}",
+                account_name=f"Account {i}",
                 account_type_id=savings_account_type.id,
-                currency="USD",
                 opening_balance=Decimal("100.00"),
-                current_balance=Decimal("100.00"),
-                created_by=test_user.id,
-                updated_by=test_user.id,
             )
-
-        # Create inactive account
-        await repo.create(
-            user_id=test_user.id,
-            financial_institution_id=test_financial_institution.id,
-            account_name="Inactive",
-            account_type_id=savings_account_type.id,
-            currency="USD",
-            opening_balance=Decimal("100.00"),
-            current_balance=Decimal("100.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
-        )
+            await repo.add(account)
 
         # Count all accounts
         count = await repo.count_user_accounts(user_id=test_user.id)
-        assert count == 4
-
-        # Count only active
-        count = await repo.count_user_accounts(user_id=test_user.id)
         assert count == 3
-
-        # Count only inactive
-        count = await repo.count_user_accounts(user_id=test_user.id)
-        assert count == 1
 
     async def test_soft_delete_filtering(
         self, db_session, test_user, test_financial_institution, savings_account_type
@@ -392,17 +319,13 @@ class TestAccountRepository:
         repo = AccountRepository(db_session)
 
         # Create account
-        account = await repo.create(
+        account = create_account_instance(
             user_id=test_user.id,
             financial_institution_id=test_financial_institution.id,
             account_name="To Delete",
             account_type_id=savings_account_type.id,
-            currency="USD",
-            opening_balance=Decimal("1000.00"),
-            current_balance=Decimal("1000.00"),
-            created_by=test_user.id,
-            updated_by=test_user.id,
         )
+        account = await repo.add(account)
 
         # Verify it exists
         found = await repo.get_by_id(account.id)

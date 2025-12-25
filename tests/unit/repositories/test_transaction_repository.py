@@ -42,7 +42,7 @@ class TestTransactionRepository:
             updated_by=test_user.id,
         )
 
-        created = await repo.create(transaction)
+        created = await repo.add(transaction)
 
         assert created.id is not None
         assert created.account_id == test_account.id
@@ -68,7 +68,7 @@ class TestTransactionRepository:
             created_by=test_user.id,
             updated_by=test_user.id,
         )
-        created = await repo.create(transaction)
+        created = await repo.add(transaction)
 
         # Retrieve by ID
         retrieved = await repo.get_by_id(created.id)
@@ -93,10 +93,10 @@ class TestTransactionRepository:
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
-            await repo.create(transaction)
+            await repo.add(transaction)
 
         # Retrieve transactions
-        transactions = await repo.get_by_account_id(test_account.id, skip=0, limit=10)
+        transactions = await repo.get_by_account_id(test_account.id, offset=0, limit=10)
 
         assert len(transactions) == 5
         # Should be ordered by date descending
@@ -118,7 +118,7 @@ class TestTransactionRepository:
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
-            await repo.create(transaction)
+            await repo.add(transaction)
 
         count = await repo.count_by_account_id(test_account.id)
         assert count == 3
@@ -140,7 +140,7 @@ class TestTransactionRepository:
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
-            await repo.create(transaction)
+            await repo.add(transaction)
 
         # Search for transactions in last 3 days
         date_from = today - timedelta(days=2)
@@ -174,7 +174,7 @@ class TestTransactionRepository:
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
-            await repo.create(transaction)
+            await repo.add(transaction)
 
         # Search for amounts between -60 and -20
         transactions, total = await repo.search_transactions(
@@ -208,7 +208,7 @@ class TestTransactionRepository:
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
-            await repo.create(transaction)
+            await repo.add(transaction)
 
         # Search for debit transactions
         transactions, total = await repo.search_transactions(
@@ -233,7 +233,7 @@ class TestTransactionRepository:
             created_by=test_user.id,
             updated_by=test_user.id,
         )
-        parent = await repo.create(parent)
+        parent = await repo.add(parent)
 
         # Create child transactions
         for i in range(2):
@@ -248,7 +248,7 @@ class TestTransactionRepository:
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
-            await repo.create(child)
+            await repo.add(child)
 
         # Get children
         children = await repo.get_children(parent.id)
@@ -270,7 +270,7 @@ class TestTransactionRepository:
             created_by=test_user.id,
             updated_by=test_user.id,
         )
-        parent = await repo.create(parent)
+        parent = await repo.add(parent)
 
         # No children yet
         assert await repo.has_children(parent.id) is False
@@ -287,7 +287,7 @@ class TestTransactionRepository:
             created_by=test_user.id,
             updated_by=test_user.id,
         )
-        await repo.create(child)
+        await repo.add(child)
 
         # Now has children
         assert await repo.has_children(parent.id) is True
@@ -311,7 +311,7 @@ class TestTransactionRepository:
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
-            await repo.create(transaction)
+            await repo.add(transaction)
 
         # Calculate balance
         balance = await repo.calculate_account_balance(test_account.id)
@@ -344,7 +344,7 @@ class TestTransactionRepository:
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
-            await repo.create(transaction)
+            await repo.add(transaction)
 
         # Get balance as of 2 days ago
         balance = await repo.get_balance_at_date(
@@ -368,7 +368,7 @@ class TestTransactionRepository:
             created_by=test_user.id,
             updated_by=test_user.id,
         )
-        created = await repo.create(transaction)
+        created = await repo.add(transaction)
 
         # Soft delete
         await repo.soft_delete(created)
@@ -397,14 +397,14 @@ class TestTransactionRepository:
                 created_by=test_user.id,
                 updated_by=test_user.id,
             )
-            await repo.create(transaction)
+            await repo.add(transaction)
 
         # Get first page (5 items)
-        page1 = await repo.get_by_account_id(test_account.id, skip=0, limit=5)
+        page1 = await repo.get_by_account_id(test_account.id, offset=0, limit=5)
         assert len(page1) == 5
 
         # Get second page (5 items)
-        page2 = await repo.get_by_account_id(test_account.id, skip=5, limit=5)
+        page2 = await repo.get_by_account_id(test_account.id, offset=5, limit=5)
         assert len(page2) == 5
 
         # Pages should not overlap

@@ -34,6 +34,7 @@ from core.exceptions import (
     InvalidCredentialsError,
     InvalidTokenError,
 )
+from models import RefreshToken
 from models.user import User
 from repositories.refresh_token_repository import RefreshTokenRepository
 from repositories.user_repository import UserRepository
@@ -70,7 +71,7 @@ class AuthService:
 
     async def register(
         self,
-        user_data: UserCreate,
+        data: UserCreate,
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> tuple[User, TokenResponse]:
@@ -85,7 +86,7 @@ class AuthService:
         5. Stores refresh token hash in database
 
         Args:
-            user_data: User registration data (email, username, password)
+            data: User registration data (email, username, password)
             ip_address: Client IP address (for audit logging)
             user_agent: Client user agent (for audit logging)
 
@@ -106,29 +107,28 @@ class AuthService:
             )
         """
         # Check if email already exists
-        if await self.user_repo.email_exists(user_data.email):
-            logger.warning(
-                f"Registration attempted with existing email: {user_data.email}"
-            )
+        if await self.user_repo.email_exists(data.email):
+            logger.warning(f"Registration attempted with existing email: {data.email}")
             raise AlreadyExistsError("User with this email")
 
         # Check if username already exists
-        if await self.user_repo.username_exists(user_data.username):
+        if await self.user_repo.username_exists(data.username):
             logger.warning(
-                f"Registration attempted with existing username: {user_data.username}"
+                f"Registration attempted with existing username: {data.username}"
             )
             raise AlreadyExistsError("User with this username")
 
         # Hash the password
-        password_hash = hash_password(user_data.password)
+        password_hash = hash_password(data.password)
 
         # Create user in database
-        user = await self.user_repo.create(
-            email=user_data.email,
-            username=user_data.username,
+        user = User(
+            email=str(data.email),
+            username=data.username,
             password_hash=password_hash,
             is_admin=False,  # Regular user by default
         )
+        user = await self.user_repo.add(user)
         await self.session.commit()
 
         logger.info(f"User registered successfully: {user.id} ({user.email})")
@@ -462,13 +462,13 @@ class AuthService:
             days=settings.refresh_token_expire_days
         )
 
-        await self.token_repo.create(
+        token = RefreshToken(
             user_id=user.id,
             token_hash=refresh_token_hash,
             token_family_id=token_family_id,
             expires_at=expires_at,
         )
-        await self.session.flush()
+        await self.token_repo.add(token)
 
         return TokenResponse(
             access_token=access_token,

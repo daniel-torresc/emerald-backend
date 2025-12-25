@@ -25,7 +25,7 @@ from core.exceptions import (
     ValidationError,
 )
 from models import AuditAction
-from models.enums import CardType, PermissionLevel, TransactionType
+from models.enums import PermissionLevel, TransactionType
 from models.transaction import Transaction
 from models.user import User
 from repositories.account_repository import AccountRepository
@@ -33,8 +33,9 @@ from repositories.card_repository import CardRepository
 from repositories.transaction_repository import TransactionRepository
 from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
 from schemas.transaction import (
+    TransactionCreate,
     TransactionFilterParams,
-    TransactionResponse,
+    TransactionListItem,
 )
 from services.audit_service import AuditService
 from services.currency_service import CurrencyService
@@ -84,16 +85,8 @@ class TransactionService:
     async def create_transaction(
         self,
         account_id: uuid.UUID,
-        transaction_date: date,
-        amount: Decimal,
-        currency: str,
-        description: str,
-        transaction_type: TransactionType,
+        data: TransactionCreate,
         current_user: User,
-        merchant: str | None = None,
-        card_id: uuid.UUID | None = None,
-        value_date: date | None = None,
-        user_notes: str | None = None,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
@@ -112,16 +105,8 @@ class TransactionService:
 
         Args:
             account_id: Account to add transaction to
-            transaction_date: Date when transaction occurred
-            amount: Transaction amount (positive or negative, non-zero)
-            currency: ISO 4217 currency code (must match account)
-            description: Transaction description (1-500 chars)
-            transaction_type: Type of transaction (debit, credit, etc.)
+            data: Transaction to create
             current_user: Currently authenticated user
-            merchant: Merchant name (optional, 1-100 chars)
-            card_id: Card used for transaction (optional)
-            value_date: Date transaction value applied (optional)
-            user_notes: User comments (optional, max 1000 chars)
             request_id: Optional request ID for correlation
             ip_address: Client IP address for audit logging
             user_agent: Client user agent for audit logging
@@ -133,18 +118,6 @@ class TransactionService:
             NotFoundError: If account not found
             AuthorizationError: If user doesn't have permission
             ValidationError: If currency mismatch or invalid data
-
-        Example:
-            transaction = await transaction_service.create_transaction(
-                account_id=account.id,
-                transaction_date=date.today(),
-                amount=Decimal("-50.25"),
-                currency="USD",
-                description="Grocery Shopping",
-                transaction_type=TransactionType.DEBIT,
-                merchant="Whole Foods",
-                current_user=user,
-            )
         """
         # Validate permissions (EDITOR or OWNER can create transactions)
         has_permission = await self.permission_service.check_permission(
@@ -168,87 +141,85 @@ class TransactionService:
             raise NotFoundError("Account")
 
         # Validate currency is supported
-        if not self.currency_service.is_supported(currency):
+        if not self.currency_service.is_supported(data.currency):
             supported_codes = ", ".join(self.currency_service.get_supported_codes())
             logger.warning(
-                f"User {current_user.id} attempted to create transaction with unsupported currency: {currency}"
+                f"User {current_user.id} attempted to create transaction with unsupported currency: {data.currency}"
             )
             raise ValidationError(
-                f"Unsupported currency code '{currency}'. "
+                f"Unsupported currency code '{data.currency}'. "
                 f"Supported currencies: {supported_codes}"
             )
 
         # Validate currency matches account
-        if currency != account.currency:
+        if data.currency != account.currency:
             logger.warning(
-                f"Currency mismatch: transaction={currency}, account={account.currency}"
+                f"Currency mismatch: transaction={data.currency}, account={account.currency}"
             )
             raise ValidationError(
-                f"Transaction currency ({currency}) must match account currency ({account.currency})"
+                f"Transaction currency ({data.currency}) must match account currency ({account.currency})"
             )
 
         # Validate amount is non-zero
-        if amount == 0:
+        if data.amount == 0:
             raise ValidationError("Transaction amount cannot be zero")
 
         # Validate card if provided
-        if card_id is not None:
+        if data.card_id is not None:
             card = await self.card_repo.get_by_id_for_user(
-                card_id=card_id,
+                card_id=data.card_id,
                 user_id=current_user.id,
             )
             if card is None:
                 logger.warning(
-                    f"Card {card_id} not found or unauthorized for user {current_user.id}"
+                    f"Card {data.card_id} not found or unauthorized for user {current_user.id}"
                 )
                 raise NotFoundError("Card")
 
-        # Use database transaction for atomicity
-        # Transaction managed by caller
-        # Create transaction
         transaction = Transaction(
             account_id=account_id,
-            transaction_date=transaction_date,
-            amount=amount,
-            currency=currency,
-            description=description,
-            merchant=merchant,
-            card_id=card_id,
-            transaction_type=transaction_type,
-            user_notes=user_notes,
-            value_date=value_date,
+            transaction_date=data.transaction_date,
+            amount=data.amount,
+            currency=data.currency,
+            description=data.description,
+            merchant=data.merchant,
+            card_id=data.card_id,
+            transaction_type=data.transaction_type,
+            user_notes=data.user_notes,
+            value_date=data.value_date,
             created_by=current_user.id,
             updated_by=current_user.id,
         )
-
-        created = await self.transaction_repo.create(transaction)
+        transaction = await self.transaction_repo.add(transaction)
 
         # Update account balance with row lock
         account = await self.account_repo.get_for_update(account_id)
         old_balance = account.current_balance
-        account.current_balance += amount
+        account.current_balance += data.amount
         new_balance = account.current_balance
 
         logger.info(
-            f"Created transaction {created.id} for account {account_id}, "
+            f"Created transaction {transaction.id} for account {account_id}, "
             f"updated balance: {old_balance} -> {new_balance}"
         )
+
+        await self.session.commit()
 
         # Audit log
         await self.audit_service.log_event(
             user_id=current_user.id,
             action=AuditAction.CREATE,
             entity_type="transaction",
-            entity_id=created.id,
-            description=f"Created transaction: {description} ({amount} {currency})",
+            entity_id=transaction.id,
+            description=f"Created transaction: {data.description} ({data.amount} {data.currency})",
             new_values={
-                "transaction_date": str(transaction_date),
-                "amount": str(amount),
-                "currency": currency,
-                "description": description,
-                "merchant": merchant,
-                "card_id": str(card_id) if card_id else None,
-                "transaction_type": transaction_type.value,
+                "transaction_date": str(data.transaction_date),
+                "amount": str(data.amount),
+                "currency": data.currency,
+                "description": data.description,
+                "merchant": data.merchant,
+                "card_id": str(data.card_id) if data.card_id else None,
+                "transaction_type": data.transaction_type.value,
             },
             extra_metadata={
                 "account_id": str(account_id),
@@ -261,8 +232,8 @@ class TransactionService:
         )
 
         # Refresh to get card relationships
-        await self.session.refresh(created, ["card"])
-        return created
+        await self.session.refresh(transaction, ["card"])
+        return transaction
 
     async def get_transaction(
         self,
@@ -312,101 +283,13 @@ class TransactionService:
 
         return transaction
 
-    async def search_transactions(
-        self,
-        account_id: uuid.UUID,
-        current_user: User,
-        date_from: date | None = None,
-        date_to: date | None = None,
-        amount_min: Decimal | None = None,
-        amount_max: Decimal | None = None,
-        description: str | None = None,
-        merchant: str | None = None,
-        transaction_type: TransactionType | None = None,
-        card_id: uuid.UUID | None = None,
-        card_type: CardType | None = None,
-        sort_by: str = "transaction_date",
-        sort_order: str = "desc",
-        skip: int = 0,
-        limit: int = 20,
-    ) -> tuple[list[Transaction], int]:
-        """
-        Search transactions with advanced filters.
-
-        Args:
-            account_id: Account to search in
-            current_user: Currently authenticated user
-            date_from: Filter from this date (inclusive)
-            date_to: Filter to this date (inclusive)
-            amount_min: Minimum amount (inclusive)
-            amount_max: Maximum amount (inclusive)
-            description: Fuzzy search on description
-            merchant: Fuzzy search on merchant
-            transaction_type: Filter by type
-            card_id: Filter by specific card UUID
-            card_type: Filter by card type (credit_card or debit_card)
-            sort_by: Sort field (transaction_date, amount, description, created_at)
-            sort_order: Sort order (asc or desc)
-            skip: Number of records to skip
-            limit: Maximum records to return
-
-        Returns:
-            Tuple of (transactions list, total count)
-
-        Raises:
-            AuthorizationError: If user doesn't have account access
-
-        Example:
-            transactions, total = await transaction_service.search_transactions(
-                account_id=account.id,
-                current_user=user,
-                description="grocery",
-                amount_min=Decimal("10.00"),
-                amount_max=Decimal("100.00"),
-                skip=0,
-                limit=20,
-            )
-        """
-        # Check user has account access (VIEWER or higher)
-        has_permission = await self.permission_service.check_permission(
-            user_id=current_user.id,
-            account_id=account_id,
-            required_permission=PermissionLevel.viewer,
-        )
-
-        if not has_permission:
-            logger.warning(
-                f"User {current_user.id} attempted to search transactions for account {account_id} without permission"
-            )
-            raise AuthorizationError(
-                "You don't have permission to view transactions for this account"
-            )
-
-        # Delegate to repository
-        return await self.transaction_repo.search_transactions(
-            account_id=account_id,
-            date_from=date_from,
-            date_to=date_to,
-            amount_min=amount_min,
-            amount_max=amount_max,
-            description=description,
-            merchant=merchant,
-            transaction_type=transaction_type,
-            card_id=card_id,
-            card_type=card_type,
-            sort_by=sort_by,
-            sort_order=sort_order,
-            skip=skip,
-            limit=limit,
-        )
-
-    async def search_transactions_paginated(
+    async def search(
         self,
         account_id: uuid.UUID,
         current_user: User,
         pagination: PaginationParams,
         filters: TransactionFilterParams,
-    ) -> PaginatedResponse[TransactionResponse]:
+    ) -> PaginatedResponse[TransactionListItem]:
         """
         Search transactions with pagination and filters.
 
@@ -462,13 +345,13 @@ class TransactionService:
             card_type=filters.card_type,
             sort_by=filters.sort_by,
             sort_order=filters.sort_order,
-            skip=pagination.offset,
+            offset=pagination.offset,
             limit=pagination.page_size,
         )
 
         # Convert to TransactionResponse
         transaction_items = [
-            TransactionResponse.model_validate(t) for t in transactions
+            TransactionListItem.model_validate(t) for t in transactions
         ]
 
         # Calculate total pages
@@ -895,12 +778,14 @@ class TransactionService:
                 created_by=current_user.id,
                 updated_by=current_user.id,
             )
-            created_child = await self.transaction_repo.create(child)
+            created_child = await self.transaction_repo.add(child)
             children.append(created_child)
 
         logger.info(f"Split transaction {transaction_id} into {len(children)} children")
 
         # No balance update needed (parent still exists, children don't add new amounts)
+
+        await self.session.commit()
 
         # Audit log
         await self.audit_service.log_event(

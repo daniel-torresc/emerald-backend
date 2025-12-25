@@ -220,14 +220,17 @@ class TestListCards:
         """Test listing cards filtered by card type."""
         from repositories.card_repository import CardRepository
 
+        from models.card import Card
+
         repo = CardRepository(db_session)
-        await repo.create(
+        card = Card(
             account_id=test_account.id,
             card_type=CardType.credit_card,
             name="Credit Card",
             created_by=test_user.id,
             updated_by=test_user.id,
         )
+        await repo.add(card)
 
         response = await async_client.get(
             "/api/v1/cards?card_type=credit_card",
