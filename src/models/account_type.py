@@ -11,13 +11,11 @@ Architecture:
 - Uses is_active flag instead of soft delete (types can be deactivated)
 """
 
-from typing import Optional
-
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from models.base import Base
-from models.mixins import TimestampMixin
+from .base import Base
+from .mixins import TimestampMixin
 
 
 class AccountType(Base, TimestampMixin):
@@ -78,14 +76,14 @@ class AccountType(Base, TimestampMixin):
         comment="Display name shown to users",
     )
 
-    description: Mapped[Optional[str]] = mapped_column(
+    description: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         comment="Detailed description of the account type",
     )
 
     # Visual identity
-    icon_url: Mapped[Optional[str]] = mapped_column(
+    icon_url: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         comment="URL to icon image for UI display",

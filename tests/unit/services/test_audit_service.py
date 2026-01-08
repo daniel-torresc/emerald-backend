@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from models.audit_log import AuditAction, AuditLog, AuditStatus
+from models import AuditAction, AuditLog, AuditStatus
 from services.audit_service import AuditService
 
 
@@ -536,7 +536,7 @@ class TestGetUserAuditLogs:
         end_date = datetime.now(UTC)
 
         # Execute
-        logs, total = await audit_service.get_user_audit_logs(
+        logs, total = await audit_service.list_user_audit_logs(
             user_id=user_id,
             action=AuditAction.LOGIN,
             entity_type="user",
@@ -589,7 +589,7 @@ class TestGetUserAuditLogs:
         mock_audit_repo.count_user_logs.return_value = 100
 
         # Execute - second page
-        logs, total = await audit_service.get_user_audit_logs(
+        logs, total = await audit_service.list_user_audit_logs(
             user_id=user_id,
             offset=10,
             limit=10,
@@ -612,7 +612,7 @@ class TestGetUserAuditLogs:
         mock_audit_repo.count_user_logs.return_value = 0
 
         # Execute
-        logs, total = await audit_service.get_user_audit_logs(
+        logs, total = await audit_service.list_user_audit_logs(
             user_id=user_id,
             action=AuditAction.DELETE,
         )
@@ -620,123 +620,3 @@ class TestGetUserAuditLogs:
         # Verify
         assert logs == []
         assert total == 0
-
-
-class TestGetAllAuditLogs:
-    """Test the get_all_audit_logs method."""
-
-    @pytest.mark.asyncio
-    async def test_get_all_audit_logs_with_filters(
-        self, audit_service, mock_audit_repo
-    ):
-        """Test getting all audit logs with filters (admin only)."""
-        # Setup
-        mock_logs = [
-            AuditLog(
-                id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
-                action=AuditAction.LOGIN_FAILED,
-                entity_type="user",
-            ),
-            AuditLog(
-                id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
-                action=AuditAction.LOGIN_FAILED,
-                entity_type="user",
-            ),
-        ]
-        mock_audit_repo.get_all_logs.return_value = mock_logs
-        mock_audit_repo.count_all_logs.return_value = len(mock_logs)
-
-        start_date = datetime.now(UTC) - timedelta(days=7)
-
-        # Execute
-        logs, total = await audit_service.get_all_audit_logs(
-            action=AuditAction.LOGIN_FAILED,
-            status=AuditStatus.FAILURE,
-            start_date=start_date,
-            offset=0,
-            limit=50,
-        )
-
-        # Verify
-        assert logs == mock_logs
-        assert total == len(mock_logs)
-        mock_audit_repo.get_all_logs.assert_called_once_with(
-            action=AuditAction.LOGIN_FAILED,
-            entity_type=None,
-            status=AuditStatus.FAILURE,
-            start_date=start_date,
-            end_date=None,
-            offset=0,
-            limit=50,
-        )
-        mock_audit_repo.count_all_logs.assert_called_once_with(
-            action=AuditAction.LOGIN_FAILED,
-            entity_type=None,
-            status=AuditStatus.FAILURE,
-            start_date=start_date,
-            end_date=None,
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_all_audit_logs_no_filters(self, audit_service, mock_audit_repo):
-        """Test getting all audit logs without filters."""
-        # Setup
-        mock_logs = [
-            AuditLog(
-                id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
-                action=AuditAction.READ,
-                entity_type="user",
-            )
-            for _ in range(100)
-        ]
-        mock_audit_repo.get_all_logs.return_value = mock_logs
-        mock_audit_repo.count_all_logs.return_value = len(mock_logs)
-
-        # Execute
-        logs, total = await audit_service.get_all_audit_logs()
-
-        # Verify
-        assert len(logs) == 100
-        assert total == 100
-        mock_audit_repo.get_all_logs.assert_called_once()
-        mock_audit_repo.count_all_logs.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_all_audit_logs_by_entity_type(
-        self, audit_service, mock_audit_repo
-    ):
-        """Test filtering all audit logs by entity type."""
-        # Setup
-        mock_logs = [
-            AuditLog(
-                id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
-                action=AuditAction.CREATE,
-                entity_type="transaction",
-            ),
-            AuditLog(
-                id=uuid.uuid4(),
-                user_id=uuid.uuid4(),
-                action=AuditAction.UPDATE,
-                entity_type="transaction",
-            ),
-        ]
-        mock_audit_repo.get_all_logs.return_value = mock_logs
-        mock_audit_repo.count_all_logs.return_value = len(mock_logs)
-
-        # Execute
-        logs, total = await audit_service.get_all_audit_logs(
-            entity_type="transaction",
-            offset=0,
-            limit=20,
-        )
-
-        # Verify
-        assert logs == mock_logs
-        assert total == len(mock_logs)
-        call_args = mock_audit_repo.get_all_logs.call_args[1]
-        assert call_args["entity_type"] == "transaction"
-        mock_audit_repo.count_all_logs.assert_called_once()

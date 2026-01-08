@@ -11,25 +11,30 @@ This module provides:
 
 import uuid
 from datetime import datetime
-from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from core.security import validate_password_strength
+from .common import SortOrder, SortParams
+from .enums import UserSortField
 
 
-class UserSortField(str, Enum):
+class UserSortParams(SortParams[UserSortField]):
     """
-    Allowed sort fields for user list queries.
+    Sorting parameters for user list queries.
 
-    Whitelists fields that can be used for sorting to prevent SQL injection.
-    Values must match SQLAlchemy model attribute names exactly.
+    Provides type-safe sorting with validation at schema level.
+    Default sort: created_at descending (newest first).
     """
 
-    USERNAME = "username"
-    EMAIL = "email"
-    CREATED_AT = "created_at"
-    LAST_LOGIN_AT = "last_login_at"
+    sort_by: UserSortField = Field(
+        default=UserSortField.CREATED_AT,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.DESC,
+        description="Sort direction",
+    )
 
 
 class UserBase(BaseModel):
@@ -284,13 +289,13 @@ class UserFilterParams(BaseModel):
     Query parameters for filtering user lists.
 
     Attributes:
-        is_superuser: Filter by superuser status
+        is_admin: Filter by admin status
         search: Search in email or username
     """
 
-    is_superuser: bool | None = Field(
+    is_admin: bool | None = Field(
         default=None,
-        description="Filter by superuser status",
+        description="Filter by admin status",
     )
     search: str | None = Field(
         default=None,
@@ -302,7 +307,7 @@ class UserFilterParams(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "is_superuser": False,
+                "is_admin": False,
                 "search": "john",
             }
         }

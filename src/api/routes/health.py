@@ -8,8 +8,8 @@ from typing import Any
 from fastapi import APIRouter, Request
 from sqlalchemy import text
 
-from api.dependencies import DbSession
 from core.config import settings
+from ..dependencies import DbSession
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,6 @@ async def readiness_check(
         "version": settings.version,
         "checks": {
             "database": "ok" if db_healthy else "ko",
-            "redis": "ok",  # Placeholder - TODO: Add Redis check
+            "redis": "-",  # TODO: Add Redis check
         },
     }

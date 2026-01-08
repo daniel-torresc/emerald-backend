@@ -13,27 +13,32 @@ This module defines request and response schemas for card operations:
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from models.enums import CardType
-from schemas.account import AccountEmbedded
-from schemas.financial_institution import FinancialInstitutionEmbedded
+from models import CardType
+from .account import AccountEmbedded
+from .common import SortOrder, SortParams
+from .enums import CardSortField
+from .financial_institution import FinancialInstitutionEmbedded
 
 
-class CardSortField(str, Enum):
+class CardSortParams(SortParams[CardSortField]):
     """
-    Allowed sort fields for card list queries.
+    Sorting parameters for card list queries.
 
-    Whitelists fields that can be used for sorting to prevent SQL injection.
-    Values must match SQLAlchemy model attribute names exactly.
+    Provides type-safe sorting with validation at schema level.
+    Default sort: created_at descending (newest first).
     """
 
-    NAME = "name"
-    LAST_FOUR_DIGITS = "last_four_digits"
-    EXPIRY_YEAR = "expiry_year"
-    CREATED_AT = "created_at"
+    sort_by: CardSortField = Field(
+        default=CardSortField.CREATED_AT,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.DESC,
+        description="Sort direction",
+    )
 
 
 class CardBase(BaseModel):

@@ -12,14 +12,15 @@ Audit logs are WRITE-ONCE - they cannot be modified or deleted after creation.
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from models.base import Base
-from models.enums import AuditAction, AuditStatus
+from .base import Base
+from .enums import AuditAction, AuditStatus
+from .user import User
 
 
 class AuditLog(Base):
@@ -97,7 +98,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     # Who performed the action (NULL for system actions)
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
@@ -118,42 +119,42 @@ class AuditLog(Base):
         index=True,
     )
 
-    entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         nullable=True,
         index=True,
     )
 
     # What changed (for data modifications)
-    old_values: Mapped[Optional[dict[str, Any]]] = mapped_column(
+    old_values: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
 
-    new_values: Mapped[Optional[dict[str, Any]]] = mapped_column(
+    new_values: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
 
     # Human-readable description
-    description: Mapped[Optional[str]] = mapped_column(
+    description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
 
     # Request context
-    ip_address: Mapped[Optional[str]] = mapped_column(
+    ip_address: Mapped[str | None] = mapped_column(
         String(45),  # IPv6 max length
         nullable=True,
         index=True,
     )
 
-    user_agent: Mapped[Optional[str]] = mapped_column(
+    user_agent: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
     )
 
-    request_id: Mapped[Optional[str]] = mapped_column(
+    request_id: Mapped[str | None] = mapped_column(
         String(36),  # UUID length
         nullable=True,
         index=True,
@@ -167,13 +168,13 @@ class AuditLog(Base):
         index=True,
     )
 
-    error_message: Mapped[Optional[str]] = mapped_column(
+    error_message: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
 
     # Additional context
-    extra_metadata: Mapped[Optional[dict[str, Any]]] = mapped_column(
+    extra_metadata: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
@@ -187,7 +188,7 @@ class AuditLog(Base):
     )
 
     # Relationship to User (who performed the action)
-    user: Mapped[Optional["User"]] = relationship(
+    user: Mapped[User | None] = relationship(
         "User",
         lazy="selectin",
     )

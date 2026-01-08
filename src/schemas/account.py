@@ -12,27 +12,36 @@ import re
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from schwifty import IBAN
 
-from schemas.account_type import AccountTypeListItem
-from schemas.financial_institution import FinancialInstitutionResponse
+from .account_type import (
+    AccountTypeEmbedded,
+)
+from .common import SortOrder, SortParams
+from .enums import AccountSortField
+from .financial_institution import (
+    FinancialInstitutionEmbedded,
+)
 
 
-class AccountSortField(str, Enum):
+class AccountSortParams(SortParams[AccountSortField]):
     """
-    Allowed sort fields for account list queries.
+    Sorting parameters for account list queries.
 
-    Whitelists fields that can be used for sorting to prevent SQL injection.
-    Values must match SQLAlchemy model attribute names exactly.
+    Provides type-safe sorting with validation at schema level.
+    Default sort: created_at descending (newest first).
     """
 
-    ACCOUNT_NAME = "account_name"
-    CURRENT_BALANCE = "current_balance"
-    CREATED_AT = "created_at"
-    UPDATED_AT = "updated_at"
+    sort_by: AccountSortField = Field(
+        default=AccountSortField.CREATED_AT,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.DESC,
+        description="Sort direction",
+    )
 
 
 class AccountBase(BaseModel):
@@ -348,13 +357,11 @@ class AccountResponse(AccountBase):
     id: uuid.UUID = Field(description="Account unique identifier")
     user_id: uuid.UUID = Field(description="Owner's user ID")
 
-    account_type_id: uuid.UUID = Field(description="Account type ID")
-    account_type: AccountTypeListItem = Field(
+    account_type: AccountTypeEmbedded = Field(
         description="Account type details (key, name, icon, etc.)"
     )
 
-    financial_institution_id: uuid.UUID = Field(description="Financial institution ID")
-    financial_institution: FinancialInstitutionResponse = Field(
+    financial_institution: FinancialInstitutionEmbedded = Field(
         description="Financial institution details (name, logo, etc.)"
     )
 
@@ -401,27 +408,23 @@ class AccountListItem(BaseModel):
     Attributes:
         id: Account UUID
         account_name: Account name
-        account_type_id: Account type ID
         account_type: Account type details
         currency: Currency code
         current_balance: Current balance
         color_hex: Hex color code
         icon_url: Icon URL
-        financial_institution_id: Institution ID
         financial_institution: Full institution details
         created_at: Creation timestamp
     """
 
     id: uuid.UUID
     account_name: str
-    account_type_id: uuid.UUID
-    account_type: AccountTypeListItem
+    account_type: AccountTypeEmbedded
     currency: str
     current_balance: Decimal
     color_hex: str
     icon_url: str | None
-    financial_institution_id: uuid.UUID
-    financial_institution: FinancialInstitutionResponse
+    financial_institution: FinancialInstitutionEmbedded
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -11,20 +11,22 @@ This module provides REST endpoints for:
 
 import logging
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter
+from starlette import status
+from starlette.requests import Request
 
-from api.dependencies import AuditServiceDep, AuthServiceDep, CurrentUser
-from core.config import settings
+from core import settings
 from core.rate_limit import limiter
-from models import AuditAction, AuditStatus
-from schemas.auth import (
+from schemas import (
     AccessTokenResponse,
     LoginRequest,
     LogoutRequest,
     RefreshTokenRequest,
-    TokenResponse,
+    UserCreate,
+    UserPasswordChange,
+    UserResponse,
 )
-from schemas.user import UserCreate, UserPasswordChange, UserResponse
+from ..dependencies import AuthServiceDep, CurrentUser
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,6 @@ async def register(
     data: UserCreate,
     request: Request,
     auth_service: AuthServiceDep,
-    audit_service: AuditServiceDep,
 ) -> UserResponse:
     """
     Register a new user.
@@ -65,7 +66,6 @@ async def register(
         data: User registration data (email, username, password)
         request: FastAPI request object
         auth_service: Injected AuthService instance
-        audit_service: Injected AuditService instance
 
     Returns:
         UserResponse with created user data
@@ -80,41 +80,19 @@ async def register(
     request_id = getattr(request.state, "request_id", None)
 
     # Register user
-    user, tokens = await auth_service.register(
+    user = await auth_service.register(
         data=data,
-        ip_address=ip_address,
-        user_agent=user_agent,
-    )
-
-    # Log registration
-    await audit_service.log_event(
-        user_id=user.id,
-        action=AuditAction.CREATE,
-        entity_type="user",
-        entity_id=user.id,
-        new_values={
-            "email": user.email,
-            "username": user.username,
-        },
-        description="User registered",
-        ip_address=ip_address,
-        user_agent=user_agent,
         request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
-
-    logger.info(f"User registered: {user.id} ({user.email})")
-
-    # Store tokens in response headers (alternative to body)
-    # This is optional - tokens are already in the response body
-    # response.headers["X-Access-Token"] = tokens.access_token
-    # response.headers["X-Refresh-Token"] = tokens.refresh_token
 
     return UserResponse.model_validate(user)
 
 
 @router.post(
     "/login",
-    response_model=TokenResponse,
+    response_model=AccessTokenResponse,
     status_code=status.HTTP_200_OK,
     summary="Login with email and password",
     description="""
@@ -130,8 +108,7 @@ async def login(
     credentials: LoginRequest,
     request: Request,
     auth_service: AuthServiceDep,
-    audit_service: AuditServiceDep,
-) -> TokenResponse:
+) -> AccessTokenResponse:
     """
     Login and receive authentication tokens.
 
@@ -139,7 +116,6 @@ async def login(
         credentials: Login credentials (email, password)
         request: FastAPI request object
         auth_service: Injected AuthService instance
-        audit_service: Injected AuditService instance
 
     Returns:
         TokenResponse with access and refresh tokens
@@ -152,47 +128,19 @@ async def login(
     user_agent = request.headers.get("User-Agent")
     request_id = getattr(request.state, "request_id", None)
 
-    # Attempt login
-    try:
-        user, tokens = await auth_service.login(
-            email=credentials.email,
-            password=credentials.password,
-            ip_address=ip_address,
-            user_agent=user_agent,
-        )
+    access_token, refresh_token, expires_at = await auth_service.login(
+        email=credentials.email,
+        password=credentials.password,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
 
-        # Log successful login
-        await audit_service.log_login(
-            user_id=user.id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            request_id=request_id,
-            success=True,
-        )
-
-        logger.info(f"User logged in: {user.id} ({user.email})")
-
-        return tokens
-
-    except Exception as e:
-        # Log failed login attempt
-        # Note: We don't have user_id for failed attempts, so it's None
-        await audit_service.log_event(
-            user_id=None,
-            action=AuditAction.LOGIN_FAILED,
-            entity_type="user",
-            description=f"Failed login attempt for {credentials.email}",
-            ip_address=ip_address,
-            user_agent=user_agent,
-            request_id=request_id,
-            status=AuditStatus.FAILURE,
-            error_message=str(e),
-        )
-
-        logger.warning(f"Failed login attempt for {credentials.email}")
-
-        # Re-raise the exception
-        raise
+    return AccessTokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_at=expires_at,
+    )
 
 
 @router.post(
@@ -217,7 +165,6 @@ async def refresh(
     token_request: RefreshTokenRequest,
     request: Request,
     auth_service: AuthServiceDep,
-    audit_service: AuditServiceDep,
 ) -> AccessTokenResponse:
     """
     Refresh access token using refresh token.
@@ -226,7 +173,6 @@ async def refresh(
         token_request: Refresh token
         request: FastAPI request object
         auth_service: Injected AuthService instance
-        audit_service: Injected AuditService instance
 
     Returns:
         AccessTokenResponse with new access and refresh tokens
@@ -239,56 +185,18 @@ async def refresh(
     user_agent = request.headers.get("User-Agent")
     request_id = getattr(request.state, "request_id", None)
 
-    # Attempt token refresh
-    try:
-        tokens = await auth_service.refresh_access_token(
-            refresh_token=token_request.refresh_token,
-            ip_address=ip_address,
-            user_agent=user_agent,
-        )
+    access_token, refresh_token, expires_at = await auth_service.refresh_access_token(
+        refresh_token=token_request.refresh_token,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
 
-        # Extract user_id from the new access token for logging
-        from core.security import decode_token
-
-        token_data = decode_token(tokens.access_token)
-        user_id_str = token_data.get("sub")
-
-        if user_id_str:
-            import uuid
-
-            user_id = uuid.UUID(user_id_str)
-
-            # Log successful token refresh
-            await audit_service.log_token_refresh(
-                user_id=user_id,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                request_id=request_id,
-                success=True,
-            )
-
-        logger.info("Token refreshed successfully")
-
-        return tokens
-
-    except Exception as e:
-        # Log failed token refresh
-        await audit_service.log_event(
-            user_id=None,
-            action=AuditAction.TOKEN_REFRESH,
-            entity_type="token",
-            description="Failed token refresh attempt",
-            ip_address=ip_address,
-            user_agent=user_agent,
-            request_id=request_id,
-            status=AuditStatus.FAILURE,
-            error_message=str(e),
-        )
-
-        logger.warning("Failed token refresh attempt")
-
-        # Re-raise the exception
-        raise
+    return AccessTokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_at=expires_at,
+    )
 
 
 @router.post(
@@ -306,7 +214,6 @@ async def logout(
     logout_request: LogoutRequest,
     request: Request,
     auth_service: AuthServiceDep,
-    audit_service: AuditServiceDep,
 ) -> None:
     """
     Logout user by revoking refresh token.
@@ -315,7 +222,6 @@ async def logout(
         logout_request: Refresh token to revoke
         request: FastAPI request object
         auth_service: Injected AuthService instance
-        audit_service: Injected AuditService instance
 
     Raises:
         401: Invalid refresh token
@@ -325,31 +231,12 @@ async def logout(
     user_agent = request.headers.get("User-Agent")
     request_id = getattr(request.state, "request_id", None)
 
-    # Extract user_id before logout
-    from core.security import decode_token
-
-    try:
-        token_data = decode_token(logout_request.refresh_token)
-        user_id_str = token_data.get("sub")
-    except Exception:
-        user_id_str = None
-
-    # Logout
-    await auth_service.logout(refresh_token=logout_request.refresh_token)
-
-    # Log logout
-    if user_id_str:
-        import uuid
-
-        user_id = uuid.UUID(user_id_str)
-        await audit_service.log_logout(
-            user_id=user_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            request_id=request_id,
-        )
-
-    logger.info("User logged out")
+    await auth_service.logout(
+        refresh_token=logout_request.refresh_token,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
 
 
 @router.post(
@@ -371,7 +258,6 @@ async def change_password(
     request: Request,
     current_user: CurrentUser,
     auth_service: AuthServiceDep,
-    audit_service: AuditServiceDep,
 ) -> None:
     """
     Change user password.
@@ -381,7 +267,6 @@ async def change_password(
         request: FastAPI request object
         current_user: Authenticated user (from dependency)
         auth_service: Injected AuthService instance
-        audit_service: Injected AuditService instance
 
     Raises:
         401: Invalid current password
@@ -392,37 +277,11 @@ async def change_password(
     user_agent = request.headers.get("User-Agent")
     request_id = getattr(request.state, "request_id", None)
 
-    # Attempt password change
-    try:
-        await auth_service.change_password(
-            user_id=current_user.id,
-            current_password=password_data.current_password,
-            new_password=password_data.new_password,
-        )
-
-        # Log successful password change
-        await audit_service.log_password_change(
-            user_id=current_user.id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            request_id=request_id,
-            success=True,
-        )
-
-        logger.info(f"Password changed for user {current_user.id}")
-
-    except Exception as e:
-        # Log failed password change
-        await audit_service.log_password_change(
-            user_id=current_user.id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            request_id=request_id,
-            success=False,
-            error_message=str(e),
-        )
-
-        logger.warning(f"Failed password change for user {current_user.id}")
-
-        # Re-raise the exception
-        raise
+    await auth_service.change_password(
+        user_id=current_user.id,
+        current_password=password_data.current_password,
+        new_password=password_data.new_password,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )

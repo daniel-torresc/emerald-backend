@@ -10,13 +10,13 @@ This module implements refresh token storage for token rotation security:
 
 import uuid
 from datetime import UTC, datetime
-from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from models.base import Base
+from .base import Base
+from .user import User
 
 
 class RefreshToken(Base):
@@ -122,7 +122,7 @@ class RefreshToken(Base):
         index=True,
     )
 
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(
+    revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
@@ -136,7 +136,7 @@ class RefreshToken(Base):
     )
 
     # Relationship to User
-    user: Mapped["User"] = relationship(
+    user: Mapped[User] = relationship(
         "User",
         lazy="selectin",
     )

@@ -6,14 +6,22 @@ Note: AuditLogs are IMMUTABLE - this repository only supports
 creation and reading, not updates or deletes.
 """
 
-import uuid
-from datetime import datetime
+import logging
+from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, UnaryExpression, and_, asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from models import AuditAction, AuditStatus
-from models.audit_log import AuditLog
+from models import AuditLog
+from schemas import (
+    AuditLogFilterParams,
+    AuditLogSortParams,
+    PaginationParams,
+    SortOrder,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class AuditLogRepository:
@@ -40,6 +48,79 @@ class AuditLogRepository:
         """
         self.session = session
 
+    @staticmethod
+    def _build_filters(
+        params: AuditLogFilterParams,
+    ) -> list[ColumnElement[bool]]:
+        """
+        Convert AuditLogFilterParams to SQLAlchemy filter expressions.
+
+        Args:
+            params: Filter parameters from request
+
+        Returns:
+            List of SQLAlchemy filter expressions
+        """
+        filters: list[ColumnElement[bool]] = []
+
+        # User filter
+        if params.user_id is not None:
+            filters.append(AuditLog.user_id == params.user_id)
+
+        # Action filter
+        if params.action is not None:
+            filters.append(AuditLog.action == params.action)
+
+        # Entity type filter
+        if params.entity_type is not None:
+            filters.append(AuditLog.entity_type == params.entity_type)
+
+        # Entity ID filter
+        if params.entity_id is not None:
+            filters.append(AuditLog.entity_id == params.entity_id)
+
+        # Status filter
+        if params.status is not None:
+            filters.append(AuditLog.status == params.status)
+
+        # Date range filters
+        if params.start_date is not None:
+            filters.append(AuditLog.created_at >= params.start_date)
+
+        if params.end_date is not None:
+            filters.append(AuditLog.created_at <= params.end_date)
+
+        return filters
+
+    @staticmethod
+    def _build_order_by(
+        params: AuditLogSortParams,
+    ) -> list[UnaryExpression]:
+        """
+        Convert AuditLogSortParams to SQLAlchemy order_by expressions.
+
+        Args:
+            params: Sort parameters with sort_by and sort_order
+
+        Returns:
+            List of SQLAlchemy order_by expressions
+        """
+        order_by: list[UnaryExpression] = []
+
+        # Get the model column from enum value
+        sort_column = getattr(AuditLog, params.sort_by.value)
+
+        # Apply sort direction
+        if params.sort_order == SortOrder.ASC:
+            order_by.append(asc(sort_column))
+        else:
+            order_by.append(desc(sort_column))
+
+        # Add secondary sort by id for deterministic pagination
+        order_by.append(desc(AuditLog.id))
+
+        return order_by
+
     async def add(self, instance: AuditLog) -> AuditLog:
         """
         Persist a new audit log entry.
@@ -57,17 +138,12 @@ class AuditLogRepository:
         await self.session.refresh(instance)
         return instance
 
-    async def get_user_logs(
+    async def list_user_logs(
         self,
-        user_id: uuid.UUID,
-        action: AuditAction | None = None,
-        entity_type: str | None = None,
-        status: AuditStatus | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> list[AuditLog]:
+        filter_params: AuditLogFilterParams,
+        sort_params: AuditLogSortParams,
+        pagination_params: PaginationParams,
+    ) -> tuple[list[AuditLog], int]:
         """
         Get audit logs for a specific user with filtering.
 
@@ -77,13 +153,9 @@ class AuditLogRepository:
 
         Args:
             user_id: UUID of the user
-            action: Filter by action type
-            entity_type: Filter by entity type
-            status: Filter by status
-            start_date: Filter logs after this date
-            end_date: Filter logs before this date
-            offset: Number of records to skip (pagination)
-            limit: Maximum number of records to return
+            filter_params:
+            sort_params:
+            pagination_params:
 
         Returns:
             List of AuditLog instances
@@ -105,244 +177,125 @@ class AuditLogRepository:
                 start_date=datetime.now(UTC) - timedelta(days=1),
             )
         """
-        query = select(AuditLog).where(AuditLog.user_id == user_id)
+        filters = self._build_filters(params=filter_params)
+        order_by = self._build_order_by(params=sort_params)
 
-        # Apply filters
-        if action:
-            query = query.where(AuditLog.action == action)
-
-        if entity_type:
-            query = query.where(AuditLog.entity_type == entity_type)
-
-        if status:
-            query = query.where(AuditLog.status == status)
-
-        if start_date:
-            query = query.where(AuditLog.created_at >= start_date)
-
-        if end_date:
-            query = query.where(AuditLog.created_at <= end_date)
-
-        # Order by created_at descending (newest first)
-        query = query.order_by(AuditLog.created_at.desc())
-
-        # Apply pagination
-        query = query.offset(offset).limit(limit)
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
-
-    async def get_entity_logs(
-        self,
-        entity_type: str,
-        entity_id: uuid.UUID,
-        action: AuditAction | None = None,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> list[AuditLog]:
-        """
-        Get audit logs for a specific entity.
-
-        Shows the complete history of actions performed on an entity.
-
-        Args:
-            entity_type: Type of entity (e.g., "user", "transaction")
-            entity_id: UUID of the entity
-            action: Filter by action type
-            offset: Number of records to skip (pagination)
-            limit: Maximum number of records to return
-
-        Returns:
-            List of AuditLog instances
-
-        Example:
-            # Get all actions performed on a user
-            logs = await audit_repo.get_entity_logs(
-                entity_type="user",
-                entity_id=user_id,
-            )
-
-            # Get all modifications to a transaction
-            logs = await audit_repo.get_entity_logs(
-                entity_type="transaction",
-                entity_id=transaction_id,
-                action=AuditAction.UPDATE,
-            )
-        """
-        query = select(AuditLog).where(
-            AuditLog.entity_type == entity_type,
-            AuditLog.entity_id == entity_id,
+        return await self._list_and_count(
+            filters=filters,
+            order_by=order_by,
+            offset=pagination_params.offset,
+            limit=pagination_params.page_size,
         )
 
-        if action:
-            query = query.where(AuditLog.action == action)
+    # ========================================================================
+    # UTILITY METHODS
+    # ========================================================================
 
-        # Order by created_at descending (newest first)
-        query = query.order_by(AuditLog.created_at.desc())
-
-        # Apply pagination
-        query = query.offset(offset).limit(limit)
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
-
-    async def count_user_logs(
+    async def _list_and_count(
         self,
-        user_id: uuid.UUID,
-        action: AuditAction | None = None,
-        entity_type: str | None = None,
-        status: AuditStatus | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-    ) -> int:
-        """
-        Count audit logs for a user with filters.
-
-        Used for pagination metadata.
-
-        Args:
-            user_id: UUID of the user
-            action: Filter by action type
-            entity_type: Filter by entity type
-            status: Filter by status
-            start_date: Filter logs after this date
-            end_date: Filter logs before this date
-
-        Returns:
-            Total count of matching logs
-
-        Example:
-            total = await audit_repo.count_user_logs(user_id=user.id)
-            total_pages = (total + limit - 1) // limit
-        """
-        query = (
-            select(func.count())
-            .select_from(AuditLog)
-            .where(AuditLog.user_id == user_id)
+        filters: list[ColumnElement[bool]] | None = None,
+        order_by: list[UnaryExpression[Any]] | None = None,
+        load_relationships: list[_AbstractLoad] | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> tuple[list[AuditLog], int]:
+        records = await self._list(
+            filters=filters,
+            order_by=order_by,
+            load_relationships=load_relationships,
+            offset=offset,
+            limit=limit,
         )
 
-        # Apply filters
-        if action:
-            query = query.where(AuditLog.action == action)
+        count = await self._count(
+            filters=filters,
+        )
 
-        if entity_type:
-            query = query.where(AuditLog.entity_type == entity_type)
+        return records, count
 
-        if status:
-            query = query.where(AuditLog.status == status)
-
-        if start_date:
-            query = query.where(AuditLog.created_at >= start_date)
-
-        if end_date:
-            query = query.where(AuditLog.created_at <= end_date)
-
-        result = await self.session.execute(query)
-        return result.scalar_one()
-
-    async def count_all_logs(
+    async def _list(
         self,
-        action: AuditAction | None = None,
-        entity_type: str | None = None,
-        status: AuditStatus | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-    ) -> int:
-        """
-        Count all audit logs with filters (admin only).
-
-        Used for pagination metadata.
-
-        Args:
-            action: Filter by action type
-            entity_type: Filter by entity type
-            status: Filter by status
-            start_date: Filter logs after this date
-            end_date: Filter logs before this date
-
-        Returns:
-            Total count of matching logs
-
-        Example:
-            total = await audit_repo.count_all_logs()
-            total_pages = (total + limit - 1) // limit
-        """
-        query = select(func.count()).select_from(AuditLog)
-
-        # Apply filters
-        if action:
-            query = query.where(AuditLog.action == action)
-
-        if entity_type:
-            query = query.where(AuditLog.entity_type == entity_type)
-
-        if status:
-            query = query.where(AuditLog.status == status)
-
-        if start_date:
-            query = query.where(AuditLog.created_at >= start_date)
-
-        if end_date:
-            query = query.where(AuditLog.created_at <= end_date)
-
-        result = await self.session.execute(query)
-        return result.scalar_one()
-
-    async def get_all_logs(
-        self,
-        action: AuditAction | None = None,
-        entity_type: str | None = None,
-        status: AuditStatus | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        offset: int = 0,
-        limit: int = 100,
+        filters: list[ColumnElement[bool]] | None = None,
+        order_by: list[UnaryExpression[Any]] | None = None,
+        load_relationships: list[_AbstractLoad] | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
     ) -> list[AuditLog]:
         """
-        Get all audit logs with filtering (admin only).
+        Get records with optional filtering, sorting, and pagination.
+
+        This is the primary method for list operations. Uses pre-built
+        filters and order_by expressions from build_filters() and build_order_by().
 
         Args:
-            action: Filter by action type
-            entity_type: Filter by entity type
-            status: Filter by status
-            start_date: Filter logs after this date
-            end_date: Filter logs before this date
-            offset: Number of records to skip (pagination)
-            limit: Maximum number of records to return
+            filters: List of SQLAlchemy filter expressions
+            order_by: List of SQLAlchemy order_by expressions
+            load_relationships: SQLAlchemy load options for eager relationship loading
+            offset: Number of records to skip
+            limit: Maximum number of records to return (default to 100)
 
         Returns:
-            List of AuditLog instances
+            List of model instances
 
         Example:
-            # Get all failed login attempts in last week
-            logs = await audit_repo.get_all_logs(
-                action=AuditAction.LOGIN_FAILED,
-                start_date=datetime.now(UTC) - timedelta(days=7),
+            filters = repo.build_filters(filter_params, user_id=user.id)
+            order_by = repo.build_order_by(sort_params)
+            items = await repo.find_all(
+                filters=filters,
+                order_by=order_by,
+                offset=pagination.offset,
+                limit=pagination.page_size,
             )
         """
         query = select(AuditLog)
 
+        # Apply eager loading options
+        if load_relationships:
+            query = query.options(*load_relationships)
+
         # Apply filters
-        if action:
-            query = query.where(AuditLog.action == action)
+        if filters:
+            query = query.where(and_(*filters))
 
-        if entity_type:
-            query = query.where(AuditLog.entity_type == entity_type)
-
-        if status:
-            query = query.where(AuditLog.status == status)
-
-        if start_date:
-            query = query.where(AuditLog.created_at >= start_date)
-
-        if end_date:
-            query = query.where(AuditLog.created_at <= end_date)
-
-        # Order by created_at descending (newest first)
-        query = query.order_by(AuditLog.created_at.desc())
+        # Apply ordering
+        if order_by:
+            query = query.order_by(*order_by)
 
         # Apply pagination
-        query = query.offset(offset).limit(limit)
+        if offset is not None and limit is not None:
+            query = query.offset(offset).limit(limit)
+        else:
+            logger.warning(
+                f"Listing {AuditLog.__name__} without pagination. Beware of performance issues."
+            )
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+    async def _count(
+        self,
+        filters: list[ColumnElement[bool]] | None = None,
+    ) -> int:
+        """
+        Count records with optional filtering.
+
+        Uses pre-built filters from build_filters().
+
+        Args:
+            filters: List of SQLAlchemy filter expressions
+
+        Returns:
+            Total count of matching records
+
+        Example:
+            filters = repo.build_filters(filter_params, user_id=user.id)
+            total = await repo.count_with_filters(filters)
+        """
+        query = select(func.count()).select_from(AuditLog)
+
+        # Apply filters
+        if filters:
+            query = query.where(and_(*filters))
+
+        result = await self.session.execute(query)
+        return result.scalar_one() or 0

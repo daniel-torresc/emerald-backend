@@ -20,8 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
 from core.security import TOKEN_TYPE_ACCESS, decode_token, verify_token_type
-from models.user import User
-from repositories.user_repository import UserRepository
+from models import User
+from repositories import UserRepository
 from services import (
     AccountService,
     AccountTypeService,

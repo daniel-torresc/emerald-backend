@@ -210,7 +210,7 @@ class TestAccountService:
             )
 
         # List all accounts
-        accounts = await service.list_accounts(
+        accounts = await service.list_user_accounts(
             user_id=test_user.id,
             current_user=test_user,
         )
@@ -255,7 +255,7 @@ class TestAccountService:
             current_user=test_user,
         )
 
-        active_accounts = await service.list_accounts(
+        active_accounts = await service.list_user_accounts(
             user_id=test_user.id,
             current_user=test_user,
         )
@@ -263,7 +263,7 @@ class TestAccountService:
         assert active_accounts[0].account_name == "Active Other"
 
         # Filter by account_type_id
-        other_accounts = await service.list_accounts(
+        other_accounts = await service.list_user_accounts(
             user_id=test_user.id,
             current_user=test_user,
             account_type_id=other_account_type.id,
@@ -290,7 +290,7 @@ class TestAccountService:
             )
 
         # Get first 2
-        page1 = await service.list_accounts(
+        page1 = await service.list_user_accounts(
             user_id=test_user.id,
             current_user=test_user,
             skip=0,
@@ -299,7 +299,7 @@ class TestAccountService:
         assert len(page1) == 2
 
         # Get next 2
-        page2 = await service.list_accounts(
+        page2 = await service.list_user_accounts(
             user_id=test_user.id,
             current_user=test_user,
             skip=2,
@@ -325,7 +325,7 @@ class TestAccountService:
         )
 
         # Request with limit > 100 (should be capped)
-        accounts = await service.list_accounts(
+        accounts = await service.list_user_accounts(
             user_id=test_user.id,
             current_user=test_user,
             limit=150,
@@ -454,7 +454,7 @@ class TestAccountService:
             )
 
         # Should not appear in list
-        accounts = await service.list_accounts(
+        accounts = await service.list_user_accounts(
             user_id=test_user.id,
             current_user=test_user,
         )
@@ -488,35 +488,3 @@ class TestAccountService:
                 account_id=account.id,
                 current_user=admin_user,
             )
-
-    async def test_count_user_accounts(
-        self, db_session, test_user, test_financial_institution, savings_account_type
-    ):
-        """Test counting user's accounts."""
-        service = AccountService(db_session)
-
-        # Initially 0
-        count = await service.count_user_accounts(
-            user_id=test_user.id,
-            current_user=test_user,
-        )
-        assert count == 0
-
-        # Create 3 active accounts
-        for i in range(3):
-            await service.create_account(
-                user_id=test_user.id,
-                financial_institution_id=test_financial_institution.id,
-                account_name=f"Account {i}",
-                account_type_id=savings_account_type.id,
-                currency="USD",
-                opening_balance=Decimal("100.00"),
-                current_user=test_user,
-            )
-
-        # Count should be 3
-        count = await service.count_user_accounts(
-            user_id=test_user.id,
-            current_user=test_user,
-        )
-        assert count == 3

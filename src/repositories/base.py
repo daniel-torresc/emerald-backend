@@ -8,20 +8,25 @@ Type Parameters:
     ModelType: The SQLAlchemy model class (e.g., User, Role, etc.)
 """
 
+import logging
 import uuid
+from abc import ABC
 from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import ColumnElement, Select, UnaryExpression, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from models.base import Base
+from models import Base
+
+logger = logging.getLogger(__name__)
 
 # Type variable for the model class
 ModelType = TypeVar("ModelType", bound=Base)
 
 
-class BaseRepository(Generic[ModelType]):
+class BaseRepository(Generic[ModelType], ABC):
     """
     Generic base repository for database operations.
 
@@ -52,34 +57,9 @@ class BaseRepository(Generic[ModelType]):
         self.model = model
         self.session = session
 
-    def _apply_soft_delete_filter(self, query: Select[Any]) -> Select[Any]:
-        """
-        Apply soft delete filter to query if model supports it.
-
-        Args:
-            query: SQLAlchemy select statement
-
-        Returns:
-            Query with soft delete filter applied
-        """
-        if hasattr(self.model, "deleted_at"):
-            query = query.where(self.model.deleted_at.is_(None))
-        return query
-
-    async def add(self, instance: ModelType) -> ModelType:
-        """
-        Persist a model instance.
-
-        Args:
-            instance: Model instance to persist
-
-        Returns:
-            Persisted model instance (with ID and timestamps populated)
-        """
-        self.session.add(instance)
-        await self.session.flush()
-        await self.session.refresh(instance)
-        return instance
+    # ========================================================================
+    # CORE CRUD OPERATIONS
+    # ========================================================================
 
     async def get_by_id(self, id: uuid.UUID) -> ModelType | None:
         """
@@ -104,31 +84,20 @@ class BaseRepository(Generic[ModelType]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_all(
-        self,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> list[ModelType]:
+    async def create(self, instance: ModelType) -> ModelType:
         """
-        Get all records with pagination.
-
-        Automatically filters out soft-deleted records.
+        Persist a model instance.
 
         Args:
-            offset: Number of records to skip
-            limit: Maximum number of records to return
+            instance: Model instance to persist
 
         Returns:
-            List of model instances
-
-        Example:
-            users = await user_repo.get_all(skip=0, limit=20)
+            Persisted model instance (with ID and timestamps populated)
         """
-        query = select(self.model).offset(offset).limit(limit)
-        query = self._apply_soft_delete_filter(query)
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
+        self.session.add(instance)
+        await self.session.flush()
+        await self.session.refresh(instance)
+        return instance
 
     async def update(self, instance: ModelType) -> ModelType:
         """
@@ -153,6 +122,41 @@ class BaseRepository(Generic[ModelType]):
         await self.session.flush()
         await self.session.refresh(instance)
         return instance
+
+    async def delete(self, instance: ModelType) -> None:
+        """
+        Hard delete a record (permanent removal from database).
+
+        WARNING: This permanently deletes the record. Use soft_delete() instead
+        for models that support it (models with SoftDeleteMixin).
+
+        Args:
+            instance: Model instance to delete
+
+        Example:
+            # Only use for cleanup, testing, or models without soft delete
+            await repo.delete(temp_record)
+        """
+        await self.session.delete(instance)
+        await self.session.flush()
+
+    # ========================================================================
+    # SOFT DELETE HANDLING
+    # ========================================================================
+
+    def _apply_soft_delete_filter(self, query: Select[Any]) -> Select[Any]:
+        """
+        Apply soft delete filter to query if model supports it.
+
+        Args:
+            query: SQLAlchemy select statement
+
+        Returns:
+            Query with soft delete filter applied
+        """
+        if hasattr(self.model, "deleted_at"):
+            query = query.where(self.model.deleted_at.is_(None))
+        return query
 
     async def soft_delete(self, instance: ModelType) -> ModelType:
         """
@@ -182,39 +186,124 @@ class BaseRepository(Generic[ModelType]):
         await self.session.refresh(instance)
         return instance
 
-    async def delete(self, instance: ModelType) -> None:
-        """
-        Hard delete a record (permanent removal from database).
+    # ========================================================================
+    # UTILITY METHODS
+    # ========================================================================
 
-        WARNING: This permanently deletes the record. Use soft_delete() instead
-        for models that support it (models with SoftDeleteMixin).
+    async def _list_and_count(
+        self,
+        filters: list[ColumnElement[bool]] | None = None,
+        order_by: list[UnaryExpression[Any]] | None = None,
+        load_relationships: list[_AbstractLoad] | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> tuple[list[ModelType], int]:
+        records = await self._list(
+            filters=filters,
+            order_by=order_by,
+            load_relationships=load_relationships,
+            offset=offset,
+            limit=limit,
+        )
+
+        count = await self._count(
+            filters=filters,
+        )
+
+        return records, count
+
+    async def _list(
+        self,
+        filters: list[ColumnElement[bool]] | None = None,
+        order_by: list[UnaryExpression[Any]] | None = None,
+        load_relationships: list[_AbstractLoad] | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> list[ModelType]:
+        """
+        Get records with optional filtering, sorting, and pagination.
+
+        This is the primary method for list operations. Uses pre-built
+        filters and order_by expressions from build_filters() and build_order_by().
 
         Args:
-            instance: Model instance to delete
-
-        Example:
-            # Only use for cleanup, testing, or models without soft delete
-            await repo.delete(temp_record)
-        """
-        await self.session.delete(instance)
-        await self.session.flush()
-
-    async def count(self) -> int:
-        """
-        Count total records.
+            filters: List of SQLAlchemy filter expressions
+            order_by: List of SQLAlchemy order_by expressions
+            load_relationships: SQLAlchemy load options for eager relationship loading
+            offset: Number of records to skip
+            limit: Maximum number of records to return (default to 100)
 
         Returns:
-            Total count
+            List of model instances
 
         Example:
-            total_users = await user_repo.count()
-            total_including_deleted = await user_repo.count(include_deleted=True)
+            filters = repo.build_filters(filter_params, user_id=user.id)
+            order_by = repo.build_order_by(sort_params)
+            items = await repo.find_all(
+                filters=filters,
+                order_by=order_by,
+                offset=pagination.offset,
+                limit=pagination.page_size,
+            )
         """
-        query = select(func.count()).select_from(self.model)
+        query = select(self.model)
+
+        # Apply soft-delete filter
         query = self._apply_soft_delete_filter(query)
 
+        # Apply eager loading options
+        if load_relationships:
+            query = query.options(*load_relationships)
+
+        # Apply filters
+        if filters:
+            query = query.where(and_(*filters))
+
+        # Apply ordering
+        if order_by:
+            query = query.order_by(*order_by)
+
+        # Apply pagination
+        if offset is not None and limit is not None:
+            query = query.offset(offset).limit(limit)
+        else:
+            logger.warning(
+                f"Listing {self.model.__name__} without pagination. Beware of performance issues."
+            )
+
         result = await self.session.execute(query)
-        return result.scalar_one()
+        return list(result.scalars().all())
+
+    async def _count(
+        self,
+        filters: list[ColumnElement[bool]] | None = None,
+    ) -> int:
+        """
+        Count records with optional filtering.
+
+        Uses pre-built filters from build_filters().
+
+        Args:
+            filters: List of SQLAlchemy filter expressions
+
+        Returns:
+            Total count of matching records
+
+        Example:
+            filters = repo.build_filters(filter_params, user_id=user.id)
+            total = await repo.count_with_filters(filters)
+        """
+        query = select(func.count()).select_from(self.model)
+
+        # Apply soft-delete filter
+        query = self._apply_soft_delete_filter(query)
+
+        # Apply filters
+        if filters:
+            query = query.where(and_(*filters))
+
+        result = await self.session.execute(query)
+        return result.scalar_one() or 0
 
     async def exists(self, id: uuid.UUID) -> bool:
         """

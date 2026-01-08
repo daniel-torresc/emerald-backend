@@ -17,20 +17,16 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AlreadyExistsError, NotFoundError
-from models import AuditAction, FinancialInstitution
-from models.user import User
-from repositories.financial_institution_repository import (
-    FinancialInstitutionRepository,
-)
-from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
-from schemas.financial_institution import (
+from models import AuditAction, FinancialInstitution, User
+from repositories import FinancialInstitutionRepository
+from schemas import (
     FinancialInstitutionCreate,
     FinancialInstitutionFilterParams,
-    FinancialInstitutionListItem,
-    FinancialInstitutionResponse,
+    FinancialInstitutionSortParams,
     FinancialInstitutionUpdate,
+    PaginationParams,
 )
-from services.audit_service import AuditService
+from .audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +65,7 @@ class FinancialInstitutionService:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> FinancialInstitutionResponse:
+    ) -> FinancialInstitution:
         """
         Create a new financial institution (admin only).
 
@@ -136,7 +132,7 @@ class FinancialInstitutionService:
             logo_url=str(data.logo_url) if data.logo_url else None,
             website_url=str(data.website_url) if data.website_url else None,
         )
-        institution = await self.institution_repo.add(institution)
+        institution = await self.institution_repo.create(institution)
 
         # Commit transaction
         await self.session.commit()
@@ -161,12 +157,12 @@ class FinancialInstitutionService:
             user_agent=user_agent,
         )
 
-        return FinancialInstitutionResponse.model_validate(institution)
+        return institution
 
     async def get_institution(
         self,
         institution_id: uuid.UUID,
-    ) -> FinancialInstitutionResponse:
+    ) -> FinancialInstitution:
         """
         Get financial institution by ID.
 
@@ -190,12 +186,12 @@ class FinancialInstitutionService:
         if not institution:
             raise NotFoundError(f"Institution with ID {institution_id} not found")
 
-        return FinancialInstitutionResponse.model_validate(institution)
+        return institution
 
     async def get_by_swift_code(
         self,
         swift_code: str,
-    ) -> FinancialInstitutionResponse:
+    ) -> FinancialInstitution:
         """
         Get financial institution by SWIFT/BIC code.
 
@@ -206,7 +202,7 @@ class FinancialInstitutionService:
             swift_code: SWIFT/BIC code (case-insensitive)
 
         Returns:
-            FinancialInstitutionResponse with institution data
+            FinancialInstitution with institution data
 
         Raises:
             NotFoundError: If institution not found
@@ -219,12 +215,12 @@ class FinancialInstitutionService:
         if not institution:
             raise NotFoundError(f"Institution with SWIFT code {swift_code} not found")
 
-        return FinancialInstitutionResponse.model_validate(institution)
+        return institution
 
     async def get_by_routing_number(
         self,
         routing_number: str,
-    ) -> FinancialInstitutionResponse:
+    ) -> FinancialInstitution:
         """
         Get financial institution by ABA routing number.
 
@@ -250,13 +246,14 @@ class FinancialInstitutionService:
                 f"Institution with routing number {routing_number} not found"
             )
 
-        return FinancialInstitutionResponse.model_validate(institution)
+        return institution
 
     async def list_institutions(
         self,
         filters: FinancialInstitutionFilterParams,
         pagination: PaginationParams,
-    ) -> PaginatedResponse[FinancialInstitutionListItem]:
+        sorting: FinancialInstitutionSortParams,
+    ) -> tuple[list[FinancialInstitution], int]:
         """
         List financial institutions with pagination and filtering.
 
@@ -265,8 +262,9 @@ class FinancialInstitutionService:
         Supports filtering by country, type, and search query.
 
         Args:
-            pagination: Pagination parameters (page, per_page)
             filters: Filter parameters (country_code, institution_type, search)
+            pagination: Pagination parameters (page, per_page)
+            sorting: Sort parameters (sort_by, sort_order)
 
         Returns:
             PaginatedResponse with list of institutions and metadata
@@ -274,48 +272,21 @@ class FinancialInstitutionService:
         Example:
             # Get active Spanish banks
             result = await service.list_institutions(
-                pagination=PaginationParams(page=1, per_page=20),
                 filters=FinancialInstitutionFilterParams(
                     country_code="ES",
                     institution_type=InstitutionType.bank
-                )
+                ),
+                pagination=PaginationParams(page=1, page_size=20),
+                sorting=FinancialInstitutionSortParams()
             )
         """
-
-        # Get institutions
-        institutions = await self.institution_repo.search(
-            query_text=filters.search,
-            country_code=filters.country_code,
-            institution_type=filters.institution_type,
-            limit=pagination.page_size,
-            offset=pagination.offset,
+        financial_institutions = await self.institution_repo.list_all(
+            filter_params=filters,
+            pagination_params=pagination,
+            sort_params=sorting,
         )
 
-        # Get total count
-        total_count = await self.institution_repo.search_count(
-            query_text=filters.search,
-            country_code=filters.country_code,
-            institution_type=filters.institution_type,
-        )
-
-        # Convert to list items
-        items = [
-            FinancialInstitutionListItem.model_validate(inst) for inst in institutions
-        ]
-
-        # Calculate pagination metadata
-        total_pages = PaginationParams.calculate_total_pages(
-            total=total_count, page_size=pagination.page_size
-        )
-
-        metadata = PaginationMeta(
-            page=pagination.page,
-            page_size=pagination.page_size,
-            total=total_count,
-            total_pages=total_pages,
-        )
-
-        return PaginatedResponse(data=items, meta=metadata)
+        return financial_institutions
 
     async def update_institution(
         self,
@@ -325,7 +296,7 @@ class FinancialInstitutionService:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> FinancialInstitutionResponse:
+    ) -> FinancialInstitution:
         """
         Update financial institution (admin only).
 
@@ -341,7 +312,7 @@ class FinancialInstitutionService:
             user_agent: Client user agent
 
         Returns:
-            FinancialInstitutionResponse with updated institution data
+            FinancialInstitution with updated institution data
 
         Raises:
             NotFoundError: If institution not found
@@ -365,9 +336,7 @@ class FinancialInstitutionService:
         update_dict = data.model_dump(exclude_unset=True)
 
         if not update_dict:
-            return FinancialInstitutionResponse.model_validate(
-                institution
-            )  # Nothing to update
+            return institution
 
         # 3. Business validations (only for changing fields)
         if (
@@ -456,7 +425,7 @@ class FinancialInstitutionService:
         # 9. Commit transaction
         await self.session.commit()
 
-        return FinancialInstitutionResponse.model_validate(institution)
+        return institution
 
     async def delete_institution(
         self,

@@ -13,11 +13,21 @@ This module provides:
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends
+from starlette import status
+from starlette.requests import Request
 
-from api.dependencies import AdminUser, CurrentUser, UserServiceDep
-from schemas.common import PaginatedResponse, PaginationParams
-from schemas.user import UserFilterParams, UserListItem, UserResponse, UserUpdate
+from schemas import (
+    PaginatedResponse,
+    PaginationMeta,
+    PaginationParams,
+    UserFilterParams,
+    UserListItem,
+    UserResponse,
+    UserSortParams,
+    UserUpdate,
+)
+from ..dependencies import AdminUser, CurrentUser, UserServiceDep
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +55,17 @@ async def get_current_user_profile(
         - Valid access token
         - Active user account
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     user = await user_service.get_user_profile(
         user_id=current_user.id,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return UserResponse.model_validate(user)
@@ -86,14 +101,18 @@ async def update_current_user_profile(
         - 409 Conflict: If email or username already in use
         - 422 Unprocessable Entity: If validation fails
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
 
     user = await user_service.update_user_profile(
         user_id=current_user.id,
         data=data,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return UserResponse.model_validate(user)
@@ -134,12 +153,17 @@ async def get_user_by_id(
         - 403 Forbidden: If non-admin user tries to view another user
         - 404 Not Found: If user not found
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     user = await user_service.get_user_profile(
         user_id=user_id,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return UserResponse.model_validate(user)
@@ -149,7 +173,7 @@ async def get_user_by_id(
     "",
     response_model=PaginatedResponse[UserListItem],
     summary="List all users",
-    description="List all users with pagination and filtering (admin only)",
+    description="List all users with pagination, filtering, and sorting (admin only)",
 )
 async def list_users(
     request: Request,
@@ -157,6 +181,7 @@ async def list_users(
     user_service: UserServiceDep,
     pagination: PaginationParams = Depends(),
     filters: UserFilterParams = Depends(),
+    sorting: UserSortParams = Depends(),
 ) -> PaginatedResponse[UserListItem]:
     """
     List all users with pagination and filtering.
@@ -166,6 +191,8 @@ async def list_users(
         - page_size: Items per page (default: 20, max: 100)
         - is_superuser: Filter by superuser status (optional)
         - search: Search in email or username (optional)
+        - sort_by: Sort field (username, email, created_at, last_login_at)
+        - sort_order: Sort direction (asc or desc)
 
     Returns:
         PaginatedResponse with list of users and pagination metadata
@@ -178,14 +205,28 @@ async def list_users(
     Raises:
         - 403 Forbidden: If user is not admin
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
 
-    return await user_service.list_users(
+    users, count = await user_service.list_users(
         pagination=pagination,
         filters=filters,
+        sorting=sorting,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+
+    return PaginatedResponse(
+        data=[UserListItem.model_validate(u) for u in users],
+        meta=PaginationMeta(
+            total=count,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        ),
     )
 
 
@@ -221,13 +262,17 @@ async def deactivate_user(
         - 403 Forbidden: If user is not admin
         - 404 Not Found: If user not found
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
 
     await user_service.deactivate_user(
         user_id=user_id,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
 
@@ -265,11 +310,15 @@ async def delete_user(
         - 403 Forbidden: If user is not admin
         - 404 Not Found: If user not found
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
 
     await user_service.delete_user(
         user_id=user_id,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )

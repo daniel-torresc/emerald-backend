@@ -26,16 +26,14 @@ import redis.asyncio as redis
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from core.config import settings
 from api.dependencies import get_db
-from main import app
-from models.base import Base
-from models.card import Card
-from models.user import User
+from core.config import settings
 from core.security import hash_password
+from main import app
+from models import Base, Card, User
 
 
 # ============================================================================
@@ -77,7 +75,7 @@ async def test_engine(event_loop):
         await conn.run_sync(Base.metadata.create_all)
 
     # Seed account_types table with system types (from migration ec9ccafe4320)
-    from models.account_type import AccountType
+    from models import AccountType
 
     async_session_factory = async_sessionmaker(
         engine,
@@ -479,8 +477,7 @@ async def test_financial_institution(test_engine):
     Returns:
         FinancialInstitution instance for testing
     """
-    from models.financial_institution import FinancialInstitution
-    from models.enums import InstitutionType
+    from models import FinancialInstitution, InstitutionType
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -515,8 +512,9 @@ async def savings_account_type(test_engine):
     Returns:
         AccountType instance for the 'savings' system type
     """
-    from models.account_type import AccountType
     from sqlalchemy import select
+
+    from models import AccountType
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -540,8 +538,9 @@ async def checking_account_type(test_engine):
     Returns:
         AccountType instance for the 'checking' system type
     """
-    from models.account_type import AccountType
     from sqlalchemy import select
+
+    from models import AccountType
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -565,8 +564,9 @@ async def investment_account_type(test_engine):
     Returns:
         AccountType instance for the 'investment' system type
     """
-    from models.account_type import AccountType
     from sqlalchemy import select
+
+    from models import AccountType
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -590,8 +590,9 @@ async def other_account_type(test_engine):
     Returns:
         AccountType instance for the 'other' system type
     """
-    from models.account_type import AccountType
     from sqlalchemy import select
+
+    from models import AccountType
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -615,8 +616,9 @@ async def inactive_account_type(test_engine):
     Returns:
         AccountType instance that is inactive
     """
-    from models.account_type import AccountType
     from sqlalchemy import select
+
+    from models import AccountType
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -661,7 +663,8 @@ async def test_account(
         Account instance for testing transactions
     """
     from decimal import Decimal
-    from models.account import Account
+
+    from models import Account
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -700,9 +703,9 @@ async def test_card(test_engine, test_account, test_user) -> "Card":
     Returns:
         Card instance linked to test_account
     """
-    from models.card import Card
-    from models.enums import CardType
     from decimal import Decimal
+
+    from models import Card, CardType
 
     async_session_factory = async_sessionmaker(
         test_engine,
@@ -735,7 +738,7 @@ async def test_card(test_engine, test_account, test_user) -> "Card":
 @pytest_asyncio.fixture
 async def test_financial_institution_for_cards(test_engine):
     """Get or create a test financial institution for cards."""
-    from models.financial_institution import FinancialInstitution
+    from models import FinancialInstitution
 
     async_session_factory = async_sessionmaker(
         test_engine,

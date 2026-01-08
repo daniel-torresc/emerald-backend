@@ -16,24 +16,27 @@ import uuid
 
 from fastapi import APIRouter, Depends, Path, Request, status
 
-from api.dependencies import CurrentUser, TransactionServiceDep
-from schemas.common import PaginatedResponse, PaginationParams, SortParams
-from schemas.transaction import (
+from schemas import (
+    PaginatedResponse,
+    PaginationMeta,
+    PaginationParams,
     TransactionCreate,
     TransactionFilterParams,
     TransactionListItem,
     TransactionResponse,
+    TransactionSortParams,
     TransactionSplitRequest,
     TransactionUpdate,
 )
+from ..dependencies import CurrentUser, TransactionServiceDep
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["Transactions"])
+router = APIRouter(prefix="/accounts/{account_id}/transactions", tags=["Transactions"])
 
 
 @router.post(
-    "/accounts/{account_id}/transactions",
+    "",
     response_model=TransactionResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create transaction",
@@ -83,21 +86,26 @@ async def create_transaction(
         - Valid access token
         - EDITOR or OWNER permission on account
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     transaction = await transaction_service.create_transaction(
         account_id=account_id,
         data=data,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return TransactionResponse.model_validate(transaction)
 
 
 @router.get(
-    "/accounts/{account_id}/transactions",
-    response_model=PaginatedResponse[TransactionResponse],
+    "",
+    response_model=PaginatedResponse[TransactionListItem],
     summary="List and search transactions",
     description="""
     List transactions for an account with advanced search and filtering.
@@ -126,7 +134,7 @@ async def list_transactions(
     account_id: uuid.UUID = Path(description="Account UUID"),
     pagination: PaginationParams = Depends(),
     filters: TransactionFilterParams = Depends(),
-    sorting: SortParams = Depends(),
+    sorting: TransactionSortParams = Depends(),
 ) -> PaginatedResponse[TransactionListItem]:
     """
     List and search transactions for an account.
@@ -153,7 +161,7 @@ async def list_transactions(
         - Valid access token
         - VIEWER or higher permission on account
     """
-    return await transaction_service.search(
+    transactions, count = await transaction_service.list_user_transactions(
         account_id=account_id,
         current_user=current_user,
         pagination=pagination,
@@ -161,9 +169,18 @@ async def list_transactions(
         sorting=sorting,
     )
 
+    return PaginatedResponse(
+        data=[TransactionListItem.model_validate(t) for t in transactions],
+        meta=PaginationMeta(
+            total=count,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        ),
+    )
+
 
 @router.get(
-    "/transactions/{transaction_id}",
+    "/{transaction_id}",
     response_model=TransactionResponse,
     summary="Get transaction by ID",
     description="""
@@ -205,7 +222,7 @@ async def get_transaction(
 
 
 @router.put(
-    "/transactions/{transaction_id}",
+    "/{transaction_id}",
     response_model=TransactionResponse,
     summary="Update transaction",
     description="""
@@ -253,20 +270,25 @@ async def update_transaction(
         - Valid access token
         - Creator, OWNER permission, or Admin role
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     transaction = await transaction_service.update_transaction(
         transaction_id=transaction_id,
         data=data,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return TransactionResponse.model_validate(transaction)
 
 
 @router.delete(
-    "/transactions/{transaction_id}",
+    "/{transaction_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete transaction",
     description="""
@@ -299,18 +321,23 @@ async def delete_transaction(
         - Valid access token
         - OWNER permission on account
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     await transaction_service.delete_transaction(
         transaction_id=transaction_id,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
 
 @router.post(
-    "/transactions/{transaction_id}/split",
-    response_model=dict,
+    "/{transaction_id}/split",
+    response_model=list[TransactionListItem],
     status_code=status.HTTP_200_OK,
     summary="Split transaction",
     description="""
@@ -336,10 +363,10 @@ async def delete_transaction(
 async def split_transaction(
     request: Request,
     current_user: CurrentUser,
+    transaction_id: uuid.UUID,
+    data: TransactionSplitRequest,
     transaction_service: TransactionServiceDep,
-    transaction_id: uuid.UUID = Path(description="Transaction UUID to split"),
-    split_data: TransactionSplitRequest = ...,
-) -> dict:
+) -> list[TransactionListItem]:
     """
     Split transaction into multiple parts.
 
@@ -357,25 +384,25 @@ async def split_transaction(
         - Valid access token
         - EDITOR or higher permission on account
     """
-    parent, children = await transaction_service.split_transaction(
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
+    new_transactions = await transaction_service.split_transaction(
         transaction_id=transaction_id,
-        splits=[item.model_dump() for item in split_data.splits],
+        splits=[item.model_dump() for item in data.splits],
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
-    return {
-        "parent": TransactionResponse.model_validate(parent).model_dump(),
-        "children": [
-            TransactionResponse.model_validate(child).model_dump() for child in children
-        ],
-    }
+    return [TransactionListItem.model_validate(child) for child in new_transactions]
 
 
 @router.post(
-    "/transactions/{transaction_id}/join",
+    "/{transaction_id}/join",
     response_model=TransactionResponse,
     status_code=status.HTTP_200_OK,
     summary="Join split transaction",
@@ -411,12 +438,17 @@ async def join_split_transaction(
         - Valid access token
         - EDITOR or higher permission on account
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     parent = await transaction_service.join_split_transaction(
         transaction_id=transaction_id,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return TransactionResponse.model_validate(parent)

@@ -14,7 +14,7 @@ from decimal import Decimal
 import pytest
 from httpx import AsyncClient
 
-from models.user import User
+from models import User
 
 
 @pytest.mark.asyncio
@@ -298,10 +298,10 @@ async def test_viewer_cannot_create_transaction(
     test_engine,
 ):
     """Test: User with VIEWER permission cannot create transactions."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     from core.security import hash_password
-    from models.account import AccountShare
-    from models.enums import PermissionLevel
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    from models import AccountShare, PermissionLevel
 
     # Create a viewer user
     async_session_factory = async_sessionmaker(
@@ -363,10 +363,10 @@ async def test_viewer_cannot_update_transaction(
     test_engine,
 ):
     """Test: User with VIEWER permission cannot update transactions."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     from core.security import hash_password
-    from models.account import AccountShare
-    from models.enums import PermissionLevel
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    from models import AccountShare, PermissionLevel
 
     # Create transaction as owner
     create_response = await async_client.post(
@@ -436,10 +436,10 @@ async def test_viewer_cannot_delete_transaction(
     test_engine,
 ):
     """Test: User with VIEWER permission cannot delete transactions."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     from core.security import hash_password
-    from models.account import AccountShare
-    from models.enums import PermissionLevel
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    from models import AccountShare, PermissionLevel
 
     # Create transaction as owner
     create_response = await async_client.post(
@@ -507,10 +507,10 @@ async def test_editor_can_create_transaction(
     test_engine,
 ):
     """Test: User with EDITOR permission can create transactions."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     from core.security import hash_password
-    from models.account import AccountShare
-    from models.enums import PermissionLevel
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    from models import AccountShare, PermissionLevel
 
     # Create an editor user
     async_session_factory = async_sessionmaker(
@@ -783,12 +783,11 @@ async def test_cannot_create_transaction_in_non_member_account(
     test_financial_institution,
 ):
     """Test: Cannot create transaction in account where user is not a member."""
-    from models.account import Account, AccountShare
-    from models.account_type import AccountType
-    from models.enums import PermissionLevel
-    from core.security import hash_password
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
     from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from core.security import hash_password
+    from models import Account, AccountShare, AccountType, PermissionLevel
 
     # Create another user with their own account
     async_session_factory = async_sessionmaker(
@@ -873,8 +872,9 @@ async def test_cannot_access_another_users_transaction(
     test_engine,
 ):
     """Test: Cannot access transaction from account where user has no access."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
     from core.security import hash_password
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
     # Create transaction as test_user
     create_response = await async_client.post(

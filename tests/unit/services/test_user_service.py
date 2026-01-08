@@ -14,10 +14,8 @@ from core.exceptions import (
     InsufficientPermissionsError,
     NotFoundError,
 )
-from models.audit_log import AuditAction
-from models.user import User
-from schemas.common import PaginationParams
-from schemas.user import UserFilterParams, UserUpdate
+from models import AuditAction, User
+from schemas import PaginationParams, UserFilterParams, UserUpdate
 from services.user_service import UserService
 
 
@@ -424,7 +422,7 @@ class TestListUsers:
         """Test listing users with filters."""
         # Setup
         pagination = PaginationParams(page=1, page_size=10)
-        filters = UserFilterParams(is_superuser=False, search="john")
+        filters = UserFilterParams(is_admin=False, search="john")
 
         mock_user_repo.filter_users.return_value = []
         mock_user_repo.count_filtered.return_value = 0

@@ -12,18 +12,19 @@ import uuid
 
 from fastapi import APIRouter, Request, status
 
-from api.dependencies import AccountServiceDep, CurrentUser
-from schemas.account_share import (
+from schemas import (
     AccountShareCreate,
+    AccountShareListItem,
     AccountShareResponse,
     AccountShareUpdate,
 )
+from ..dependencies import AccountServiceDep, CurrentUser
 
-router = APIRouter(prefix="/accounts", tags=["Account Shares"])
+router = APIRouter(prefix="/accounts/{account_id}/shares", tags=["Accounts Shares"])
 
 
 @router.post(
-    "/{account_id}/shares",
+    "",
     response_model=AccountShareResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Share account with user",
@@ -72,23 +73,26 @@ async def create_share(
         400: Invalid share data (self-share, owner permission, duplicate)
         422: Validation error
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     share = await account_service.share_account(
         current_user=current_user,
         account_id=account_id,
         data=data,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        request_id=request.state.request_id
-        if hasattr(request.state, "request_id")
-        else None,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return AccountShareResponse.model_validate(share)
 
 
 @router.get(
-    "/{account_id}/shares",
-    response_model=list[AccountShareResponse],
+    "",
+    response_model=list[AccountShareListItem],
     summary="List account shares",
     description="""
     List all shares for an account.
@@ -107,7 +111,7 @@ async def list_shares(
     account_id: uuid.UUID,
     current_user: CurrentUser,
     account_service: AccountServiceDep,
-) -> list[AccountShareResponse]:
+) -> list[AccountShareListItem]:
     """
     List all shares for an account.
 
@@ -130,11 +134,11 @@ async def list_shares(
         current_user=current_user,
     )
 
-    return [AccountShareResponse.model_validate(share) for share in shares]
+    return [AccountShareListItem.model_validate(share) for share in shares]
 
 
 @router.put(
-    "/{account_id}/shares/{share_id}",
+    "/{share_id}",
     response_model=AccountShareResponse,
     summary="Update share permission",
     description="""
@@ -181,23 +185,26 @@ async def update_share(
         400: Invalid permission change (owner grant, self-modification)
         422: Validation error
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     updated_share = await account_service.update_share(
         account_id=account_id,
         share_id=share_id,
         data=data,
         current_user=current_user,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        request_id=request.state.request_id
-        if hasattr(request.state, "request_id")
-        else None,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return AccountShareResponse.model_validate(updated_share)
 
 
 @router.delete(
-    "/{account_id}/shares/{share_id}",
+    "/{share_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Revoke account access",
     description="""
@@ -241,13 +248,16 @@ async def revoke_share(
         403: User is not the account owner
         400: Trying to revoke own owner permission
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     await account_service.revoke_share(
         account_id=account_id,
         share_id=share_id,
         current_user=current_user,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        request_id=request.state.request_id
-        if hasattr(request.state, "request_id")
-        else None,
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )

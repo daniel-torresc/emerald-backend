@@ -8,8 +8,8 @@ including lookups by key and ordered retrieval.
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.account_type import AccountType
-from repositories.base import BaseRepository
+from models import AccountType
+from .base import BaseRepository
 
 
 class AccountTypeRepository(BaseRepository[AccountType]):

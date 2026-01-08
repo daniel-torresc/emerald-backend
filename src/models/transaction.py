@@ -39,16 +39,16 @@ Soft Delete:
 import uuid
 from datetime import date
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import CheckConstraint, Date, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from models.base import Base
-from models.enums import TransactionType
-from models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
-
+from .account import Account
+from .base import Base
+from .card import Card
+from .enums import TransactionType
+from .mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 
 # =============================================================================
 # Transaction Model
@@ -194,14 +194,14 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         index=True,
     )
 
-    parent_transaction_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    parent_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("transactions.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
 
-    card_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    card_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("cards.id", ondelete="SET NULL"),
         nullable=True,
@@ -215,7 +215,7 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         index=True,
     )
 
-    value_date: Mapped[Optional[date]] = mapped_column(
+    value_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
     )
@@ -235,7 +235,7 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         nullable=False,
     )
 
-    merchant: Mapped[Optional[str]] = mapped_column(
+    merchant: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
     )
@@ -245,25 +245,25 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         index=True,
     )
 
-    user_notes: Mapped[Optional[str]] = mapped_column(
+    user_notes: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
 
     # Relationships
-    account: Mapped["Account"] = relationship(  # type: ignore
+    account: Mapped[Account] = relationship(  # type: ignore
         "Account",
         foreign_keys=[account_id],
         lazy="selectin",
     )
 
-    card: Mapped[Optional["Card"]] = relationship(  # type: ignore
+    card: Mapped[Card | None] = relationship(  # type: ignore
         "Card",
         foreign_keys=[card_id],
         lazy="selectin",
     )
 
-    parent_transaction: Mapped[Optional["Transaction"]] = relationship(
+    parent_transaction: Mapped["Transaction | None"] = relationship(
         "Transaction",
         remote_side="Transaction.id",
         foreign_keys=[parent_transaction_id],

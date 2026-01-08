@@ -12,26 +12,31 @@ This module provides:
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from models.enums import CardType, TransactionType
-from schemas.card import CardEmbedded
+from models import CardType, TransactionType
+from .card import CardEmbedded
+from .common import SortOrder, SortParams
+from .enums import TransactionSortField
 
 
-class TransactionSortField(str, Enum):
+class TransactionSortParams(SortParams[TransactionSortField]):
     """
-    Allowed sort fields for transaction list queries.
+    Sorting parameters for transaction list queries.
 
-    Whitelists fields that can be used for sorting to prevent SQL injection.
-    Values must match SQLAlchemy model attribute names exactly.
+    Provides type-safe sorting with validation at schema level.
+    Default sort: transaction_date descending (newest first).
     """
 
-    TRANSACTION_DATE = "transaction_date"
-    AMOUNT = "amount"
-    DESCRIPTION = "description"
-    CREATED_AT = "created_at"
+    sort_by: TransactionSortField = Field(
+        default=TransactionSortField.TRANSACTION_DATE,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.DESC,
+        description="Sort direction",
+    )
 
 
 class TransactionBase(BaseModel):
@@ -571,4 +576,9 @@ class TransactionFilterParams(BaseModel):
     card_type: CardType | None = Field(
         default=None,
         description="Filter by card type (credit_card or debit_card)",
+    )
+
+    account_id: uuid.UUID | None = Field(
+        default=None,
+        description="Filter by specific account UUID",
     )

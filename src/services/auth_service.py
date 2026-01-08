@@ -17,29 +17,27 @@ from jose import JWTError
 from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.config import settings
-from core.security import (
-    TOKEN_TYPE_REFRESH,
-    create_access_token,
-    create_refresh_token,
-    decode_token,
-    hash_password,
-    hash_refresh_token,
-    verify_password,
-    verify_token_type,
-)
+from core import settings
 from core.exceptions import (
     AlreadyExistsError,
     AuthenticationError,
     InvalidCredentialsError,
     InvalidTokenError,
 )
-from models import RefreshToken
-from models.user import User
-from repositories.refresh_token_repository import RefreshTokenRepository
-from repositories.user_repository import UserRepository
-from schemas.auth import AccessTokenResponse, TokenResponse
-from schemas.user import UserCreate
+from core.security import (
+    TOKEN_TYPE_ACCESS,
+    TOKEN_TYPE_REFRESH,
+    create_token,
+    decode_token,
+    hash_password,
+    hash_refresh_token,
+    verify_password,
+    verify_token_type,
+)
+from models import AuditAction, RefreshToken, User
+from repositories import RefreshTokenRepository, UserRepository
+from schemas import UserCreate
+from services import AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -68,13 +66,15 @@ class AuthService:
         self.session = session
         self.user_repo = UserRepository(session)
         self.token_repo = RefreshTokenRepository(session)
+        self.audit_service = AuditService(session)
 
     async def register(
         self,
         data: UserCreate,
+        request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> tuple[User, TokenResponse]:
+    ) -> User:
         """
         Register a new user and generate authentication tokens.
 
@@ -87,6 +87,7 @@ class AuthService:
 
         Args:
             data: User registration data (email, username, password)
+            request_id: Optional request ID for correlation
             ip_address: Client IP address (for audit logging)
             user_agent: Client user agent (for audit logging)
 
@@ -128,23 +129,37 @@ class AuthService:
             password_hash=password_hash,
             is_admin=False,  # Regular user by default
         )
-        user = await self.user_repo.add(user)
+        user = await self.user_repo.create(user)
         await self.session.commit()
 
         logger.info(f"User registered successfully: {user.id} ({user.email})")
 
-        # Generate tokens
-        tokens = await self._generate_tokens(user, ip_address, user_agent)
+        # Log registration
+        await self.audit_service.log_event(
+            user_id=user.id,
+            action=AuditAction.CREATE,
+            entity_type="user",
+            entity_id=user.id,
+            new_values={
+                "email": user.email,
+                "username": user.username,
+            },
+            description="User registered",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            request_id=request_id,
+        )
 
-        return user, tokens
+        return user
 
     async def login(
         self,
         email: EmailStr,
         password: str,
+        request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> tuple[User, TokenResponse]:
+    ) -> tuple[str, str, datetime]:
         """
         Authenticate user and generate authentication tokens.
 
@@ -159,6 +174,7 @@ class AuthService:
         Args:
             email: User's email address
             password: User's password (plain text)
+            request_id: Optional request ID for correlation
             ip_address: Client IP address (for audit logging)
             user_agent: Client user agent (for audit logging)
 
@@ -169,7 +185,7 @@ class AuthService:
             InvalidCredentialsError: If email or password is incorrect
 
         Example:
-            user, tokens = await auth_service.login(
+            tokens = await auth_service.login(
                 email="john@example.com",
                 password="SecureP@ss123",
                 ip_address="192.168.1.1"
@@ -188,21 +204,33 @@ class AuthService:
 
         # Update last login timestamp
         await self.user_repo.update_last_login(user.id)
+
+        # Generate tokens
+        access_token, refresh_token = await self._generate_tokens(user=user)
+        expires_at = datetime.fromtimestamp(decode_token(access_token)["exp"], UTC)
+
         await self.session.commit()
 
         logger.info(f"User logged in successfully: {user.id} ({user.email})")
 
-        # Generate tokens
-        tokens = await self._generate_tokens(user, ip_address, user_agent)
+        # Log successful login
+        await self.audit_service.log_login(
+            user_id=user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            request_id=request_id,
+            success=True,
+        )
 
-        return user, tokens
+        return access_token, refresh_token, expires_at
 
     async def refresh_access_token(
         self,
         refresh_token: str,
+        request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> AccessTokenResponse:
+    ) -> tuple[str, str, datetime]:
         """
         Refresh access token using a refresh token.
 
@@ -223,6 +251,7 @@ class AuthService:
 
         Args:
             refresh_token: JWT refresh token
+            request_id: Optional request ID for correlation
             ip_address: Client IP address (for audit logging)
             user_agent: Client user agent (for audit logging)
 
@@ -288,22 +317,40 @@ class AuthService:
         await self.token_repo.revoke_token(db_token.id)
 
         # Generate new tokens (same token family for rotation tracking)
-        tokens = await self._generate_tokens(
-            user,
-            ip_address,
-            user_agent,
+        access_token, refresh_token = await self._generate_tokens(
+            user=user,
             token_family_id=db_token.token_family_id,
         )
+        expires_at = datetime.fromtimestamp(decode_token(access_token)["exp"], UTC)
 
         await self.session.commit()
 
         logger.info(f"Access token refreshed for user {user.id}")
 
-        return tokens
+        # Extract user_id from the new access token for logging
+        token_data = decode_token(access_token)
+        user_id_str = token_data.get("sub")
+
+        if user_id_str:
+            # Log successful token refresh
+            await self.audit_service.log_token_refresh(
+                user_id=uuid.UUID(user_id_str),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                request_id=request_id,
+                success=True,
+            )
+
+        logger.info("Token refreshed successfully")
+
+        return access_token, refresh_token, expires_at
 
     async def logout(
         self,
         refresh_token: str,
+        request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> None:
         """
         Logout user by revoking their refresh token.
@@ -318,6 +365,9 @@ class AuthService:
 
         Args:
             refresh_token: JWT refresh token to revoke
+            request_id: Optional request ID for correlation
+            ip_address: Client IP address (for audit logging)
+            user_agent: Client user agent (for audit logging)
 
         Raises:
             InvalidTokenError: If token is invalid or not found
@@ -351,11 +401,25 @@ class AuthService:
 
         logger.info(f"User logged out: {db_token.user_id}")
 
+        user_id_str = token_data.get("sub")
+
+        # Log logout
+        if user_id_str:
+            await self.audit_service.log_logout(
+                user_id=uuid.UUID(user_id_str),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                request_id=request_id,
+            )
+
     async def change_password(
         self,
         user_id: uuid.UUID,
         current_password: str,
         new_password: str,
+        request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> None:
         """
         Change user's password and revoke all refresh tokens.
@@ -374,6 +438,9 @@ class AuthService:
             user_id: User's UUID
             current_password: Current password (for verification)
             new_password: New password (will be hashed)
+            request_id: Optional request ID for correlation
+            ip_address: Client IP address (for audit logging)
+            user_agent: Client user agent (for audit logging)
 
         Raises:
             NotFoundError: If user not found
@@ -414,13 +481,20 @@ class AuthService:
             f"Password changed for user {user_id}. Revoked {revoked_count} refresh tokens."
         )
 
+        # Log successful password change
+        await self.audit_service.log_password_change(
+            user_id=user_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            request_id=request_id,
+            success=True,
+        )
+
     async def _generate_tokens(
         self,
         user: User,
-        ip_address: str | None = None,
-        user_agent: str | None = None,
         token_family_id: uuid.UUID | None = None,
-    ) -> TokenResponse:
+    ) -> tuple[str, str]:
         """
         Generate access and refresh tokens for a user.
 
@@ -428,8 +502,6 @@ class AuthService:
 
         Args:
             user: User instance
-            ip_address: Client IP address
-            user_agent: Client user agent
             token_family_id: Existing token family ID (for rotation)
 
         Returns:
@@ -440,27 +512,29 @@ class AuthService:
             token_family_id = uuid.uuid4()
 
         # Create access token
-        access_token = create_access_token(
+        access_token = create_token(
             data={
                 "sub": str(user.id),
                 "email": user.email,
                 "is_admin": user.is_admin,
-            }
+            },
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
+            token_type=TOKEN_TYPE_ACCESS,
         )
+        expires_at = datetime.fromtimestamp(decode_token(access_token)["exp"], UTC)
 
         # Create refresh token
-        refresh_token = create_refresh_token(
+        refresh_token = create_token(
             data={
                 "sub": str(user.id),
                 "token_family_id": str(token_family_id),
-            }
+            },
+            expires_delta=timedelta(days=settings.refresh_token_expire_days),
+            token_type=TOKEN_TYPE_REFRESH,
         )
 
         # Store refresh token hash in database
         refresh_token_hash = hash_refresh_token(refresh_token)
-        expires_at = datetime.now(UTC) + timedelta(
-            days=settings.refresh_token_expire_days
-        )
 
         token = RefreshToken(
             user_id=user.id,
@@ -468,11 +542,9 @@ class AuthService:
             token_family_id=token_family_id,
             expires_at=expires_at,
         )
-        await self.token_repo.add(token)
+        await self.token_repo.create(token)
 
-        return TokenResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer",
-            expires_in=settings.access_token_expire_minutes * 60,  # Convert to seconds
+        return (
+            access_token,
+            refresh_token,
         )

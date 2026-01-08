@@ -293,7 +293,7 @@ from src.schemas.product import (
     ProductListItem,
     ProductFilterParams,
 )
-from src.schemas.common import PaginatedResponse, PaginationParams, SortParams
+from src.schemas.common import PaginatedResponse, PaginationParams, SortParams, PaginationMeta
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -320,11 +320,12 @@ async def list_products(
     result = await service.list_products(filters, pagination, sorting)
     
     return PaginatedResponse(
-        items=[ProductListItem.model_validate(p) for p in result.items],
-        total=result.total,
-        page=pagination.page,
-        size=pagination.size,
-        pages=(result.total + pagination.size - 1) // pagination.size,
+        data=[ProductListItem.model_validate(p) for p in result.items],
+        meta=PaginationMeta(
+            total=result.total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        ),
     )
 
 

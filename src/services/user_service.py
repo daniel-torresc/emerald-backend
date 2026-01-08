@@ -20,13 +20,15 @@ from core.exceptions import (
     InsufficientPermissionsError,
     NotFoundError,
 )
-from models import AuditAction
-from models.user import User
-from repositories.refresh_token_repository import RefreshTokenRepository
-from repositories.user_repository import UserRepository
-from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
-from schemas.user import UserFilterParams, UserListItem, UserUpdate
-from services.audit_service import AuditService
+from models import AuditAction, User
+from repositories import RefreshTokenRepository, UserRepository
+from schemas import (
+    PaginationParams,
+    UserFilterParams,
+    UserSortParams,
+    UserUpdate,
+)
+from .audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -234,13 +236,14 @@ class UserService:
 
     async def list_users(
         self,
-        pagination: PaginationParams,
-        filters: UserFilterParams,
         current_user: User,
+        filters: UserFilterParams,
+        sorting: UserSortParams,
+        pagination: PaginationParams,
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> PaginatedResponse[UserListItem]:
+    ) -> tuple[list[User], int]:
         """
         List users with pagination and filtering.
 
@@ -249,6 +252,7 @@ class UserService:
         Args:
             pagination: Pagination parameters (page, page_size)
             filters: Filter parameters (is_superuser, search)
+            sorting: Sort parameters (sort_by, sort_order)
             current_user: Currently authenticated user (must be admin)
             request_id: Request ID for audit logging
             ip_address: Client IP address
@@ -271,25 +275,11 @@ class UserService:
                 "Administrator privileges required to list users"
             )
 
-        # Get filtered users
-        users = await self.user_repo.filter_users(
-            is_admin=filters.is_superuser,
-            search=filters.search,
-            offset=pagination.offset,
-            limit=pagination.page_size,
+        users = await self.user_repo.list_users(
+            filter_params=filters,
+            pagination_params=pagination,
+            sort_params=sorting,
         )
-
-        # Get total count
-        total_count = await self.user_repo.count_filtered(
-            is_admin=filters.is_superuser,
-            search=filters.search,
-        )
-
-        # Calculate total pages
-        total_pages = (total_count + pagination.page_size - 1) // pagination.page_size
-
-        # Convert to UserListItem schemas
-        user_items = [UserListItem.model_validate(user) for user in users]
 
         # Log audit event
         await self.audit_service.log_event(
@@ -304,18 +294,10 @@ class UserService:
         )
 
         logger.info(
-            f"Admin {current_user.id} listed users: page {pagination.page}, total {total_count}"
+            f"Admin {current_user.id} listed users: page {pagination.page}, total {users[1]}"
         )
 
-        return PaginatedResponse(
-            data=user_items,
-            meta=PaginationMeta(
-                total=total_count,
-                page=pagination.page,
-                page_size=pagination.page_size,
-                total_pages=total_pages,
-            ),
-        )
+        return users
 
     async def delete_user(
         self,
@@ -349,10 +331,10 @@ class UserService:
         # Check admin permission
         if not current_user.is_admin:
             logger.warning(
-                f"User {current_user.id} attempted to deactivate user {user_id} without admin permission"
+                f"User {current_user.id} attempted to delete user {user_id} without admin permission"
             )
             raise InsufficientPermissionsError(
-                "Administrator privileges required to deactivate users"
+                "Administrator privileges required to delete users"
             )
 
         # Get user from database
@@ -376,13 +358,13 @@ class UserService:
             entity_id=user_id,
             old_values={},
             new_values={},
-            description=f"Admin {current_user.username} deactivated (soft deleted) user {user.username}",
+            description=f"Admin {current_user.username} deleted user {user.username}",
             ip_address=ip_address,
             user_agent=user_agent,
             request_id=request_id,
         )
 
-        logger.info(f"User {user_id} deactivated by admin {current_user.id}")
+        logger.info(f"User {user_id} deleted by admin {current_user.id}")
 
     async def deactivate_user(
         self,
@@ -418,10 +400,10 @@ class UserService:
         # Check admin permission
         if not current_user.is_admin:
             logger.warning(
-                f"User {current_user.id} attempted to delete user {user_id} without admin permission"
+                f"User {current_user.id} attempted to deactivate user {user_id} without admin permission"
             )
             raise InsufficientPermissionsError(
-                "Administrator privileges required to delete users"
+                "Administrator privileges required to deactivate users"
             )
 
         # Get user from database

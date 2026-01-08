@@ -23,26 +23,27 @@ from core.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from models import AuditAction
-from models.account import Account, AccountShare
-from models.enums import PermissionLevel
-from models.user import User
-from repositories import FinancialInstitutionRepository
-from repositories.account_repository import AccountRepository
-from repositories.account_share_repository import AccountShareRepository
-from repositories.account_type_repository import AccountTypeRepository
-from repositories.user_repository import UserRepository
-from schemas.account import (
+from models import Account, AccountShare, AuditAction, PermissionLevel, User
+from repositories import (
+    AccountRepository,
+    AccountShareRepository,
+    AccountTypeRepository,
+    FinancialInstitutionRepository,
+    TransactionRepository,
+    UserRepository,
+)
+from schemas import (
     AccountCreate,
     AccountFilterParams,
-    AccountListItem,
+    AccountShareCreate,
+    AccountShareUpdate,
+    AccountSortParams,
     AccountUpdate,
+    PaginationParams,
 )
-from schemas.account_share import AccountShareCreate, AccountShareUpdate
-from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
-from services.audit_service import AuditService
-from services.currency_service import CurrencyService
-from services.permission_service import PermissionService
+from .audit_service import AuditService
+from .currency_service import CurrencyService
+from .permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class AccountService:
         self.account_repo = AccountRepository(session)
         self.account_type_repo = AccountTypeRepository(session)
         self.financial_institution_repo = FinancialInstitutionRepository(session)
-        self.share_repo = AccountShareRepository(session)
+        self.account_share_repo = AccountShareRepository(session)
         self.user_repo = UserRepository(session)
         self.permission_service = PermissionService(session)
         self.audit_service = AuditService(session)
@@ -178,7 +179,6 @@ class AccountService:
                 raise EncryptionError("Failed to encrypt IBAN") from e
 
         # Create account
-        # Phase 2: current_balance = opening_balance (no transactions yet)
         account = Account(
             user_id=user.id,
             financial_institution_id=data.financial_institution_id,
@@ -195,7 +195,18 @@ class AccountService:
             created_by=user.id,
             updated_by=user.id,
         )
-        account = await self.account_repo.add(account)
+        account = await self.account_repo.create(account)
+
+        # Create account share
+        account_share = AccountShare(
+            account_id=account.id,
+            user_id=user.id,
+            permission_level=PermissionLevel.owner,
+            created_by=user.id,
+            updated_by=user.id,
+        )
+        account_share = await self.account_share_repo.create(account_share)
+
         await self.session.commit()
 
         logger.info(
@@ -231,6 +242,8 @@ class AccountService:
         account_id: uuid.UUID,
         current_user: User,
         request_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> Account:
         """
         Get account by ID.
@@ -241,6 +254,8 @@ class AccountService:
             account_id: ID of the account to retrieve
             current_user: Currently authenticated user
             request_id: Optional request ID for correlation
+            ip_address: Client IP address for audit logging
+            user_agent: Client user agent for audit logging
 
         Returns:
             Account instance
@@ -269,96 +284,6 @@ class AccountService:
             raise NotFoundError("Account")  # Don't reveal account exists
 
         return account
-
-    async def list_user_accounts(
-        self,
-        user_id: uuid.UUID,
-        current_user: User,
-        pagination: PaginationParams,
-        filters: AccountFilterParams,
-    ) -> PaginatedResponse[AccountListItem]:
-        """
-        List all accounts for a user with pagination and filtering.
-
-        Returns paginated response with metadata.
-
-        Args:
-            user_id: ID of the user whose accounts to list
-            current_user: Currently authenticated user
-            pagination: Pagination parameters (page, page_size)
-            filters: Filter parameters (account_type_id, financial_institution_id)
-
-        Returns:
-            PaginatedResponse with AccountListItem instances and metadata
-
-        Raises:
-            PermissionError: If user attempts to list another user's accounts
-
-        Example:
-            response = await account_service.list_accounts_paginated(
-                user_id=user.id,
-                current_user=user,
-                pagination=PaginationParams(page=1, page_size=20),
-                filters=AccountFilterParams(account_type_id=checking_type_id)
-            )
-        """
-        # User can only list their own accounts (admins can list any user's accounts)
-        if user_id != current_user.id and not current_user.is_admin:
-            logger.warning(
-                f"User {current_user.id} attempted to list accounts for user {user_id}"
-            )
-            raise PermissionError("You can only list your own accounts")
-
-        # Get owned accounts
-        owned_accounts = await self.account_repo.get_by_user(
-            user_id=user_id,
-            account_type_id=filters.account_type_id,
-            financial_institution_id=filters.financial_institution_id,
-        )
-
-        # Get shared accounts (accounts where user has a share)
-        shared_accounts = await self.account_repo.get_shared_with_user(
-            user_id=user_id,
-            account_type_id=filters.account_type_id,
-            financial_institution_id=filters.financial_institution_id,
-        )
-
-        # Combine and deduplicate (in case user owns AND has a share on same account)
-        account_ids_seen = {acc.id for acc in owned_accounts}
-        all_accounts = list(owned_accounts)
-
-        for shared_acc in shared_accounts:
-            if shared_acc.id not in account_ids_seen:
-                all_accounts.append(shared_acc)
-                account_ids_seen.add(shared_acc.id)
-
-        # Get total count
-        total = len(all_accounts)
-
-        # Apply pagination to combined results
-        paginated_accounts = all_accounts[
-            pagination.offset : pagination.offset + pagination.page_size
-        ]
-
-        # Convert to AccountListItem
-        account_items = [
-            AccountListItem.model_validate(account) for account in paginated_accounts
-        ]
-
-        # Calculate total pages
-        total_pages = PaginationParams.calculate_total_pages(
-            total, pagination.page_size
-        )
-
-        return PaginatedResponse(
-            data=account_items,
-            meta=PaginationMeta(
-                total=total,
-                page=pagination.page,
-                page_size=pagination.page_size,
-                total_pages=total_pages,
-            ),
-        )
 
     async def update_account(
         self,
@@ -529,9 +454,6 @@ class AccountService:
         Sets deleted_at timestamp. Account is excluded from normal queries but
         transaction history is preserved for regulatory compliance.
 
-        Phase 2A: Only owner can delete.
-        Phase 2B: Only owner can delete (editors and viewers cannot).
-
         Args:
             account_id: ID of the account to delete
             current_user: Currently authenticated user
@@ -548,7 +470,7 @@ class AccountService:
         # Get account and check permission
         account = await self.get_account(account_id, current_user, request_id)
 
-        # Phase 2A: Only owner can delete
+        # Only owner can delete
         if account.user_id != current_user.id:
             logger.warning(
                 f"User {current_user.id} attempted to delete account {account_id} without permission"
@@ -580,35 +502,50 @@ class AccountService:
             request_id=request_id,
         )
 
-    async def count_user_accounts(
+    async def list_user_accounts(
         self,
-        user_id: uuid.UUID,
         current_user: User,
-    ) -> int:
+        filters: AccountFilterParams,
+        pagination: PaginationParams,
+        sorting: AccountSortParams,
+    ) -> tuple[list[Account], int]:
         """
-        Count total accounts for a user.
+        List all accounts for a user with pagination and filtering.
+
+        Returns paginated response with metadata.
 
         Args:
-            user_id: ID of the user
             current_user: Currently authenticated user
+            pagination: Pagination parameters (page, page_size)
+            filters: Filter parameters (account_type_id, financial_institution_id)
+            sorting: Sort parameters (account_type_id, account_type_name)
 
         Returns:
-            Total count of active accounts
+            PaginatedResponse with AccountListItem instances and metadata
 
         Raises:
-            PermissionError: If user attempts to count another user's accounts
+            PermissionError: If user attempts to list another user's accounts
 
         Example:
-            count = await account_service.count_user_accounts(user.id, user)
+            response = await account_service.list_accounts_paginated(
+                user_id=user.id,
+                current_user=user,
+                pagination=PaginationParams(page=1, page_size=20),
+                filters=AccountFilterParams(account_type_id=checking_type_id)
+            )
         """
-        # User can only count their own accounts
-        if user_id != current_user.id and not current_user.is_admin:
-            raise PermissionError("You can only count your own accounts")
+        # Get user accounts
+        user_accounts = await self.account_repo.list_for_user(
+            user_id=current_user.id,
+            filter_params=filters,
+            pagination_params=pagination,
+            sort_params=sorting,
+        )
 
-        return await self.account_repo.count_user_accounts(user_id)
+        return user_accounts
 
     # =============================================================================
-    # Account Sharing Methods (Phase 2B)
+    # Account Sharing Methods
     # =============================================================================
 
     async def share_account(
@@ -677,7 +614,7 @@ class AccountService:
             )
 
         # Check if share already exists
-        if await self.share_repo.exists_share(data.user_id, account_id):
+        if await self.account_share_repo.exists_share(data.user_id, account_id):
             raise AlreadyExistsError(
                 f"Account already shared with user {target_user.username}"
             )
@@ -690,7 +627,7 @@ class AccountService:
             created_by=current_user.id,
             updated_by=current_user.id,
         )
-        created_share = await self.share_repo.add(account_share)
+        created_share = await self.account_share_repo.create(account_share)
         await self.session.commit()
 
         logger.info(
@@ -748,7 +685,7 @@ class AccountService:
         )
 
         # Get all shares for account
-        shares = await self.share_repo.get_by_account(account_id)
+        shares = await self.account_share_repo.get_by_account(account_id)
 
         # If user is not owner, filter to show only their own share
         is_owner = await self.permission_service.is_owner(current_user.id, account_id)
@@ -804,7 +741,7 @@ class AccountService:
         )
 
         # Get share
-        share = await self.share_repo.get_by_id(share_id)
+        share = await self.account_share_repo.get_by_id(share_id)
         if not share or share.account_id != account_id:
             raise NotFoundError("Share not found")
 
@@ -841,7 +778,7 @@ class AccountService:
         share.updated_by = current_user.id
 
         # Persist changes
-        updated_share = await self.share_repo.update(share)
+        updated_share = await self.account_share_repo.update(share)
 
         # Capture new values for audit
         new_values = {"permission_level": updated_share.permission_level.value}
@@ -914,7 +851,7 @@ class AccountService:
         )
 
         # Get share
-        share = await self.share_repo.get_by_id(share_id)
+        share = await self.account_share_repo.get_by_id(share_id)
         if not share or share.account_id != account_id:
             raise NotFoundError("Share not found")
 
@@ -926,7 +863,7 @@ class AccountService:
             raise ValidationError("Cannot revoke your own owner permission")
 
         # Soft delete share
-        await self.share_repo.soft_delete(share)
+        await self.account_share_repo.soft_delete(share)
 
         logger.info(
             f"User {current_user.id} revoked share {share_id} "
@@ -1031,9 +968,6 @@ class AccountService:
             if cached != calculated:
                 print(f"Balance mismatch: cached={cached}, calculated={calculated}")
         """
-        # Import here to avoid circular dependency
-        from repositories.transaction_repository import TransactionRepository
-
         # Check permission (VIEWER or higher can view balance)
         await self.permission_service.require_permission(
             current_user.id, account_id, PermissionLevel.viewer

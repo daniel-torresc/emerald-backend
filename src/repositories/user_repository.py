@@ -8,11 +8,12 @@ including authentication queries, profile management, and user filtering.
 import uuid
 
 from pydantic import EmailStr
-from sqlalchemy import or_, select
+from sqlalchemy import ColumnElement, UnaryExpression, asc, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.user import User
-from repositories.base import BaseRepository
+from models import User
+from schemas import PaginationParams, SortOrder, UserFilterParams, UserSortParams
+from .base import BaseRepository
 
 
 class UserRepository(BaseRepository[User]):
@@ -34,6 +35,106 @@ class UserRepository(BaseRepository[User]):
             session: Async database session
         """
         super().__init__(User, session)
+
+    @staticmethod
+    def _build_filters(
+        params: UserFilterParams,
+    ) -> list[ColumnElement[bool]]:
+        """
+        Convert UserFilterParams to SQLAlchemy filter expressions.
+
+        Args:
+            params: Filter parameters from request
+
+        Returns:
+            List of SQLAlchemy filter expressions
+        """
+        filters: list[ColumnElement[bool]] = []
+
+        # Admin status filter
+        if params.is_admin is not None:
+            filters.append(User.is_admin == params.is_admin)
+
+        # Search filter (email, username, or full_name)
+        if params.search:
+            search_term = f"%{params.search}%"
+            filters.append(
+                or_(
+                    User.email.ilike(search_term),
+                    User.username.ilike(search_term),
+                    User.full_name.ilike(search_term),
+                )
+            )
+
+        return filters
+
+    @staticmethod
+    def _build_order_by(
+        params: UserSortParams,
+    ) -> list[UnaryExpression]:
+        """
+        Convert UserSortParams to SQLAlchemy order_by expressions.
+
+        Args:
+            params: Sort parameters with sort_by and sort_order
+
+        Returns:
+            List of SQLAlchemy order_by expressions
+        """
+        order_by: list[UnaryExpression] = []
+
+        # Get the model column from enum value
+        sort_column = getattr(User, params.sort_by.value)
+
+        # Apply sort direction
+        if params.sort_order == SortOrder.ASC:
+            order_by.append(asc(sort_column))
+        else:
+            order_by.append(desc(sort_column))
+
+        # Add secondary sort by id for deterministic pagination
+        order_by.append(desc(User.id))
+
+        return order_by
+
+    async def list_users(
+        self,
+        filter_params: UserFilterParams,
+        sort_params: UserSortParams,
+        pagination_params: PaginationParams,
+    ) -> tuple[list[User], int]:
+        """
+        Filter users with multiple criteria and pagination.
+
+        Used for admin user list view with search and filtering.
+        Automatically filters out soft-deleted users via BaseRepository.
+
+        Args:
+            filter_params:
+            sort_params:
+            pagination_params:
+
+        Returns:
+            List of User instances matching the criteria
+
+        Example:
+            # Get non-admin users with "john" in name/email
+            users = await user_repo.filter_users(
+                search="john",
+                is_admin=False,
+                skip=0,
+                limit=20
+            )
+        """
+        filters = self._build_filters(params=filter_params)
+        order_by = self._build_order_by(params=sort_params)
+
+        return await self._list_and_count(
+            filters=filters,
+            order_by=order_by,
+            offset=pagination_params.offset,
+            limit=pagination_params.page_size,
+        )
 
     async def get_by_email(self, email: EmailStr) -> User | None:
         """
@@ -102,112 +203,6 @@ class UserRepository(BaseRepository[User]):
             user.last_login_at = datetime.now(UTC)
             await self.session.flush()
 
-    async def filter_users(
-        self,
-        search: str | None = None,
-        is_admin: bool | None = None,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> list[User]:
-        """
-        Filter users with multiple criteria and pagination.
-
-        Used for admin user list view with search and filtering.
-        Automatically filters out soft-deleted users via BaseRepository.
-
-        Args:
-            search: Search term for username, email, or full_name
-            is_admin: Filter by admin status
-            offset: Number of records to skip (pagination)
-            limit: Maximum number of records to return
-
-        Returns:
-            List of User instances matching the criteria
-
-        Example:
-            # Get non-admin users with "john" in name/email
-            users = await user_repo.filter_users(
-                search="john",
-                is_admin=False,
-                skip=0,
-                limit=20
-            )
-        """
-        query = select(User)
-        query = self._apply_soft_delete_filter(query)
-
-        # Apply search filter
-        if search:
-            search_pattern = f"%{search}%"
-            query = query.where(
-                or_(
-                    User.username.ilike(search_pattern),
-                    User.email.ilike(search_pattern),
-                    User.full_name.ilike(search_pattern),
-                )
-            )
-
-        # Apply admin filter
-        if is_admin is not None:
-            query = query.where(User.is_admin.is_(is_admin))
-
-        # Apply pagination
-        query = query.offset(offset).limit(limit)
-
-        # Order by created_at descending (newest first)
-        query = query.order_by(User.created_at.desc())
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
-
-    async def count_filtered(
-        self,
-        search: str | None = None,
-        is_admin: bool | None = None,
-    ) -> int:
-        """
-        Count users matching filter criteria.
-
-        Used for pagination metadata in admin user list.
-        Automatically excludes soft-deleted users via BaseRepository.
-
-        Args:
-            search: Search term for username, email, or full_name
-            is_admin: Filter by admin status
-
-        Returns:
-            Total count of users matching criteria
-
-        Example:
-            total = await user_repo.count_filtered(
-                search="john",
-                is_admin=False
-            )
-            total_pages = (total + limit - 1) // limit
-        """
-        from sqlalchemy import func
-
-        query = select(func.count()).select_from(User)
-        query = self._apply_soft_delete_filter(query)
-
-        # Apply search filter
-        if search:
-            search_pattern = f"%{search}%"
-            query = query.where(
-                or_(
-                    User.username.ilike(search_pattern),
-                    User.email.ilike(search_pattern),
-                    User.full_name.ilike(search_pattern),
-                )
-            )
-
-        # Apply admin filter
-        if is_admin is not None:
-            query = query.where(User.is_admin.is_(is_admin))
-
-        result = await self.session.execute(query)
-        return result.scalar_one()
-
     async def email_exists(
         self, email: EmailStr, exclude_user_id: uuid.UUID | None = None
     ) -> bool:
@@ -275,27 +270,3 @@ class UserRepository(BaseRepository[User]):
 
         result = await self.session.execute(query)
         return result.scalar_one_or_none() is not None
-
-    async def count_admins(self) -> int:
-        """
-        Count total number of admin users.
-
-        Used for validation (e.g., cannot delete last admin).
-        Automatically filters out soft-deleted users.
-
-        Returns:
-            Total count of active admin users
-
-        Example:
-            admin_count = await user_repo.count_admins()
-            if admin_count <= 1:
-                raise ForbiddenError("Cannot delete last admin user")
-        """
-        from sqlalchemy import func
-
-        query = select(func.count()).select_from(User)
-        query = self._apply_soft_delete_filter(query)
-        query = query.where(User.is_admin.is_(True))
-
-        result = await self.session.execute(query)
-        return result.scalar_one()

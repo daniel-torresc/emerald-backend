@@ -11,26 +11,25 @@ they own all cards linked to that account.
 
 import uuid
 from decimal import Decimal
-from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     CheckConstraint,
-    Enum as SQLEnum,
     ForeignKey,
     Integer,
     Numeric,
     String,
 )
+from sqlalchemy import (
+    Enum as SQLEnum,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from models.base import Base
-from models.enums import CardType
-from models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
-
-if TYPE_CHECKING:
-    from models.account import Account
-    from models.financial_institution import FinancialInstitution
+from .account import Account
+from .base import Base
+from .enums import CardType
+from .financial_institution import FinancialInstitution
+from .mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 
 
 class Card(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
@@ -139,14 +138,14 @@ class Card(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Relationships
-    account: Mapped["Account"] = relationship(
+    account: Mapped[Account] = relationship(
         "Account",
         foreign_keys=[account_id],
         lazy="selectin",
         back_populates="cards",
     )
 
-    financial_institution: Mapped["FinancialInstitution | None"] = relationship(
+    financial_institution: Mapped[FinancialInstitution | None] = relationship(
         "FinancialInstitution",
         foreign_keys=[financial_institution_id],
         lazy="selectin",

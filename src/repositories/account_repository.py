@@ -9,12 +9,13 @@ This module provides database operations for Account model, including:
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import UnaryExpression, and_, asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from models.account import Account, AccountShare
-from repositories.base import BaseRepository
+from models import Account, AccountShare
+from schemas import AccountFilterParams, AccountSortParams, PaginationParams, SortOrder
+from .base import BaseRepository
 
 
 class AccountRepository(BaseRepository[Account]):
@@ -38,12 +39,11 @@ class AccountRepository(BaseRepository[Account]):
         """
         super().__init__(Account, session)
 
-    async def get_by_user(
-        self,
-        user_id: uuid.UUID,
-        account_type_id: uuid.UUID | None = None,
-        financial_institution_id: uuid.UUID | None = None,
-    ) -> list[Account]:
+    # ========================================================================
+    # DOMAIN-SPECIFIC QUERY METHODS
+    # ========================================================================
+
+    async def get_by_user(self, user_id: uuid.UUID) -> list[Account]:
         """
         Get all accounts for a specific user.
 
@@ -52,51 +52,35 @@ class AccountRepository(BaseRepository[Account]):
 
         Args:
             user_id: ID of the user who owns the accounts
-            account_type_id: Filter by account type ID (None = all types)
-            financial_institution_id: Filter by financial institution (None = all)
 
         Returns:
             List of Account instances with eager-loaded institution and account type
 
         Example:
             # Get all checking accounts for user at specific institution
-            accounts = await account_repo.get_by_user(
-                user_id=user.id,
-                account_type_id=checking_type_id,
-                financial_institution_id=chase_id
-            )
+            accounts = await account_repo.get_by_user(user_id=user.id)
         """
-        query = (
-            select(Account)
-            .where(Account.user_id == user_id)
-            .options(
-                selectinload(Account.financial_institution),
-                selectinload(Account.account_type),
-            )  # Eager load institution and account type
+        filters = [
+            Account.user_id == user_id,
+        ]
+
+        load_relationships = [
+            selectinload(Account.financial_institution),
+            selectinload(Account.account_type),
+        ]
+
+        order_by = [
+            desc(Account.created_at),
+            desc(Account.id),
+        ]
+
+        return await self._list(
+            filters=filters,
+            load_relationships=load_relationships,
+            order_by=order_by,
         )
-        query = self._apply_soft_delete_filter(query)
 
-        # Apply filters
-        if account_type_id is not None:
-            query = query.where(Account.account_type_id == account_type_id)
-
-        if financial_institution_id is not None:
-            query = query.where(
-                Account.financial_institution_id == financial_institution_id
-            )
-
-        # Order by created_at descending (newest first)
-        query = query.order_by(Account.created_at.desc())
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
-
-    async def get_shared_with_user(
-        self,
-        user_id: uuid.UUID,
-        account_type_id: uuid.UUID | None = None,
-        financial_institution_id: uuid.UUID | None = None,
-    ) -> list[Account]:
+    async def get_shared_with_user(self, user_id: uuid.UUID) -> list[Account]:
         """
         Get all accounts shared with a specific user.
 
@@ -106,8 +90,6 @@ class AccountRepository(BaseRepository[Account]):
 
         Args:
             user_id: ID of the user who has been granted access
-            account_type_id: Filter by account type ID (None = all types)
-            financial_institution_id: Filter by institution (None = all)
 
         Returns:
             List of Account instances shared with the user
@@ -120,37 +102,35 @@ class AccountRepository(BaseRepository[Account]):
                 financial_institution_id=chase_id
             )
         """
+        filters = [
+            AccountShare.user_id == user_id,
+        ]
+
+        load_relationships = [
+            selectinload(Account.financial_institution),
+            selectinload(Account.account_type),
+        ]
+
+        order_by = [
+            desc(Account.created_at),
+            desc(Account.id),
+        ]
+
         # Join Account with AccountShare to find accounts shared with this user
-        query = (
-            select(Account)
-            .join(AccountShare, Account.id == AccountShare.account_id)
-            .where(AccountShare.user_id == user_id)
-            .options(
-                selectinload(Account.financial_institution),
-                selectinload(Account.account_type),
-            )  # Eager load institution and account type
+        query = select(Account).join(
+            AccountShare, Account.id == AccountShare.account_id
         )
         query = self._apply_soft_delete_filter(query)
 
-        # Apply filters
-        if account_type_id is not None:
-            query = query.where(Account.account_type_id == account_type_id)
-
-        if financial_institution_id is not None:
-            query = query.where(
-                Account.financial_institution_id == financial_institution_id
-            )
-
-        # Order by created_at descending (newest first)
-        query = query.order_by(Account.created_at.desc())
+        query = query.options(*load_relationships)
+        query = query.where(and_(*filters))
+        query = query.order_by(*order_by)
 
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
     async def get_by_name(
-        self,
-        user_id: uuid.UUID,
-        account_name: str,
+        self, user_id: uuid.UUID, account_name: str
     ) -> Account | None:
         """
         Get account by name for a specific user.
@@ -170,21 +150,18 @@ class AccountRepository(BaseRepository[Account]):
                 account_name="Chase Savings"
             )
         """
-        query = select(Account).where(
-            Account.user_id == user_id,
+        filters = [
+            AccountShare.user_id == user_id,
             func.lower(Account.account_name) == account_name.lower(),
+        ]
+
+        results = await self._list(
+            filters=filters,
         )
-        query = self._apply_soft_delete_filter(query)
 
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return results[0] if results else None
 
-    async def exists_by_name(
-        self,
-        user_id: uuid.UUID,
-        account_name: str,
-        exclude_id: uuid.UUID | None = None,
-    ) -> bool:
+    async def exists_by_name(self, user_id: uuid.UUID, account_name: str) -> bool:
         """
         Check if an account with the given name exists for a user.
 
@@ -194,7 +171,6 @@ class AccountRepository(BaseRepository[Account]):
         Args:
             user_id: ID of the user
             account_name: Name to check
-            exclude_id: Optional account ID to exclude (for updates)
 
         Returns:
             True if account name exists, False otherwise
@@ -210,44 +186,8 @@ class AccountRepository(BaseRepository[Account]):
             ):
                 raise AlreadyExistsError("Account name already exists")
         """
-        query = select(Account).where(
-            Account.user_id == user_id,
-            func.lower(Account.account_name) == account_name.lower(),
-        )
-        query = self._apply_soft_delete_filter(query)
-
-        # Exclude the account being updated
-        if exclude_id is not None:
-            query = query.where(Account.id != exclude_id)
-
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none() is not None
-
-    async def count_user_accounts(
-        self,
-        user_id: uuid.UUID,
-    ) -> int:
-        """
-        Count total accounts for a user.
-
-        Automatically excludes soft-deleted accounts via BaseRepository.
-
-        Args:
-            user_id: ID of the user
-
-        Returns:
-            Total count of active (non-deleted) accounts
-
-        Example:
-            total = await account_repo.count_user_accounts(user.id)
-        """
-        query = (
-            select(func.count()).select_from(Account).where(Account.user_id == user_id)
-        )
-        query = self._apply_soft_delete_filter(query)
-
-        result = await self.session.execute(query)
-        return result.scalar_one()
+        record = await self.get_by_name(user_id=user_id, account_name=account_name)
+        return record is not None
 
     async def get_for_update(self, account_id: uuid.UUID) -> Account | None:
         """
@@ -291,3 +231,56 @@ class AccountRepository(BaseRepository[Account]):
 
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    # ========================================================================
+    # USER PARAMS METHODS
+    # ========================================================================
+
+    async def list_for_user(
+        self,
+        user_id: uuid.UUID,
+        filter_params: AccountFilterParams,
+        sort_params: AccountSortParams,
+        pagination_params: PaginationParams,
+    ) -> tuple[list[Account], int]:
+        filters = [
+            Account.user_id == user_id,
+        ]
+
+        # Account type filter
+        if filter_params.account_type_id is not None:
+            filters.append(Account.account_type_id == filter_params.account_type_id)
+
+        # Financial institution filter
+        if filter_params.financial_institution_id is not None:
+            filters.append(
+                Account.financial_institution_id
+                == filter_params.financial_institution_id
+            )
+
+        order_by: list[UnaryExpression] = []
+
+        # Get the model column from enum value
+        sort_column = getattr(Account, sort_params.sort_by.value)
+
+        # Apply sort direction
+        if sort_params.sort_order == SortOrder.ASC:
+            order_by.append(asc(sort_column))
+        else:
+            order_by.append(desc(sort_column))
+
+        # Add secondary sort by id for deterministic pagination
+        order_by.append(desc(Account.id))
+
+        load_relationships = [
+            selectinload(Account.financial_institution),
+            selectinload(Account.account_type),
+        ]
+
+        return await self._list_and_count(
+            filters=filters,
+            order_by=order_by,
+            load_relationships=load_relationships,
+            offset=pagination_params.offset,
+            limit=pagination_params.page_size,
+        )

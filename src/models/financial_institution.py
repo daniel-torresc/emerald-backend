@@ -11,14 +11,14 @@ Architecture:
 - Uses soft delete pattern for preserving historical references
 """
 
-from typing import Optional
-
-from sqlalchemy import Enum as SQLEnum, String
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from models.base import Base
-from models.enums import InstitutionType
-from models.mixins import SoftDeleteMixin, TimestampMixin
+from .account import Account
+from .base import Base
+from .enums import InstitutionType
+from .mixins import SoftDeleteMixin, TimestampMixin
 
 
 class FinancialInstitution(Base, TimestampMixin, SoftDeleteMixin):
@@ -81,13 +81,13 @@ class FinancialInstitution(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     # Banking identifiers
-    swift_code: Mapped[Optional[str]] = mapped_column(
+    swift_code: Mapped[str | None] = mapped_column(
         String(11),
         nullable=True,
         comment="BIC/SWIFT code (8 or 11 alphanumeric characters)",
     )
 
-    routing_number: Mapped[Optional[str]] = mapped_column(
+    routing_number: Mapped[str | None] = mapped_column(
         String(9),
         nullable=True,
         comment="ABA routing number for US banks (9 digits)",
@@ -115,20 +115,20 @@ class FinancialInstitution(Base, TimestampMixin, SoftDeleteMixin):
     )
 
     # Metadata
-    logo_url: Mapped[Optional[str]] = mapped_column(
+    logo_url: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         comment="URL to institution's logo image",
     )
 
-    website_url: Mapped[Optional[str]] = mapped_column(
+    website_url: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         comment="Official website URL",
     )
 
     # Relationships
-    accounts: Mapped[list["Account"]] = relationship(  # type: ignore
+    accounts: Mapped[list[Account]] = relationship(  # type: ignore
         "Account",
         back_populates="financial_institution",
         foreign_keys="Account.financial_institution_id",

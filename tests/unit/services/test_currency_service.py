@@ -9,7 +9,7 @@ Tests the CurrencyService and Currency model to ensure:
 
 import pytest
 
-from schemas.currency import Currency
+from schemas import Currency
 from services.currency_service import CurrencyService
 
 

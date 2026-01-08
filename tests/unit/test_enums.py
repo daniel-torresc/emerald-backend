@@ -10,7 +10,7 @@ Note: AccountType is no longer an enum - it's now a database model (account_type
 Tests for AccountType functionality should be in test_account_type_model.py or integration tests.
 """
 
-from models.enums import TransactionType
+from models import TransactionType
 
 
 # AccountType enum tests removed - AccountType is now a database model, not an enum

@@ -22,8 +22,8 @@ from core.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from models.enums import TransactionType
-from repositories.account_repository import AccountRepository
+from models import TransactionType
+from repositories import AccountRepository
 from services.transaction_service import TransactionService
 
 
@@ -291,9 +291,10 @@ class TestTransactionServiceUpdate:
         self, db_session, test_user, test_account, test_engine
     ):
         """Test that non-creator/owner cannot update transaction."""
-        from models.user import User
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
         from core.security import hash_password
-        from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+        from models import User
 
         service = TransactionService(db_session)
 
@@ -692,11 +693,7 @@ class TestTransactionServiceCardValidation:
         self, db_session, test_user, test_account, admin_user
     ):
         """Test that using another user's card raises NotFoundError."""
-        from models.card import Card
-        from models.enums import CardType
-
-        # Create card for admin user
-        from models.account import Account
+        from models import Account, Card, CardType
 
         admin_account = Account(
             account_name="Admin Account",
@@ -709,7 +706,7 @@ class TestTransactionServiceCardValidation:
             created_by=admin_user.id,
             updated_by=admin_user.id,
         )
-        admin_account = await AccountRepository(db_session).add(admin_account)
+        admin_account = await AccountRepository(db_session).create(admin_account)
 
         admin_card = Card(
             account_id=admin_account.id,
