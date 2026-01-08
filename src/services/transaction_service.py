@@ -22,28 +22,18 @@ from core.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from models import AuditAction
-from models.enums import PermissionLevel
-from models.transaction import Transaction
-from models.user import User
-from repositories.account_repository import AccountRepository
-from repositories.card_repository import CardRepository
-from repositories.transaction_repository import TransactionRepository
-from schemas.common import (
-    PaginatedResponse,
-    PaginationMeta,
+from models import AuditAction, PermissionLevel, Transaction, User
+from repositories import AccountRepository, CardRepository, TransactionRepository
+from schemas import (
     PaginationParams,
-    SortParams,
-)
-from schemas.transaction import (
     TransactionCreate,
     TransactionFilterParams,
-    TransactionListItem,
+    TransactionSortParams,
     TransactionUpdate,
 )
-from services.audit_service import AuditService
-from services.currency_service import CurrencyService
-from services.permission_service import PermissionService
+from .audit_service import AuditService
+from .currency_service import CurrencyService
+from .permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +175,7 @@ class TransactionService:
             created_by=current_user.id,
             updated_by=current_user.id,
         )
-        transaction = await self.transaction_repo.add(transaction)
+        transaction = await self.transaction_repo.create(transaction)
 
         # Update account balance with row lock
         account = await self.account_repo.get_for_update(account_id)
@@ -278,14 +268,14 @@ class TransactionService:
 
         return transaction
 
-    async def search(
+    async def list_user_transactions(
         self,
         account_id: uuid.UUID,
         current_user: User,
         pagination: PaginationParams,
         filters: TransactionFilterParams,
-        sorting: SortParams | None = None,
-    ) -> PaginatedResponse[TransactionListItem]:
+        sorting: TransactionSortParams,
+    ) -> tuple[list[Transaction], int]:
         """
         Search transactions with pagination and filters.
 
@@ -303,7 +293,7 @@ class TransactionService:
             AuthorizationError: If user doesn't have account access
 
         Example:
-            response = await transaction_service.search_transactions_paginated(
+            response = await transaction_service.search(
                 account_id=account.id,
                 current_user=user,
                 pagination=PaginationParams(page=1, page_size=20),
@@ -311,7 +301,7 @@ class TransactionService:
                     description="grocery",
                     amount_min=Decimal("10.00")
                 ),
-                sorting=SortParams(sort_by="transaction_date", sort_order="desc")
+                sorting=TransactionSortParams()
             )
         """
         # Check user has account access (VIEWER or higher)
@@ -329,47 +319,14 @@ class TransactionService:
                 "You don't have permission to view transactions for this account"
             )
 
-        # Use default sorting if not provided
-        sort_by = sorting.sort_by if sorting else "transaction_date"
-        sort_order = sorting.sort_order.value if sorting else "desc"
-
-        # Delegate to repository
-        transactions, total = await self.transaction_repo.search_transactions(
-            account_id=account_id,
-            date_from=filters.date_from,
-            date_to=filters.date_to,
-            amount_min=filters.amount_min,
-            amount_max=filters.amount_max,
-            description=filters.description,
-            merchant=filters.merchant,
-            transaction_type=filters.transaction_type,
-            card_id=filters.card_id,
-            card_type=filters.card_type,
-            sort_by=sort_by,
-            sort_order=sort_order,
-            offset=pagination.offset,
-            limit=pagination.page_size,
+        user_transactions = await self.transaction_repo.list_for_user(
+            user_id=current_user.id,
+            filter_params=filters,
+            pagination_params=pagination,
+            sort_params=sorting,
         )
 
-        # Convert to TransactionResponse
-        transaction_items = [
-            TransactionListItem.model_validate(t) for t in transactions
-        ]
-
-        # Calculate total pages
-        total_pages = PaginationParams.calculate_total_pages(
-            total, pagination.page_size
-        )
-
-        return PaginatedResponse(
-            data=transaction_items,
-            meta=PaginationMeta(
-                total=total,
-                page=pagination.page,
-                page_size=pagination.page_size,
-                total_pages=total_pages,
-            ),
-        )
+        return user_transactions
 
     async def update_transaction(
         self,
@@ -656,7 +613,7 @@ class TransactionService:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> tuple[Transaction, list[Transaction]]:
+    ) -> list[Transaction]:
         """
         Split transaction into multiple child transactions.
 
@@ -713,13 +670,13 @@ class TransactionService:
             raise ValidationError("At least 2 splits are required")
 
         # Validation: Split amounts must sum to parent amount
-        total_splits = sum(Decimal(str(s["amount"])) for s in splits)
-        if total_splits != parent.amount:
+        total_amount_splits = sum(Decimal(str(s["amount"])) for s in splits)
+        if total_amount_splits != parent.amount:
             logger.warning(
-                f"Split amounts ({total_splits}) don't equal parent amount ({parent.amount})"
+                f"Split amounts ({total_amount_splits}) don't equal parent amount ({parent.amount})"
             )
             raise ValidationError(
-                f"Split amounts ({total_splits}) must equal parent amount ({parent.amount})"
+                f"Split amounts ({total_amount_splits}) must equal parent amount ({parent.amount})"
             )
 
         # Permission check (EDITOR or higher can split)
@@ -755,13 +712,12 @@ class TransactionService:
                 created_by=current_user.id,
                 updated_by=current_user.id,
             )
-            created_child = await self.transaction_repo.add(child)
+            created_child = await self.transaction_repo.create(child)
             children.append(created_child)
 
         logger.info(f"Split transaction {transaction_id} into {len(children)} children")
 
         # No balance update needed (parent still exists, children don't add new amounts)
-
         await self.session.commit()
 
         # Audit log
@@ -789,7 +745,7 @@ class TransactionService:
 
         # Refresh parent to load children
         await self.session.refresh(parent, ["child_transactions"])
-        return parent, children
+        return children
 
     async def join_split_transaction(
         self,
@@ -856,7 +812,7 @@ class TransactionService:
 
         # Delete all children
         for child in children:
-            await self.transaction_repo.soft_delete(child)
+            await self.transaction_repo.delete(child)
 
         logger.info(
             f"Joined split transaction {transaction_id}, deleted {len(children)} children"

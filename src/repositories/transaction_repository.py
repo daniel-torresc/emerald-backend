@@ -13,14 +13,19 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import ColumnElement, UnaryExpression, asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from models.card import Card
-from models.enums import CardType, TransactionType
-from models.transaction import Transaction
-from repositories.base import BaseRepository
+from models import Account, Card, Transaction
+from schemas import (
+    PaginationParams,
+    SortOrder,
+    TransactionFilterParams,
+    TransactionSortParams,
+)
+from .base import BaseRepository
 
 
 class TransactionRepository(BaseRepository[Transaction]):
@@ -50,6 +55,127 @@ class TransactionRepository(BaseRepository[Transaction]):
             session: Async database session
         """
         super().__init__(Transaction, session)
+
+    @staticmethod
+    def _build_filters(
+        user_id: uuid.UUID,
+        params: TransactionFilterParams,
+    ) -> list[ColumnElement[bool]]:
+        """
+        Convert TransactionFilterParams to SQLAlchemy filter expressions.
+
+        Args:
+            params: Filter parameters from request
+
+        Returns:
+            List of SQLAlchemy filter expressions
+        """
+        filters: list[ColumnElement[bool]] = [
+            Transaction.account.has(Account.user_id == user_id),
+        ]
+
+        # Account ownership filter
+        if params.account_id is not None:
+            filters.append(Transaction.account_id == params.account_id)
+
+        # Date range filters
+        if params.date_from is not None:
+            filters.append(Transaction.transaction_date >= params.date_from)
+
+        if params.date_to is not None:
+            filters.append(Transaction.transaction_date <= params.date_to)
+
+        # Amount range filters
+        if params.amount_min is not None:
+            filters.append(Transaction.amount >= params.amount_min)
+
+        if params.amount_max is not None:
+            filters.append(Transaction.amount <= params.amount_max)
+
+        # Fuzzy text search on description (pg_trgm similarity)
+        if params.description:
+            filters.append(
+                func.similarity(Transaction.description, params.description) > 0.3
+            )
+
+        # Fuzzy text search on merchant (pg_trgm similarity)
+        if params.merchant:
+            filters.append(func.similarity(Transaction.merchant, params.merchant) > 0.3)
+
+        # Transaction type filter
+        if params.transaction_type is not None:
+            filters.append(Transaction.transaction_type == params.transaction_type)
+
+        # Card ID filter
+        if params.card_id is not None:
+            filters.append(Transaction.card_id == params.card_id)
+
+        # Card type filter (uses relationship)
+        if params.card_type is not None:
+            filters.append(Transaction.card.has(Card.card_type == params.card_type))
+
+        return filters
+
+    @staticmethod
+    def _build_order_by(
+        params: TransactionSortParams,
+    ) -> list[UnaryExpression]:
+        """
+        Convert TransactionSortParams to SQLAlchemy order_by expressions.
+
+        Args:
+            params: Sort parameters with sort_by and sort_order
+
+        Returns:
+            List of SQLAlchemy order_by expressions
+        """
+        order_by: list[UnaryExpression] = []
+
+        # Get the model column from enum value
+        sort_column = getattr(Transaction, params.sort_by.value)
+
+        # Apply sort direction
+        if params.sort_order == SortOrder.ASC:
+            order_by.append(asc(sort_column))
+        else:
+            order_by.append(desc(sort_column))
+
+        # Add secondary sort by id for deterministic pagination
+        order_by.append(desc(Transaction.id))
+
+        return order_by
+
+    @staticmethod
+    def _build_load_relationships() -> list[_AbstractLoad]:
+        """
+        Build eager loading options for transaction queries.
+
+        Returns:
+            List of SQLAlchemy load options
+        """
+        return [
+            selectinload(Transaction.child_transactions),
+            selectinload(Transaction.card),
+        ]
+
+    async def list_for_user(
+        self,
+        user_id: uuid.UUID,
+        filter_params: TransactionFilterParams,
+        sort_params: TransactionSortParams,
+        pagination_params: PaginationParams,
+    ) -> tuple[list[Transaction], int]:
+        filters = self._build_filters(user_id=user_id, params=filter_params)
+        order_by = self._build_order_by(params=sort_params)
+        load_relationships = self._build_load_relationships()
+
+        return await self._list_and_count(
+            filters=filters,
+            order_by=order_by,
+            load_relationships=load_relationships,
+            offset=pagination_params.offset,
+            limit=pagination_params.page_size,
+        )
 
     async def get_by_id(self, transaction_id: uuid.UUID) -> Transaction | None:
         """
@@ -82,214 +208,6 @@ class TransactionRepository(BaseRepository[Transaction]):
 
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
-
-    async def get_by_account_id(
-        self,
-        account_id: uuid.UUID,
-        offset: int = 0,
-        limit: int = 20,
-    ) -> list[Transaction]:
-        """
-        Get all transactions for an account with pagination.
-
-        Args:
-            account_id: UUID of the account
-            offset: Number of records to skip (pagination)
-            limit: Maximum number of records to return
-
-        Returns:
-            List of Transaction instances ordered by date descending
-
-        Example:
-            transactions = await repo.get_by_account_id(
-                account_id=account.id,
-                skip=0,
-                limit=20,
-            )
-        """
-        query = (
-            select(Transaction)
-            .where(Transaction.account_id == account_id)
-            .options(
-                selectinload(Transaction.child_transactions),
-                selectinload(Transaction.card),
-            )
-            .order_by(
-                Transaction.transaction_date.desc(), Transaction.created_at.desc()
-            )
-            .offset(offset)
-            .limit(limit)
-        )
-        query = self._apply_soft_delete_filter(query)
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
-
-    async def count_by_account_id(self, account_id: uuid.UUID) -> int:
-        """
-        Count total transactions for an account.
-
-        Args:
-            account_id: UUID of the account
-
-        Returns:
-            Total count of non-deleted transactions
-
-        Example:
-            total = await repo.count_by_account_id(account.id)
-        """
-        query = (
-            select(func.count())
-            .select_from(Transaction)
-            .where(Transaction.account_id == account_id)
-        )
-        query = self._apply_soft_delete_filter(query)
-
-        result = await self.session.execute(query)
-        return result.scalar_one()
-
-    async def search_transactions(
-        self,
-        account_id: uuid.UUID,
-        date_from: date | None = None,
-        date_to: date | None = None,
-        amount_min: Decimal | None = None,
-        amount_max: Decimal | None = None,
-        description: str | None = None,
-        merchant: str | None = None,
-        transaction_type: TransactionType | None = None,
-        card_id: uuid.UUID | None = None,
-        card_type: CardType | None = None,
-        sort_by: str = "transaction_date",
-        sort_order: str = "desc",
-        offset: int = 0,
-        limit: int = 20,
-    ) -> tuple[list[Transaction], int]:
-        """
-        Advanced search with multiple filters and fuzzy text matching.
-
-        Uses PostgreSQL pg_trgm extension for fuzzy matching on merchant and description.
-        Similarity threshold: 0.3 (finds matches with ~70% similarity).
-
-        Args:
-            account_id: Account to search in
-            date_from: Filter transactions from this date (inclusive)
-            date_to: Filter transactions to this date (inclusive)
-            amount_min: Minimum transaction amount (inclusive)
-            amount_max: Maximum transaction amount (inclusive)
-            description: Fuzzy search on description (handles typos)
-            merchant: Fuzzy search on merchant (handles typos)
-            transaction_type: Filter by transaction type
-            card_id: Filter by specific card UUID
-            card_type: Filter by card type (credit_card or debit_card)
-            sort_by: Field to sort by (transaction_date, amount, description, created_at)
-            sort_order: Sort order (asc or desc)
-            offset: Number of records to skip (pagination)
-            limit: Maximum number of records to return (max 100)
-
-        Returns:
-            Tuple of (transactions, total_count)
-
-        Example:
-            # Search for groceries with fuzzy matching
-            transactions, total = await repo.search_transactions(
-                account_id=account.id,
-                description="groceris",  # Typo will still match "groceries"
-                amount_min=Decimal("10.00"),
-                amount_max=Decimal("100.00"),
-                sort_by="transaction_date",
-                sort_order="desc",
-                skip=0,
-                limit=20,
-            )
-        """
-        # Build base query
-        query = (
-            select(Transaction)
-            .where(Transaction.account_id == account_id)
-            .options(
-                selectinload(Transaction.child_transactions),
-                selectinload(Transaction.card),
-            )
-        )
-        query = self._apply_soft_delete_filter(query)
-
-        # Build filters
-        filters = []
-
-        # Date range filter
-        if date_from:
-            filters.append(Transaction.transaction_date >= date_from)
-        if date_to:
-            filters.append(Transaction.transaction_date <= date_to)
-
-        # Amount range filter
-        if amount_min is not None:
-            filters.append(Transaction.amount >= amount_min)
-        if amount_max is not None:
-            filters.append(Transaction.amount <= amount_max)
-
-        # Transaction type filter
-        if transaction_type:
-            filters.append(Transaction.transaction_type == transaction_type)
-
-        # Card ID filter
-        if card_id is not None:
-            filters.append(Transaction.card_id == card_id)
-
-        # Card type filter (requires join with Card table)
-        if card_type is not None:
-            query = query.join(Card, Transaction.card_id == Card.id).where(
-                Card.card_type == card_type
-            )
-
-        # Fuzzy text search on description (pg_trgm similarity)
-        if description:
-            # Use trigram similarity with threshold 0.3 (~70% match)
-            filters.append(func.similarity(Transaction.description, description) > 0.3)
-
-        # Fuzzy text search on merchant (pg_trgm similarity)
-        if merchant:
-            filters.append(func.similarity(Transaction.merchant, merchant) > 0.3)
-
-        # Apply all filters
-        if filters:
-            query = query.where(and_(*filters))
-
-        # Count total results (before pagination)
-        count_query = select(func.count()).select_from(query.subquery())
-        count_result = await self.session.execute(count_query)
-        total_count = count_result.scalar_one()
-
-        # Apply sorting
-        if sort_by == "transaction_date":
-            order_col = Transaction.transaction_date
-        elif sort_by == "amount":
-            order_col = Transaction.amount
-        elif sort_by == "description":
-            order_col = Transaction.description
-        elif sort_by == "created_at":
-            order_col = Transaction.created_at
-        else:
-            # Default to transaction_date
-            order_col = Transaction.transaction_date
-
-        if sort_order == "asc":
-            query = query.order_by(order_col.asc())
-        else:
-            query = query.order_by(order_col.desc())
-
-        # Add secondary sort by created_at for consistent ordering
-        query = query.order_by(Transaction.created_at.desc())
-
-        # Apply pagination
-        query = query.offset(offset).limit(min(limit, 100))  # Cap at 100
-
-        # Execute query
-        result = await self.session.execute(query)
-        transactions = list(result.scalars().all())
-
-        return transactions, total_count
 
     async def get_children(self, parent_id: uuid.UUID) -> list[Transaction]:
         """

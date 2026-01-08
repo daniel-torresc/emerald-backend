@@ -7,14 +7,13 @@ All queries are scoped to user ownership via account relationships.
 
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import UnaryExpression, asc, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from models.account import Account
-from models.card import Card
-from models.enums import CardType
-from repositories.base import BaseRepository
+from models import Account, Card
+from schemas import CardFilterParams, CardSortParams, PaginationParams, SortOrder
+from .base import BaseRepository
 
 
 class CardRepository(BaseRepository[Card]):
@@ -37,23 +36,25 @@ class CardRepository(BaseRepository[Card]):
         """
         super().__init__(Card, session)
 
-    async def search_by_user(
+    # ========================================================================
+    # USER PARAMS METHODS
+    # ========================================================================
+
+    async def list_for_user(
         self,
         user_id: uuid.UUID,
-        card_type: CardType | None = None,
-        account_id: uuid.UUID | None = None,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> list[Card]:
+        filter_params: CardFilterParams,
+        sort_params: CardSortParams,
+        pagination_params: PaginationParams,
+    ) -> tuple[list[Card], int]:
         """
         Get all cards for a user (via account ownership).
 
         Args:
             user_id: UUID of the user who owns the accounts
-            card_type: Optional filter by card type (credit_card or debit_card)
-            account_id: Optional filter by specific account
-            offset: Number of records to skip for pagination (default: 0)
-            limit: Maximum number of records to return (default: 100)
+            filter_params:
+            sort_params:
+            pagination_params:
 
         Returns:
             List of Card objects ordered by created_at descending
@@ -73,73 +74,42 @@ class CardRepository(BaseRepository[Card]):
                 limit=20
             )
         """
-        query = (
-            select(Card)
-            .join(Account, Card.account_id == Account.id)
-            .where(Account.user_id == user_id)
-            .options(
-                selectinload(Card.account),
-                selectinload(Card.financial_institution),
-            )
+        filters = [Card.account.has(Account.user_id == user_id)]
+
+        # Card type filter
+        if filter_params.card_type is not None:
+            filters.append(Card.card_type == filter_params.card_type)
+
+        # Account filter
+        if filter_params.account_id is not None:
+            filters.append(Card.account_id == filter_params.account_id)
+
+        order_by: list[UnaryExpression] = []
+
+        # Get the model column from enum value
+        sort_column = getattr(Card, sort_params.sort_by.value)
+
+        # Apply sort direction
+        if sort_params.sort_order == SortOrder.ASC:
+            order_by.append(asc(sort_column))
+        else:
+            order_by.append(desc(sort_column))
+
+        # Add secondary sort by id for deterministic pagination
+        order_by.append(desc(Card.id))
+
+        load_relationships = [
+            selectinload(Card.account),
+            selectinload(Card.financial_institution),
+        ]
+
+        return await self._list_and_count(
+            filters=filters,
+            order_by=order_by,
+            load_relationships=load_relationships,
+            offset=pagination_params.offset,
+            limit=pagination_params.page_size,
         )
-        query = self._apply_soft_delete_filter(query)
-
-        # Apply optional filters
-        if card_type is not None:
-            query = query.where(Card.card_type == card_type)
-
-        if account_id is not None:
-            query = query.where(Card.account_id == account_id)
-
-        # Order by created_at desc
-        query = query.order_by(Card.created_at.desc())
-
-        # Apply pagination
-        query = query.offset(offset).limit(limit)
-
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
-
-    async def search_count_by_user(
-        self,
-        user_id: uuid.UUID,
-        card_type: CardType | None = None,
-        account_id: uuid.UUID | None = None,
-    ) -> int:
-        """
-        Count cards for a user (via account ownership).
-
-        Args:
-            user_id: UUID of the user who owns the accounts
-            card_type: Optional filter by card type
-            account_id: Optional filter by specific account
-
-        Returns:
-            Total number of cards matching criteria
-
-        Example:
-            total_credit_cards = await repo.count_by_user(
-                user_id=user.id,
-                card_type=CardType.credit_card
-            )
-        """
-        query = (
-            select(func.count())
-            .select_from(Card)
-            .join(Account, Card.account_id == Account.id)
-            .where(Account.user_id == user_id)
-        )
-        query = self._apply_soft_delete_filter(query)
-
-        # Apply optional card type filter
-        if card_type is not None:
-            query = query.where(Card.card_type == card_type)
-
-        if account_id is not None:
-            query = query.where(Card.account_id == account_id)
-
-        result = await self.session.execute(query)
-        return result.scalar_one()
 
     async def get_by_id_for_user(
         self,

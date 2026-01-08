@@ -10,13 +10,15 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
-from api.dependencies import AdminUser, AuditServiceDep, CurrentUser
-from schemas.audit import AuditLogFilterParams, AuditLogResponse
-from schemas.common import (
+from schemas import (
+    AuditLogFilterParams,
+    AuditLogListItem,
+    AuditLogSortParams,
     PaginatedResponse,
     PaginationMeta,
     PaginationParams,
 )
+from ..dependencies import AdminUser, AuditServiceDep
 
 logger = logging.getLogger(__name__)
 
@@ -24,74 +26,8 @@ router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
 
 @router.get(
-    "/users/me",
-    response_model=PaginatedResponse[AuditLogResponse],
-    summary="Get current user's audit logs",
-    description="Get audit logs for the currently authenticated user (GDPR right to access)",
-)
-async def list_user_audit_logs(
-    request: Request,
-    current_user: CurrentUser,
-    audit_service: AuditServiceDep,
-    filters: AuditLogFilterParams = Depends(),
-    pagination: PaginationParams = Depends(),
-) -> PaginatedResponse[AuditLogResponse]:
-    """
-    Get audit logs for current user.
-
-    This endpoint implements GDPR right to access:
-    - Users can view all actions performed on their account
-    - Users can see who accessed their data and when
-
-    Query parameters:
-        - page: Page number (default: 1)
-        - page_size: Items per page (default: 20, max: 100)
-        - action: Filter by action type (e.g., "LOGIN", "UPDATE")
-        - entity_type: Filter by entity type (e.g., "user", "transaction")
-        - status: Filter by status ("SUCCESS", "FAILURE")
-        - start_date: Filter logs after this date
-        - end_date: Filter logs before this date
-
-    Returns:
-        PaginatedResponse with list of audit logs and pagination metadata
-
-    Requires:
-        - Valid access token
-        - Active user account
-    """
-
-    # Get logs and total count
-    logs, total = await audit_service.get_user_audit_logs(
-        user_id=current_user.id,
-        action=filters.action,
-        entity_type=filters.entity_type,
-        status=filters.status,
-        start_date=filters.start_date,
-        end_date=filters.end_date,
-        offset=pagination.offset,
-        limit=pagination.page_size,
-    )
-
-    # Convert to response schemas
-    log_responses = [AuditLogResponse.model_validate(log) for log in logs]
-
-    # Calculate total pages
-    total_pages = PaginationParams.calculate_total_pages(total, pagination.page_size)
-
-    return PaginatedResponse(
-        data=log_responses,
-        meta=PaginationMeta(
-            total=total,
-            page=pagination.page,
-            page_size=pagination.page_size,
-            total_pages=total_pages,
-        ),
-    )
-
-
-@router.get(
     "/users",
-    response_model=PaginatedResponse[AuditLogResponse],
+    response_model=PaginatedResponse[AuditLogListItem],
     summary="Get all audit logs",
     description="Get all audit logs with filtering (admin only)",
 )
@@ -99,9 +35,10 @@ async def get_all_audit_logs(
     request: Request,
     current_user: AdminUser,
     audit_service: AuditServiceDep,
-    pagination: PaginationParams = Depends(),
     filters: AuditLogFilterParams = Depends(),
-) -> PaginatedResponse[AuditLogResponse]:
+    pagination: PaginationParams = Depends(),
+    sorting: AuditLogSortParams = Depends(),
+) -> PaginatedResponse[AuditLogListItem]:
     """
     Get all audit logs with filtering (admin only).
 
@@ -127,28 +64,17 @@ async def get_all_audit_logs(
     """
 
     # Get logs and total count
-    logs, total = await audit_service.get_all_audit_logs(
-        action=filters.action,
-        entity_type=filters.entity_type,
-        status=filters.status,
-        start_date=filters.start_date,
-        end_date=filters.end_date,
-        offset=pagination.offset,
-        limit=pagination.page_size,
+    logs, count = await audit_service.list_user_audit_logs(
+        filters=filters,
+        pagination=pagination,
+        sorting=sorting,
     )
 
-    # Convert to response schemas
-    log_responses = [AuditLogResponse.model_validate(log) for log in logs]
-
-    # Calculate total pages
-    total_pages = PaginationParams.calculate_total_pages(total, pagination.page_size)
-
     return PaginatedResponse(
-        data=log_responses,
+        data=[AuditLogListItem.model_validate(log) for log in logs],
         meta=PaginationMeta(
-            total=total,
+            total=count,
             page=pagination.page,
             page_size=pagination.page_size,
-            total_pages=total_pages,
         ),
     )

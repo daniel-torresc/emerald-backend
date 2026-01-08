@@ -14,15 +14,18 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from api.dependencies import AccountServiceDep, CurrentUser
-from schemas.account import (
+from schemas import (
     AccountCreate,
     AccountFilterParams,
     AccountListItem,
     AccountResponse,
+    AccountSortParams,
     AccountUpdate,
+    PaginatedResponse,
+    PaginationMeta,
+    PaginationParams,
 )
-from schemas.common import PaginatedResponse, PaginationParams
+from ..dependencies import AccountServiceDep, CurrentUser
 
 logger = logging.getLogger(__name__)
 
@@ -100,12 +103,17 @@ async def create_account(
         - 400 Bad Request: If account name exists, currency invalid, or institution invalid/inactive
         - 422 Unprocessable Entity: If validation fails (invalid IBAN, color format, etc.)
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     account = await account_service.create_account(
         user=current_user,
         data=data,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return AccountResponse.model_validate(account)
@@ -158,6 +166,7 @@ async def list_accounts(
     account_service: AccountServiceDep,
     filters: AccountFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
+    sorting: AccountSortParams = Depends(),
 ) -> PaginatedResponse[AccountListItem]:
     """
     List user's accounts with pagination and filtering.
@@ -175,11 +184,20 @@ async def list_accounts(
         - Valid access token
         - Active user account
     """
-    return await account_service.list_user_accounts(
-        user_id=current_user.id,
+    accounts, count = await account_service.list_user_accounts(
         current_user=current_user,
-        pagination=pagination,
         filters=filters,
+        pagination=pagination,
+        sorting=sorting,
+    )
+
+    return PaginatedResponse(
+        data=[AccountListItem.model_validate(a) for a in accounts],
+        meta=PaginationMeta(
+            total=count,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        ),
     )
 
 
@@ -241,16 +259,23 @@ async def get_account(
     Raises:
         - 404 Not Found: If account doesn't exist or user has no access
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     account = await account_service.get_account(
         account_id=account_id,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return AccountResponse.model_validate(account)
 
 
-@router.put(
+@router.patch(
     "/{account_id}",
     response_model=AccountResponse,
     summary="Update account",
@@ -312,13 +337,18 @@ async def update_account(
         - 404 Not Found: If account doesn't exist or user has no access
         - 422 Unprocessable Entity: If validation fails
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     account = await account_service.update_account(
         account_id=account_id,
         data=data,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
 
     return AccountResponse.model_validate(account)
@@ -370,10 +400,15 @@ async def delete_account(
     Raises:
         - 404 Not Found: If account doesn't exist or user has no access
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     await account_service.delete_account(
         account_id=account_id,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )

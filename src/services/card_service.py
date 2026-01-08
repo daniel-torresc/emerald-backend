@@ -10,22 +10,20 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AuthorizationError, NotFoundError
-from models import AuditAction, AuditStatus, Card
-from models.user import User
-from repositories.account_repository import AccountRepository
-from repositories.card_repository import CardRepository
-from repositories.financial_institution_repository import (
+from models import AuditAction, AuditStatus, Card, User
+from repositories import (
+    AccountRepository,
+    CardRepository,
     FinancialInstitutionRepository,
 )
-from schemas.card import (
+from schemas import (
     CardCreate,
     CardFilterParams,
-    CardListItem,
-    CardResponse,
+    CardSortParams,
     CardUpdate,
+    PaginationParams,
 )
-from schemas.common import PaginatedResponse, PaginationMeta, PaginationParams
-from services.audit_service import AuditService
+from .audit_service import AuditService
 
 
 class CardService:
@@ -57,7 +55,7 @@ class CardService:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> CardResponse:
+    ) -> Card:
         """
         Create a new card linked to user's account.
 
@@ -69,7 +67,7 @@ class CardService:
             user_agent: Optional user agent for audit log
 
         Returns:
-            CardResponse with created card details
+            Card with created card details
 
         Raises:
             NotFoundError: If account or financial institution not found
@@ -118,7 +116,7 @@ class CardService:
             created_by=current_user.id,
             updated_by=current_user.id,
         )
-        card = await self.card_repo.add(card)
+        card = await self.card_repo.create(card)
         await self.session.commit()
 
         # 4. Audit log
@@ -133,13 +131,13 @@ class CardService:
             request_id=request_id,
         )
 
-        return CardResponse.model_validate(card)
+        return card
 
     async def get_card(
         self,
         card_id: uuid.UUID,
         current_user: User,
-    ) -> CardResponse:
+    ) -> Card:
         """
         Get a card by ID (must own the account).
 
@@ -163,14 +161,15 @@ class CardService:
         if not card:
             raise NotFoundError("Card")
 
-        return CardResponse.model_validate(card)
+        return card
 
-    async def list_cards(
+    async def list_user_cards(
         self,
         current_user: User,
-        pagination: PaginationParams,
         filters: CardFilterParams,
-    ) -> PaginatedResponse[CardListItem]:
+        sorting: CardSortParams,
+        pagination: PaginationParams,
+    ) -> tuple[list[Card], int]:
         """
         List all cards for the current user with pagination.
 
@@ -178,6 +177,7 @@ class CardService:
             current_user: Authenticated user
             pagination: Pagination parameters (page, page_size)
             filters: Filter parameters (card_type, account_id)
+            sorting: Sort parameters (sort_by, sort_order)
 
         Returns:
             PaginatedResponse with CardListItem objects and metadata
@@ -186,10 +186,11 @@ class CardService:
             AuthorizationError: If filtering by account user doesn't own
 
         Example:
-            response = await service.list_cards_paginated(
+            response = await service.list_cards(
                 current_user=user,
                 pagination=PaginationParams(page=1, page_size=20),
-                filters=CardFilterParams(card_type=CardType.credit_card)
+                filters=CardFilterParams(card_type=CardType.credit_card),
+                sorting=CardSortParams()
             )
         """
         # If filtering by account, verify ownership
@@ -198,37 +199,14 @@ class CardService:
             if not account or account.user_id != current_user.id:
                 raise AuthorizationError("Account does not belong to you")
 
-        # Get cards
-        cards = await self.card_repo.search_by_user(
+        user_cards = await self.card_repo.list_for_user(
             user_id=current_user.id,
-            card_type=filters.card_type,
-            account_id=filters.account_id,
-            offset=pagination.offset,
-            limit=pagination.page_size,
+            filter_params=filters,
+            pagination_params=pagination,
+            sort_params=sorting,
         )
 
-        total_count = await self.card_repo.search_count_by_user(
-            user_id=current_user.id,
-            card_type=filters.card_type,
-            account_id=filters.account_id,
-        )
-
-        # Convert to CardListItem
-        items = [CardListItem.model_validate(card) for card in cards]
-
-        # Calculate total pages
-        total_pages = PaginationParams.calculate_total_pages(
-            total_count, pagination.page_size
-        )
-
-        metadata = PaginationMeta(
-            page=pagination.page,
-            page_size=pagination.page_size,
-            total=total_count,
-            total_pages=total_pages,
-        )
-
-        return PaginatedResponse(data=items, meta=metadata)
+        return user_cards
 
     async def update_card(
         self,
@@ -238,7 +216,7 @@ class CardService:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> CardResponse:
+    ) -> Card:
         """
         Update an existing card.
 
@@ -288,7 +266,7 @@ class CardService:
         update_dict = data.model_dump(exclude_unset=True)
 
         if not update_dict:
-            return CardResponse.model_validate(card)  # Nothing to update
+            return card
 
         # 4. Capture old values for audit (handle enum safely)
         old_card_network = card.card_network
@@ -349,7 +327,7 @@ class CardService:
         # 9. Commit transaction
         await self.session.commit()
 
-        return CardResponse.model_validate(card)
+        return card
 
     async def delete_card(
         self,

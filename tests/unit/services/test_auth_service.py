@@ -17,9 +17,8 @@ from core.exceptions import (
     InvalidCredentialsError,
     InvalidTokenError,
 )
-from models.refresh_token import RefreshToken
-from models.user import User
-from schemas.user import UserCreate
+from models import RefreshToken, User
+from schemas import UserCreate
 from services.auth_service import AuthService
 
 
@@ -700,8 +699,6 @@ class TestGenerateTokens:
         # Execute
         tokens = await auth_service._generate_tokens(
             user=sample_user,
-            ip_address="192.168.1.1",
-            user_agent="Mozilla/5.0",
         )
 
         # Verify

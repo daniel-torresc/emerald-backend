@@ -13,26 +13,18 @@ from datetime import datetime
 from enum import Enum
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from .enums import SortOrder
 
 # Type variable for generic paginated responses
 DataT = TypeVar("DataT")
 
-
-class SortOrder(str, Enum):
-    """
-    Sort direction for list queries.
-
-    Values:
-        ASC: Ascending order (A-Z, 0-9, oldest first)
-        DESC: Descending order (Z-A, 9-0, newest first)
-    """
-
-    ASC = "asc"
-    DESC = "desc"
+# Type variable for the sort enum
+SortFieldType = TypeVar("SortFieldType", bound=Enum)
 
 
-class SortParams(BaseModel):
+class SortParams(BaseModel, Generic[SortFieldType]):
     """
     Common sorting parameters for list endpoints.
 
@@ -41,17 +33,15 @@ class SortParams(BaseModel):
     SortField enum in the route layer.
 
     Attributes:
-        sort_by: Field name to sort by (validated against entity SortField enum)
         sort_order: Sort direction (ascending or descending)
     """
 
-    sort_by: str | None = Field(None, description="Field to sort by")
+    sort_by: SortFieldType = Field(description="Field to sort by")
     sort_order: SortOrder = Field(SortOrder.DESC, description="Sort direction")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "sort_by": "created_at",
                 "sort_order": "desc",
             }
         }
@@ -71,14 +61,6 @@ class SearchResult(BaseModel, Generic[DataT]):
     Attributes:
         items: List of model instances for current page
         total: Total count of items matching filters (without pagination)
-
-    Example:
-        >>> result = await service.list_users(filters, pagination, sorting)
-        >>> # result is SearchResult[User]
-        >>> response = PaginatedResponse(
-        ...     data=[UserListItem.model_validate(u) for u in result.items],
-        ...     meta=PaginationMeta(total=result.total, ...)
-        ... )
     """
 
     items: list[DataT]
@@ -113,14 +95,6 @@ class PaginationParams(BaseModel):
         }
     )
 
-    @field_validator("page_size")
-    @classmethod
-    def validate_page_size(cls, value: int) -> int:
-        """Ensure page_size doesn't exceed maximum allowed value."""
-        if value > 100:
-            return 100
-        return value
-
     @property
     def offset(self) -> int:
         """
@@ -139,28 +113,6 @@ class PaginationParams(BaseModel):
         """
         return (self.page - 1) * self.page_size
 
-    @staticmethod
-    def calculate_total_pages(total: int, page_size: int) -> int:
-        """
-        Calculate total pages from total count.
-
-        Args:
-            total: Total number of items
-            page_size: Number of items per page
-
-        Returns:
-            Total number of pages (0 if no items)
-
-        Example:
-            >>> PaginationParams.calculate_total_pages(100, 20)
-            5
-            >>> PaginationParams.calculate_total_pages(95, 20)
-            5
-            >>> PaginationParams.calculate_total_pages(0, 20)
-            0
-        """
-        return (total + page_size - 1) // page_size if total > 0 else 0
-
 
 class PaginationMeta(BaseModel):
     """
@@ -170,13 +122,31 @@ class PaginationMeta(BaseModel):
         total: Total number of items across all pages
         page: Current page number
         page_size: Number of items per page
-        total_pages: Total number of pages
     """
 
     total: int = Field(description="Total number of items")
     page: int = Field(description="Current page number")
     page_size: int = Field(description="Number of items per page")
-    total_pages: int = Field(description="Total number of pages")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def total_pages(self) -> int:
+        """Calculate total number of pages."""
+        return (
+            (self.total + self.page_size - 1) // self.page_size if self.total > 0 else 0
+        )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def has_next(self) -> bool:
+        """Whether there is a next page."""
+        return self.page < self.total_pages
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def has_previous(self) -> bool:
+        """Whether there is a previous page."""
+        return self.page > 1
 
 
 class PaginatedResponse(BaseModel, Generic[DataT]):

@@ -7,7 +7,9 @@ This module provides:
 - JWT token response models
 """
 
-from pydantic import BaseModel, EmailStr, Field
+from datetime import UTC, datetime
+
+from pydantic import BaseModel, EmailStr, Field, computed_field
 
 
 class LoginRequest(BaseModel):
@@ -21,27 +23,6 @@ class LoginRequest(BaseModel):
 
     email: EmailStr = Field(description="User's email address")
     password: str = Field(description="User's password")
-
-
-class TokenResponse(BaseModel):
-    """
-    Schema for authentication token response.
-
-    Returned after successful login or registration.
-
-    Attributes:
-        access_token: JWT access token (short-lived, 15 minutes)
-        refresh_token: JWT refresh token (long-lived, 7 days)
-        token_type: Type of token (always "bearer")
-        expires_in: Access token expiration time in seconds
-    """
-
-    access_token: str = Field(description="JWT access token")
-    refresh_token: str = Field(description="JWT refresh token")
-    token_type: str = Field(default="bearer", description="Token type")
-    expires_in: int = Field(
-        description="Access token expiration time in seconds (900 = 15 minutes)"
-    )
 
 
 class RefreshTokenRequest(BaseModel):
@@ -65,15 +46,23 @@ class AccessTokenResponse(BaseModel):
         access_token: New JWT access token
         refresh_token: New JWT refresh token (rotated)
         token_type: Type of token (always "bearer")
-        expires_in: Access token expiration time in seconds
+        expires_at: Access token expiration datetime
     """
 
     access_token: str = Field(description="New JWT access token")
     refresh_token: str = Field(description="New JWT refresh token (rotated)")
     token_type: str = Field(default="bearer", description="Token type")
-    expires_in: int = Field(
-        description="Access token expiration time in seconds (900 = 15 minutes)"
+    expires_at: datetime = Field(
+        description="Access token expiration datetime", exclude=True
     )
+
+    @computed_field
+    @property
+    def expires_in(self) -> int:
+        """Calculate seconds until expiration from expires_at."""
+        now = datetime.now(UTC)
+        delta = self.expires_at - now
+        return int(delta.total_seconds())
 
 
 class LogoutRequest(BaseModel):

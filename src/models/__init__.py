@@ -5,23 +5,25 @@ This module exports all SQLAlchemy models and the declarative base.
 Import models from this module to ensure proper initialization.
 """
 
-from models.account import Account, AccountShare
-from models.account_type import AccountType
-from models.audit_log import AuditLog
-from models.base import Base
-from models.card import Card
-from models.enums import (
+from .account import Account
+from .account_share import AccountShare
+from .account_type import AccountType
+from .audit_log import AuditLog
+from .base import Base
+from .card import Card
+from .enums import (
     AuditAction,
     AuditStatus,
     CardType,
+    InstitutionType,
     PermissionLevel,
     TransactionType,
 )
-from models.financial_institution import FinancialInstitution
-from models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
-from models.refresh_token import RefreshToken
-from models.transaction import Transaction
-from models.user import User
+from .financial_institution import FinancialInstitution
+from .mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
+from .refresh_token import RefreshToken
+from .transaction import Transaction
+from .user import User
 
 __all__ = [
     # Base
@@ -51,4 +53,5 @@ __all__ = [
     "TransactionType",
     # Master data models
     "FinancialInstitution",
+    "InstitutionType",
 ]

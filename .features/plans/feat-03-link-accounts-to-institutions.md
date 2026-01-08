@@ -1264,7 +1264,7 @@ tests/
        Returns:
            List of AccountListItem with institution details for UI
        """
-       accounts = await account_service.list_accounts(
+       accounts = await account_service.list_user_accounts(
            user_id=current_user.id,
            current_user=current_user,
            skip=skip,

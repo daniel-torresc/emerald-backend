@@ -48,9 +48,6 @@ class Base(DeclarativeBase):
         index=True,
     )
 
-    # Type annotation for repr
-    __name__: str
-
     def __repr__(self) -> str:
         """
         String representation of model instance.

@@ -14,14 +14,12 @@ Architecture:
 """
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from models.base import Base
-from models.mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
-
+from .base import Base
+from .mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 
 # =============================================================================
 # User Model
@@ -80,7 +78,7 @@ class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     )
 
     # Profile fields
-    full_name: Mapped[Optional[str]] = mapped_column(
+    full_name: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
     )
@@ -94,7 +92,7 @@ class User(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     )
 
     # Activity tracking
-    last_login_at: Mapped[Optional[datetime]] = mapped_column(
+    last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

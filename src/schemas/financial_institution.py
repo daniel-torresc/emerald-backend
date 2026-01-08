@@ -11,28 +11,33 @@ This module provides:
 
 import uuid
 from datetime import datetime
-from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic_extra_types.country import CountryAlpha2
 from pydantic_extra_types.routing_number import ABARoutingNumber
 from schwifty import BIC
 
-from models.enums import InstitutionType
+from models import InstitutionType
+from .common import SortOrder, SortParams
+from .enums import FinancialInstitutionSortField
 
 
-class FinancialInstitutionSortField(str, Enum):
+class FinancialInstitutionSortParams(SortParams[FinancialInstitutionSortField]):
     """
-    Allowed sort fields for financial institution list queries.
+    Sorting parameters for financial institution list queries.
 
-    Whitelists fields that can be used for sorting to prevent SQL injection.
-    Values must match SQLAlchemy model attribute names exactly.
+    Provides type-safe sorting with validation at schema level.
+    Default sort: name ascending (alphabetical order).
     """
 
-    NAME = "name"
-    SHORT_NAME = "short_name"
-    COUNTRY_CODE = "country_code"
-    CREATED_AT = "created_at"
+    sort_by: FinancialInstitutionSortField = Field(
+        default=FinancialInstitutionSortField.NAME,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.ASC,
+        description="Sort direction",
+    )
 
 
 class FinancialInstitutionBase(BaseModel):

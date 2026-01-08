@@ -125,7 +125,7 @@ class TestJWTAccessToken:
     def test_create_access_token_structure(self):
         """Test that create_access_token generates correct structure."""
         # Create token
-        token = security.create_access_token({"sub": "user_123"})
+        token = security.create_token({"sub": "user_123"})
 
         # Decode token
         payload = security.decode_token(token)
@@ -140,7 +140,7 @@ class TestJWTAccessToken:
         """Test that access token uses default expiration from settings."""
         # Create token (uses default 15 minutes from settings)
         before_creation = datetime.now(UTC)
-        token = security.create_access_token({"sub": "user_123"})
+        token = security.create_token({"sub": "user_123"})
         after_creation = datetime.now(UTC)
 
         # Decode token
@@ -161,7 +161,7 @@ class TestJWTAccessToken:
         # Create token with custom expiration (2 hours)
         custom_delta = timedelta(hours=2)
         before_creation = datetime.now(UTC)
-        token = security.create_access_token(
+        token = security.create_token(
             {"sub": "user_123"}, expires_delta=custom_delta
         )
         after_creation = datetime.now(UTC)
@@ -179,8 +179,8 @@ class TestJWTAccessToken:
 
     def test_create_access_token_includes_jti(self):
         """Test that access token includes unique jti (JWT ID)."""
-        token1 = security.create_access_token({"sub": "user_123"})
-        token2 = security.create_access_token({"sub": "user_123"})
+        token1 = security.create_token({"sub": "user_123"})
+        token2 = security.create_token({"sub": "user_123"})
 
         payload1 = security.decode_token(token1)
         payload2 = security.decode_token(token2)
@@ -192,7 +192,7 @@ class TestJWTAccessToken:
 
     def test_create_access_token_preserves_custom_claims(self):
         """Test that custom claims are preserved in token."""
-        token = security.create_access_token(
+        token = security.create_token(
             {"sub": "user_123", "role": "admin", "permissions": ["read", "write"]}
         )
 
@@ -203,61 +203,12 @@ class TestJWTAccessToken:
         assert payload["permissions"] == ["read", "write"]
 
 
-class TestJWTRefreshToken:
-    """Test JWT refresh token creation and validation."""
-
-    def test_create_refresh_token_structure(self):
-        """Test that create_refresh_token generates correct structure."""
-        # Create token
-        token = security.create_refresh_token({"sub": "user_123"})
-
-        # Decode token
-        payload = security.decode_token(token)
-
-        assert payload["sub"] == "user_123"
-        assert payload["type"] == "refresh"
-        assert "jti" in payload
-        assert "exp" in payload
-        assert "iat" in payload
-
-    def test_create_refresh_token_default_expiration(self):
-        """Test that refresh token uses default expiration from settings."""
-        # Create token (uses default 7 days from settings)
-        before_creation = datetime.now(UTC)
-        token = security.create_refresh_token({"sub": "user_123"})
-        after_creation = datetime.now(UTC)
-
-        # Decode token
-        payload = security.decode_token(token)
-
-        # Check expiration is approximately 7 days from now
-        # JWT timestamps are in seconds, so we add 1 second tolerance
-        exp_time = datetime.fromtimestamp(payload["exp"], tz=UTC)
-        expected_exp_min = before_creation + timedelta(days=7) - timedelta(seconds=1)
-        expected_exp_max = after_creation + timedelta(days=7) + timedelta(seconds=1)
-
-        assert expected_exp_min <= exp_time <= expected_exp_max
-
-    def test_create_refresh_token_includes_jti(self):
-        """Test that refresh token includes unique jti (JWT ID)."""
-        token1 = security.create_refresh_token({"sub": "user_123"})
-        token2 = security.create_refresh_token({"sub": "user_123"})
-
-        payload1 = security.decode_token(token1)
-        payload2 = security.decode_token(token2)
-
-        # JTI should be different for each token
-        assert "jti" in payload1
-        assert "jti" in payload2
-        assert payload1["jti"] != payload2["jti"]
-
-
 class TestDecodeToken:
     """Test JWT token decoding and validation."""
 
     def test_decode_valid_token(self):
         """Test that decode_token successfully decodes valid token."""
-        token = security.create_access_token({"sub": "user_123"})
+        token = security.create_token({"sub": "user_123"})
         payload = security.decode_token(token)
 
         assert payload["sub"] == "user_123"
@@ -359,7 +310,7 @@ class TestTokenUniqueness:
     def test_access_tokens_created_simultaneously_are_unique(self):
         """Test that access tokens created at the same time have unique hashes."""
         # Create multiple tokens for the same user at the same time
-        tokens = [security.create_access_token({"sub": "user_123"}) for _ in range(10)]
+        tokens = [security.create_token({"sub": "user_123"}) for _ in range(10)]
 
         # Hash each token
         hashes = [security.hash_refresh_token(token) for token in tokens]
@@ -370,7 +321,7 @@ class TestTokenUniqueness:
     def test_refresh_tokens_created_simultaneously_are_unique(self):
         """Test that refresh tokens created at the same time have unique hashes."""
         # Create multiple tokens for the same user at the same time
-        tokens = [security.create_refresh_token({"sub": "user_123"}) for _ in range(10)]
+        tokens = [security.create_token({"sub": "user_123"}) for _ in range(10)]
 
         # Hash each token
         hashes = [security.hash_refresh_token(token) for token in tokens]

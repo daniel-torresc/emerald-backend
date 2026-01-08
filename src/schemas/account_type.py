@@ -218,6 +218,25 @@ class AccountTypeResponse(AccountTypeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AccountTypeEmbedded(BaseModel):
+    """
+    Minimal account type representation for embedding.
+
+    Includes only essential fields for list display to reduce payload size.
+
+    Attributes:
+        id: Unique identifier
+        key: Unique key identifier
+        name: Display name
+    """
+
+    id: uuid.UUID = Field(description="Unique identifier")
+    key: str = Field(description="Unique key identifier")
+    name: str = Field(description="Display name")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AccountTypeListItem(BaseModel):
     """
     Schema for account type list item.

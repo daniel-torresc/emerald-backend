@@ -12,7 +12,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from models.enums import PermissionLevel
+from models import PermissionLevel
+from .user import UserEmbedded
 
 
 class AccountShareCreate(BaseModel):
@@ -68,25 +69,6 @@ class AccountShareUpdate(BaseModel):
     )
 
 
-class UserSummary(BaseModel):
-    """
-    Summary of user information for share responses.
-
-    Attributes:
-        id: User UUID
-        username: Username
-        email: Email address
-        full_name: Full name
-    """
-
-    id: uuid.UUID = Field(description="User unique identifier")
-    username: str = Field(description="Username")
-    email: str = Field(description="Email address")
-    full_name: str | None = Field(description="Full name (optional)")
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class AccountShareResponse(BaseModel):
     """
     Schema for account share response.
@@ -109,7 +91,7 @@ class AccountShareResponse(BaseModel):
     permission_level: PermissionLevel = Field(description="Permission level granted")
     created_at: datetime = Field(description="When share was created")
     updated_at: datetime = Field(description="When share was last updated")
-    user: UserSummary = Field(description="User details")
+    user: UserEmbedded = Field(description="User details")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -147,9 +129,8 @@ class AccountShareListItem(BaseModel):
     """
 
     id: uuid.UUID
-    user_id: uuid.UUID
     permission_level: PermissionLevel
     created_at: datetime
-    user: UserSummary
+    user: UserEmbedded
 
     model_config = ConfigDict(from_attributes=True)

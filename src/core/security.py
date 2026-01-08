@@ -13,7 +13,7 @@ import logging
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal, Union
 
 from argon2 import PasswordHasher
 from argon2.exceptions import (
@@ -153,9 +153,10 @@ TOKEN_TYPE_ACCESS = "access"
 TOKEN_TYPE_REFRESH = "refresh"
 
 
-def create_access_token(
+def create_token(
     data: dict[str, Any],
-    expires_delta: timedelta | None = None,
+    expires_delta: timedelta,
+    token_type: Union[TOKEN_TYPE_REFRESH, TOKEN_TYPE_ACCESS],
 ) -> str:
     """
     Create a JWT access token.
@@ -168,79 +169,25 @@ def create_access_token(
               Must contain 'sub' (subject, typically user_id)
         expires_delta: Optional custom expiration time. If None,
                       uses settings.access_token_expire_minutes
+        token_type: Token type to use
 
     Returns:
         Encoded JWT token string
 
     Example:
-        >>> token = create_access_token({"sub": "user_123", "role": "admin"})
+        >>> token = create_token({"sub": "user_123", "role": "admin"})
     """
     to_encode = data.copy()
 
     # Set expiration time
-    if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
-    else:
-        expire = datetime.now(UTC) + timedelta(
-            minutes=settings.access_token_expire_minutes
-        )
+    expires_at = datetime.now(UTC) + expires_delta
 
     to_encode.update(
         {
-            "exp": expire,
+            "exp": expires_at,
             "iat": datetime.now(UTC),
-            "type": TOKEN_TYPE_ACCESS,
+            "type": token_type,
             "jti": str(uuid.uuid4()),  # Unique JWT ID to ensure token uniqueness
-        }
-    )
-
-    encoded_jwt = jwt.encode(
-        to_encode,
-        settings.secret_key,
-        algorithm=ALGORITHM,
-    )
-
-    return encoded_jwt
-
-
-def create_refresh_token(
-    data: dict[str, Any],
-    expires_delta: timedelta | None = None,
-) -> str:
-    """
-    Create a JWT refresh token.
-
-    Refresh tokens are long-lived (default: 7 days) and used to issue
-    new access tokens. They are rotated on every use for security.
-
-    Args:
-        data: Dictionary of claims to encode in the token
-              Must contain 'sub' (subject, typically user_id)
-        expires_delta: Optional custom expiration time. If None,
-                      uses settings.refresh_token_expire_days
-
-    Returns:
-        Encoded JWT token string
-
-    Example:
-        >>> token = create_refresh_token(
-        ...     {"sub": "user_123", "token_family_id": "family_abc"}
-        ... )
-    """
-    to_encode = data.copy()
-
-    # Set expiration time
-    if expires_delta:
-        expire = datetime.now(UTC) + expires_delta
-    else:
-        expire = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
-
-    to_encode.update(
-        {
-            "exp": expire,
-            "iat": datetime.now(UTC),
-            "type": TOKEN_TYPE_REFRESH,
-            "jti": str(uuid.uuid4()),  # Unique JWT ID to prevent hash collisions
         }
     )
 
@@ -272,7 +219,7 @@ def decode_token(token: str) -> dict[str, Any]:
         JWTError: If token is invalid, expired, or malformed
 
     Example:
-        >>> token = create_access_token({"sub": "user_123"})
+        >>> token = create_token({"sub": "user_123"})
         >>> claims = decode_token(token)
         >>> print(claims["sub"])
         user_123
@@ -328,11 +275,6 @@ def hash_refresh_token(token: str) -> str:
 
     Returns:
         SHA-256 hash of the token (hex string)
-
-    Example:
-        >>> token = create_refresh_token({"sub": "user_123"})
-        >>> token_hash = hash_refresh_token(token)
-        >>> # Store token_hash in database, not the token itself
     """
     return hashlib.sha256(token.encode()).hexdigest()
 
@@ -347,11 +289,5 @@ def verify_refresh_token_hash(token: str, token_hash: str) -> bool:
 
     Returns:
         True if token matches hash, False otherwise
-
-    Example:
-        >>> token = create_refresh_token({"sub": "user_123"})
-        >>> token_hash = hash_refresh_token(token)
-        >>> verify_refresh_token_hash(token, token_hash)
-        True
     """
     return hash_refresh_token(token) == token_hash

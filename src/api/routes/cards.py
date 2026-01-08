@@ -13,15 +13,18 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from api.dependencies import CardServiceDep, CurrentUser
-from schemas.card import (
+from schemas import (
     CardCreate,
     CardFilterParams,
     CardListItem,
     CardResponse,
+    CardSortParams,
     CardUpdate,
+    PaginatedResponse,
+    PaginationMeta,
+    PaginationParams,
 )
-from schemas.common import PaginatedResponse, PaginationParams
+from ..dependencies import CardServiceDep, CurrentUser
 
 router = APIRouter(prefix="/cards", tags=["Cards"])
 
@@ -32,12 +35,13 @@ async def list_cards(
     service: CardServiceDep,
     filters: CardFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
+    sorting: CardSortParams = Depends(),
 ) -> PaginatedResponse[CardListItem]:
     """
     List all cards for the authenticated user.
 
     Returns cards linked to accounts owned by the current user.
-    Supports filtering by card type and account, plus pagination.
+    Supports filtering by card type and account, plus pagination and sorting.
 
     **Authorization**: Requires active user authentication.
 
@@ -46,18 +50,30 @@ async def list_cards(
     - `page_size`: Items per page (default: 20, max: 100)
     - `card_type`: Filter by credit_card or debit_card
     - `account_id`: Filter cards for specific account
+    - `sort_by`: Sort field (name, last_four_digits, expiry_year, created_at)
+    - `sort_order`: Sort direction (asc or desc)
 
     **Returns**: Paginated response with cards and metadata.
 
     **Example**:
     ```
-    GET /api/v1/cards?page=1&page_size=20&card_type=credit_card
+    GET /api/v1/cards?page=1&page_size=20&card_type=credit_card&sort_by=created_at&sort_order=desc
     ```
     """
-    return await service.list_cards(
+    cards, count = await service.list_user_cards(
         current_user=current_user,
         pagination=pagination,
         filters=filters,
+        sorting=sorting,
+    )
+
+    return PaginatedResponse(
+        data=[CardListItem.model_validate(c) for c in cards],
+        meta=PaginationMeta(
+            total=count,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        ),
     )
 
 
@@ -83,10 +99,12 @@ async def get_card(
     GET /api/v1/cards/550e8400-e29b-41d4-a716-446655440100
     ```
     """
-    return await service.get_card(
+    card = await service.get_card(
         card_id=card_id,
         current_user=current_user,
     )
+
+    return CardResponse.model_validate(card)
 
 
 @router.post("", response_model=CardResponse, status_code=status.HTTP_201_CREATED)
@@ -146,12 +164,20 @@ async def create_card(
     }
     ```
     """
-    return await service.create_card(
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
+    card = await service.create_card(
         data=data,
         current_user=current_user,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
+
+    return CardResponse.model_validate(card)
 
 
 @router.patch("/{card_id}", response_model=CardResponse)
@@ -206,13 +232,21 @@ async def update_card(
     }
     ```
     """
-    return await service.update_card(
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
+    card = await service.update_card(
         card_id=card_id,
         data=data,
         current_user=current_user,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
+
+    return CardResponse.model_validate(card)
 
 
 @router.delete("/{card_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -245,9 +279,15 @@ async def delete_card(
     DELETE /api/v1/cards/550e8400-e29b-41d4-a716-446655440100
     ```
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     await service.delete_card(
         card_id=card_id,
         current_user=current_user,
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )

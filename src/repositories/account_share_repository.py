@@ -12,10 +12,10 @@ import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from models.account import AccountShare
-from models.enums import PermissionLevel
-from repositories.base import BaseRepository
+from models import AccountShare, PermissionLevel
+from .base import BaseRepository
 
 
 class AccountShareRepository(BaseRepository[AccountShare]):

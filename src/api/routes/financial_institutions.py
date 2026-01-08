@@ -16,15 +16,18 @@ import uuid
 
 from fastapi import APIRouter, Depends, Request, status
 
-from api.dependencies import AdminUser, CurrentUser, FinancialInstitutionServiceDep
-from schemas.common import PaginatedResponse, PaginationParams
-from schemas.financial_institution import (
+from schemas import (
     FinancialInstitutionCreate,
     FinancialInstitutionFilterParams,
     FinancialInstitutionListItem,
     FinancialInstitutionResponse,
+    FinancialInstitutionSortParams,
     FinancialInstitutionUpdate,
+    PaginatedResponse,
+    PaginationMeta,
+    PaginationParams,
 )
+from ..dependencies import AdminUser, CurrentUser, FinancialInstitutionServiceDep
 
 logger = logging.getLogger(__name__)
 
@@ -68,26 +71,34 @@ async def create_institution(
         - 409 Conflict: If SWIFT code or routing number already exists
         - 422 Unprocessable Entity: If validation fails
     """
-    return await service.create_institution(
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
+    institution = await service.create_institution(
         data=data,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
+
+    return FinancialInstitutionResponse.model_validate(institution)
 
 
 @router.get(
     "",
     response_model=PaginatedResponse[FinancialInstitutionListItem],
     summary="List financial institutions",
-    description="List financial institutions with optional filtering and pagination",
+    description="List financial institutions with optional filtering, pagination, and sorting",
 )
 async def list_institutions(
     current_user: CurrentUser,
     service: FinancialInstitutionServiceDep,
     filters: FinancialInstitutionFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
+    sorting: FinancialInstitutionSortParams = Depends(),
 ) -> PaginatedResponse[FinancialInstitutionListItem]:
     """
     List financial institutions with filtering.
@@ -99,6 +110,8 @@ async def list_institutions(
         - institution_type: Filter by type (bank, credit_union, brokerage, fintech, other)
         - is_active: Filter by active status (default: true)
         - search: Search in name and short_name fields
+        - sort_by: Sort field (name, short_name, country_code, created_at)
+        - sort_order: Sort direction (asc or desc)
 
     Returns:
         PaginatedResponse with list of institutions and metadata
@@ -109,9 +122,22 @@ async def list_institutions(
 
     Returns active institutions by default.
     """
-    return await service.list_institutions(
-        pagination=pagination,
+    financial_institutions, count = await service.list_institutions(
         filters=filters,
+        pagination=pagination,
+        sorting=sorting,
+    )
+
+    return PaginatedResponse(
+        data=[
+            FinancialInstitutionListItem.model_validate(fi)
+            for fi in financial_institutions
+        ],
+        meta=PaginationMeta(
+            total=count,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        ),
     )
 
 
@@ -144,7 +170,9 @@ async def get_institution(
     Raises:
         - 404 Not Found: If institution not found
     """
-    return await service.get_institution(institution_id=institution_id)
+    institution = await service.get_institution(institution_id=institution_id)
+
+    return FinancialInstitutionResponse.model_validate(institution)
 
 
 @router.get(
@@ -175,7 +203,9 @@ async def get_by_swift_code(
         - 404 Not Found: If institution not found
         - 422 Unprocessable Entity: If SWIFT code format invalid
     """
-    return await service.get_by_swift_code(swift_code=swift_code)
+    institution = await service.get_by_swift_code(swift_code=swift_code)
+
+    return FinancialInstitutionResponse.model_validate(institution)
 
 
 @router.get(
@@ -208,7 +238,9 @@ async def get_by_routing_number(
         - 404 Not Found: If institution not found
         - 422 Unprocessable Entity: If routing number format invalid
     """
-    return await service.get_by_routing_number(routing_number=routing_number)
+    institution = await service.get_by_routing_number(routing_number=routing_number)
+
+    return FinancialInstitutionResponse.model_validate(institution)
 
 
 @router.patch(
@@ -253,14 +285,21 @@ async def update_institution(
         - 409 Conflict: If new SWIFT code or routing number already exists
         - 422 Unprocessable Entity: If validation fails
     """
-    return await service.update_institution(
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
+    institution = await service.update_institution(
         institution_id=institution_id,
         data=data,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
+
+    return FinancialInstitutionResponse.model_validate(institution)
 
 
 @router.delete(
@@ -291,10 +330,15 @@ async def delete_institution(
     Raises:
         - 404 Not Found: If institution not found
     """
+    # Extract client info
+    request_id = getattr(request.state, "request_id", None)
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("User-Agent")
+
     await service.delete_institution(
         institution_id=institution_id,
         current_user=current_user,
-        request_id=getattr(request.state, "request_id", None),
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
+        request_id=request_id,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )

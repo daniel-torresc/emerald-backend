@@ -16,7 +16,7 @@ Tests:
 import pytest
 from httpx import AsyncClient
 
-from models.user import User
+from models import User
 
 
 @pytest.mark.asyncio

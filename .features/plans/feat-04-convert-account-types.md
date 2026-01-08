@@ -1016,7 +1016,7 @@ tests/
    **Step 2**: Update service call
    ```python
    # UPDATE (around line ~165):
-   accounts = await account_service.list_accounts(
+   accounts = await account_service.list_user_accounts(
        user_id=current_user.id,
        is_active=is_active,
        account_type_id=account_type_id,  # CHANGED from account_type

@@ -16,20 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 
-from api.routes import (
-    account_shares,
-    account_types,
-    accounts,
-    audit_logs,
-    auth,
-    cards,
-    financial_institutions,
-    health,
-    metadata,
-    root,
-    transactions,
-    users,
-)
+from api import routes
 from core import settings
 from core.exceptions import AppException
 from core.handlers import (
@@ -107,22 +94,21 @@ app.add_middleware(
 # ============================================================================
 # Create V1 Router
 v1_router = APIRouter(prefix="/v1")
-v1_router.include_router(audit_logs.router)
-v1_router.include_router(users.router)
-v1_router.include_router(financial_institutions.router)
-v1_router.include_router(account_types.router)
-v1_router.include_router(accounts.router)
-v1_router.include_router(account_shares.router)
-v1_router.include_router(cards.router)
-v1_router.include_router(transactions.router)
+v1_router.include_router(routes.users.router)
+v1_router.include_router(routes.financial_institutions.router)
+v1_router.include_router(routes.cards.router)
+v1_router.include_router(routes.accounts.router)
+v1_router.include_router(routes.account_shares.router)
+v1_router.include_router(routes.transactions.router)
+v1_router.include_router(routes.audit_logs.router)
 
 # Create API Router
 api_router = APIRouter(prefix="/api")
-api_router.include_router(auth.router)
-api_router.include_router(metadata.router)
+api_router.include_router(routes.auth.router)
+api_router.include_router(routes.metadata.router)
 api_router.include_router(v1_router)
 
 # Include Application Routers
-app.include_router(root.router)
-app.include_router(health.router)
+app.include_router(routes.root.router)
+app.include_router(routes.health.router)
 app.include_router(api_router)

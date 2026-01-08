@@ -10,13 +10,13 @@ This module provides:
 
 import logging
 import uuid
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.audit_log import AuditAction, AuditLog, AuditStatus
-from repositories.audit_repository import AuditLogRepository
+from models import AuditAction, AuditLog, AuditStatus
+from repositories import AuditLogRepository
+from schemas import AuditLogFilterParams, AuditLogSortParams, PaginationParams
 
 logger = logging.getLogger(__name__)
 
@@ -318,16 +318,11 @@ class AuditService:
             error_message=error_message,
         )
 
-    async def get_user_audit_logs(
+    async def list_user_audit_logs(
         self,
-        user_id: uuid.UUID,
-        action: AuditAction | None = None,
-        entity_type: str | None = None,
-        status: AuditStatus | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        offset: int = 0,
-        limit: int = 100,
+        filters: AuditLogFilterParams,
+        pagination: PaginationParams,
+        sorting: AuditLogSortParams,
     ) -> tuple[list[AuditLog], int]:
         """
         Get audit logs for a specific user (GDPR right to access).
@@ -337,14 +332,9 @@ class AuditService:
         - Admins viewing user's action history
 
         Args:
-            user_id: UUID of the user
-            action: Filter by action type
-            entity_type: Filter by entity type
-            status: Filter by status
-            start_date: Filter logs after this date
-            end_date: Filter logs before this date
-            offset: Number of records to skip (pagination)
-            limit: Maximum number of records to return
+            filters:
+            pagination:
+            sorting:
 
         Returns:
             Tuple of (list of AuditLog instances, total count)
@@ -358,76 +348,10 @@ class AuditService:
                 limit=20
             )
         """
-        logs = await self.audit_repo.get_user_logs(
-            user_id=user_id,
-            action=action,
-            entity_type=entity_type,
-            status=status,
-            start_date=start_date,
-            end_date=end_date,
-            offset=offset,
-            limit=limit,
+        user_logs = await self.audit_repo.list_user_logs(
+            filter_params=filters,
+            pagination_params=pagination,
+            sort_params=sorting,
         )
 
-        total = await self.audit_repo.count_user_logs(
-            user_id=user_id,
-            action=action,
-            entity_type=entity_type,
-            status=status,
-            start_date=start_date,
-            end_date=end_date,
-        )
-
-        return logs, total
-
-    async def get_all_audit_logs(
-        self,
-        action: AuditAction | None = None,
-        entity_type: str | None = None,
-        status: AuditStatus | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> tuple[list[AuditLog], int]:
-        """
-        Get all audit logs with filtering (admin only).
-
-        Args:
-            action: Filter by action type
-            entity_type: Filter by entity type
-            status: Filter by status
-            start_date: Filter logs after this date
-            end_date: Filter logs before this date
-            offset: Number of records to skip (pagination)
-            limit: Maximum number of records to return
-
-        Returns:
-            Tuple of (list of AuditLog instances, total count)
-
-        Example:
-            # Get all failed login attempts in last week
-            logs, total = await audit_service.get_all_audit_logs(
-                action=AuditAction.LOGIN_FAILED,
-                start_date=datetime.now(UTC) - timedelta(days=7)
-            )
-        """
-        logs = await self.audit_repo.get_all_logs(
-            action=action,
-            entity_type=entity_type,
-            status=status,
-            start_date=start_date,
-            end_date=end_date,
-            offset=offset,
-            limit=limit,
-        )
-
-        total = await self.audit_repo.count_all_logs(
-            action=action,
-            entity_type=entity_type,
-            status=status,
-            start_date=start_date,
-            end_date=end_date,
-        )
-
-        return logs, total
+        return user_logs

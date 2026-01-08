@@ -17,16 +17,13 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.exceptions import AlreadyExistsError, NotFoundError
-from models import AccountType, AuditAction
-from models.user import User
-from repositories.account_type_repository import AccountTypeRepository
-from schemas.account_type import (
+from models import AccountType, AuditAction, User
+from repositories import AccountTypeRepository
+from schemas import (
     AccountTypeCreate,
-    AccountTypeListItem,
-    AccountTypeResponse,
     AccountTypeUpdate,
 )
-from services.audit_service import AuditService
+from .audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +62,7 @@ class AccountTypeService:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> AccountTypeResponse:
+    ) -> AccountType:
         """
         Create a new account type (admin only).
 
@@ -114,7 +111,7 @@ class AccountTypeService:
             icon_url=str(data.icon_url) if data.icon_url else None,
             sort_order=data.sort_order,
         )
-        account_type = await self.account_type_repo.add(account_type)
+        account_type = await self.account_type_repo.create(account_type)
 
         # Commit transaction
         await self.session.commit()
@@ -139,12 +136,12 @@ class AccountTypeService:
             user_agent=user_agent,
         )
 
-        return AccountTypeResponse.model_validate(account_type)
+        return account_type
 
     async def get_account_type(
         self,
         account_type_id: uuid.UUID,
-    ) -> AccountTypeResponse:
+    ) -> AccountType:
         """
         Get account type by ID.
 
@@ -168,12 +165,12 @@ class AccountTypeService:
         if not account_type:
             raise NotFoundError(f"Account type with ID {account_type_id} not found")
 
-        return AccountTypeResponse.model_validate(account_type)
+        return account_type
 
     async def get_by_key(
         self,
         key: str,
-    ) -> AccountTypeResponse:
+    ) -> AccountType:
         """
         Get account type by key.
 
@@ -197,11 +194,11 @@ class AccountTypeService:
         if not account_type:
             raise NotFoundError(f"Account type with key '{key}' not found")
 
-        return AccountTypeResponse.model_validate(account_type)
+        return account_type
 
     async def list_account_types(
         self,
-    ) -> list[AccountTypeListItem]:
+    ) -> list[AccountType]:
         """
         List all account types.
 
@@ -217,10 +214,7 @@ class AccountTypeService:
         """
         account_types = await self.account_type_repo.get_all_ordered()
 
-        return [
-            AccountTypeListItem.model_validate(account_type)
-            for account_type in account_types
-        ]
+        return account_types
 
     async def update_account_type(
         self,
@@ -230,7 +224,7 @@ class AccountTypeService:
         request_id: str | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-    ) -> AccountTypeResponse:
+    ) -> AccountType:
         """
         Update account type (admin only).
 
@@ -246,7 +240,7 @@ class AccountTypeService:
             user_agent: Client user agent
 
         Returns:
-            AccountTypeResponse with updated account type data
+            AccountType with updated account type data
 
         Raises:
             NotFoundError: If account type not found
@@ -269,7 +263,7 @@ class AccountTypeService:
         update_dict = data.model_dump(exclude_unset=True)
 
         if not update_dict:
-            return AccountTypeResponse.model_validate(account_type)  # Nothing to update
+            return account_type
 
         # 3. Capture old values for audit
         old_values = {
@@ -321,7 +315,7 @@ class AccountTypeService:
         # 8. Commit transaction
         await self.session.commit()
 
-        return AccountTypeResponse.model_validate(account_type)
+        return account_type
 
     async def delete_account_type(
         self,

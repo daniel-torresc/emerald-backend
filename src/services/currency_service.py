@@ -8,7 +8,7 @@ This module provides:
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from schemas.currency import Currency
+from schemas import Currency
 
 
 class CurrencyService:

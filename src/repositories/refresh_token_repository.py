@@ -11,8 +11,8 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.refresh_token import RefreshToken
-from repositories.base import BaseRepository
+from models import RefreshToken
+from .base import BaseRepository
 
 
 class RefreshTokenRepository(BaseRepository[RefreshToken]):

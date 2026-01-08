@@ -21,9 +21,7 @@ import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from models.account import Account, AccountShare
-from models.enums import PermissionLevel
-from models.user import User
+from models import Account, AccountShare, PermissionLevel, User
 
 
 # ============================================================================
