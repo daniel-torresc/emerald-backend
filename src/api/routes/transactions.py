@@ -73,11 +73,11 @@ async def create_transaction(
         - transaction_date: Date when transaction occurred
         - amount: Transaction amount (positive or negative, non-zero)
         - currency: ISO 4217 code (must match account currency)
-        - description: Transaction description (1-500 chars)
-        - transaction_type: Type (debit, credit, transfer, fee, interest, other)
+        - original_description: Transaction description (immutable, 1-500 chars)
         - merchant: Optional merchant name (1-100 chars)
         - value_date: Optional value date
-        - user_notes: Optional notes (max 1000 chars)
+        - comments: Optional user comments (max 1000 chars)
+        - review_status: Review status (to_review or reviewed)
 
     Returns:
         TransactionResponse with created transaction details
@@ -114,7 +114,7 @@ async def create_transaction(
     - Date range filtering
     - Amount range filtering
     - Fuzzy text search (handles typos)
-    - Transaction type filtering
+    - Review status filtering
     - Multiple sort options
     - Pagination
 
@@ -148,10 +148,10 @@ async def list_transactions(
         - amount_max: Maximum amount (inclusive)
         - description: Fuzzy search on description (handles typos)
         - merchant: Fuzzy search on merchant (handles typos)
-        - transaction_type: Filter by type
+        - review_status: Filter by review status (to_review or reviewed)
         - card_id: Filter by card UUID
         - card_type: Filter by card type (credit_card or debit_card)
-        - sort_by: Sort field (transaction_date, amount, description, created_at)
+        - sort_by: Sort field (transaction_date, amount, original_description, created_at)
         - sort_order: Sort order (asc or desc)
 
     Returns:
@@ -253,14 +253,16 @@ async def update_transaction(
     """
     Update transaction fields.
 
+    Note: original_description cannot be modified after creation.
+
     Request body (all fields optional):
         - transaction_date: New date
         - amount: New amount (non-zero)
-        - description: New description
+        - user_description: New user description (editable)
         - merchant: New merchant
         - card_id: New card (or null to clear)
-        - transaction_type: New type
-        - user_notes: New notes
+        - comments: New user comments
+        - review_status: New review status
         - value_date: New value date
 
     Returns:
@@ -373,12 +375,12 @@ async def split_transaction(
     Request body:
         - splits: List of split items (min 2)
             - amount: Split amount (must sum to parent)
-            - description: Split description
+            - user_description: User description for this split
             - merchant: Optional merchant for this split
-            - user_notes: Optional notes for this split
+            - comments: Optional comments for this split
 
     Returns:
-        Dictionary with parent and children details
+        List of child transactions
 
     Requires:
         - Valid access token

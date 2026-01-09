@@ -32,16 +32,16 @@ class TestTransactionAPI:
                 "transaction_date": str(date.today()),
                 "amount": "-50.25",
                 "currency": "USD",
-                "description": "Grocery shopping",
+                "original_description": "Grocery shopping",
                 "merchant": "Whole Foods",
-                "transaction_type": "expense",
+                "review_status": "to_review",
             },
         )
 
         assert response.status_code == 201
         data = response.json()
         assert data["amount"] == "-50.25"
-        assert data["description"] == "Grocery shopping"
+        assert data["original_description"] == "Grocery shopping"
         assert data["merchant"] == "Whole Foods"
 
     async def test_list_transactions(
@@ -57,8 +57,8 @@ class TestTransactionAPI:
                     "transaction_date": str(date.today()),
                     "amount": f"-{10 + i}.00",
                     "currency": "USD",
-                    "description": f"Transaction {i}",
-                    "transaction_type": "expense",
+                    "original_description": f"Transaction {i}",
+                    "review_status": "to_review",
                 },
             )
 
@@ -88,8 +88,8 @@ class TestTransactionAPI:
                 "transaction_date": str(date.today()),
                 "amount": "-25.00",
                 "currency": "USD",
-                "description": "Test transaction",
-                "transaction_type": "expense",
+                "original_description": "Test transaction",
+                "review_status": "to_review",
             },
         )
 
@@ -97,14 +97,14 @@ class TestTransactionAPI:
 
         # Get transaction
         response = await async_client.get(
-            f"/api/v1/transactions/{transaction_id}",
+            f"/api/v1/accounts/{test_account.id}/transactions/{transaction_id}",
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == transaction_id
-        assert data["description"] == "Test transaction"
+        assert data["original_description"] == "Test transaction"
 
     async def test_update_transaction(
         self, async_client: AsyncClient, test_user: User, user_token: dict, test_account
@@ -118,8 +118,8 @@ class TestTransactionAPI:
                 "transaction_date": str(date.today()),
                 "amount": "-25.00",
                 "currency": "USD",
-                "description": "Original",
-                "transaction_type": "expense",
+                "original_description": "Original",
+                "review_status": "to_review",
             },
         )
 
@@ -130,14 +130,14 @@ class TestTransactionAPI:
             f"/api/v1/transactions/{transaction_id}",
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
             json={
-                "description": "Updated description",
+                "user_description": "Updated description",
                 "amount": "-30.00",
             },
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["description"] == "Updated description"
+        assert data["user_description"] == "Updated description"
         assert data["amount"] == "-30.00"
 
     async def test_delete_transaction(
@@ -152,8 +152,8 @@ class TestTransactionAPI:
                 "transaction_date": str(date.today()),
                 "amount": "-25.00",
                 "currency": "USD",
-                "description": "To delete",
-                "transaction_type": "expense",
+                "original_description": "To delete",
+                "review_status": "to_review",
             },
         )
 
@@ -187,8 +187,8 @@ class TestTransactionAPI:
                 "transaction_date": str(date.today()),
                 "amount": "-50.00",
                 "currency": "USD",
-                "description": "Shopping",
-                "transaction_type": "expense",
+                "original_description": "Shopping",
+                "review_status": "to_review",
             },
         )
 
@@ -200,15 +200,15 @@ class TestTransactionAPI:
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
             json={
                 "splits": [
-                    {"amount": "-30.00", "description": "Groceries"},
-                    {"amount": "-20.00", "description": "Household items"},
+                    {"amount": "-30.00", "user_description": "Groceries"},
+                    {"amount": "-20.00", "user_description": "Household items"},
                 ]
             },
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data["child_transactions"]) == 2
+        assert len(data) == 2  # Returns list of child transactions
 
     async def test_join_split_transaction(
         self, async_client: AsyncClient, test_user: User, user_token: dict, test_account
@@ -222,8 +222,8 @@ class TestTransactionAPI:
                 "transaction_date": str(date.today()),
                 "amount": "-50.00",
                 "currency": "USD",
-                "description": "Shopping",
-                "transaction_type": "expense",
+                "original_description": "Shopping",
+                "review_status": "to_review",
             },
         )
 
@@ -234,8 +234,8 @@ class TestTransactionAPI:
             headers={"Authorization": f"Bearer {user_token['access_token']}"},
             json={
                 "splits": [
-                    {"amount": "-30.00", "description": "Split 1"},
-                    {"amount": "-20.00", "description": "Split 2"},
+                    {"amount": "-30.00", "user_description": "Split 1"},
+                    {"amount": "-20.00", "user_description": "Split 2"},
                 ]
             },
         )
@@ -249,7 +249,7 @@ class TestTransactionAPI:
         assert response.status_code == 200
         data = response.json()
         # Transaction should be joined (no child transactions)
-        assert "child_transactions" not in data or len(data["child_transactions"]) == 0
+        assert data["is_split_parent"] is False
 
     async def test_permission_denied(
         self,
@@ -269,8 +269,8 @@ class TestTransactionAPI:
                 "transaction_date": str(date.today()),
                 "amount": "-25.00",
                 "currency": "USD",
-                "description": "Transaction",
-                "transaction_type": "expense",
+                "original_description": "Transaction",
+                "review_status": "to_review",
             },
         )
 
@@ -346,8 +346,8 @@ async def test_viewer_cannot_create_transaction(
             "transaction_date": str(date.today()),
             "amount": "-25.00",
             "currency": "USD",
-            "description": "Test",
-            "transaction_type": "expense",
+            "original_description": "Test",
+            "review_status": "to_review",
         },
     )
 
@@ -376,8 +376,8 @@ async def test_viewer_cannot_update_transaction(
             "transaction_date": str(date.today()),
             "amount": "-25.00",
             "currency": "USD",
-            "description": "Original",
-            "transaction_type": "expense",
+            "original_description": "Original",
+            "review_status": "to_review",
         },
     )
     transaction_id = create_response.json()["id"]
@@ -421,7 +421,7 @@ async def test_viewer_cannot_update_transaction(
     response = await async_client.put(
         f"/api/v1/transactions/{transaction_id}",
         headers={"Authorization": f"Bearer {viewer_token['access_token']}"},
-        json={"description": "Updated"},
+        json={"user_description": "Updated"},
     )
 
     assert response.status_code == 403
@@ -449,8 +449,8 @@ async def test_viewer_cannot_delete_transaction(
             "transaction_date": str(date.today()),
             "amount": "-25.00",
             "currency": "USD",
-            "description": "To delete",
-            "transaction_type": "expense",
+            "original_description": "To delete",
+            "review_status": "to_review",
         },
     )
     transaction_id = create_response.json()["id"]
@@ -555,13 +555,13 @@ async def test_editor_can_create_transaction(
             "transaction_date": str(date.today()),
             "amount": "-25.00",
             "currency": "USD",
-            "description": "Editor transaction",
-            "transaction_type": "expense",
+            "original_description": "Editor transaction",
+            "review_status": "to_review",
         },
     )
 
     assert response.status_code == 201
-    assert response.json()["description"] == "Editor transaction"
+    assert response.json()["original_description"] == "Editor transaction"
 
 
 @pytest.mark.asyncio
@@ -580,8 +580,8 @@ async def test_owner_has_full_access(
             "transaction_date": str(date.today()),
             "amount": "-25.00",
             "currency": "USD",
-            "description": "Owner transaction",
-            "transaction_type": "expense",
+            "original_description": "Owner transaction",
+            "review_status": "to_review",
         },
     )
     assert create_response.status_code == 201
@@ -598,7 +598,7 @@ async def test_owner_has_full_access(
     update_response = await async_client.put(
         f"/api/v1/transactions/{transaction_id}",
         headers={"Authorization": f"Bearer {user_token['access_token']}"},
-        json={"description": "Updated"},
+        json={"user_description": "Updated"},
     )
     assert update_response.status_code == 200
 
@@ -627,8 +627,8 @@ async def test_cannot_create_transaction_with_wrong_currency(
             "transaction_date": str(date.today()),
             "amount": "-25.00",
             "currency": "EUR",  # Account is USD
-            "description": "Wrong currency",
-            "transaction_type": "expense",
+            "original_description": "Wrong currency",
+            "review_status": "to_review",
         },
     )
 
@@ -653,8 +653,8 @@ async def test_cannot_create_transaction_with_unsupported_currency(
                 "transaction_date": str(date.today()),
                 "amount": "-25.00",
                 "currency": currency,
-                "description": f"Test {currency}",
-                "transaction_type": "expense",
+                "original_description": f"Test {currency}",
+                "review_status": "to_review",
             },
         )
 
@@ -679,8 +679,8 @@ async def test_cannot_create_transaction_with_zero_amount(
             "transaction_date": str(date.today()),
             "amount": "0.00",
             "currency": "USD",
-            "description": "Zero amount",
-            "transaction_type": "expense",
+            "original_description": "Zero amount",
+            "review_status": "to_review",
         },
     )
 
@@ -702,8 +702,8 @@ async def test_split_transaction_maintains_balance(
             "transaction_date": str(date.today()),
             "amount": "-50.00",
             "currency": "USD",
-            "description": "Shopping",
-            "transaction_type": "expense",
+            "original_description": "Shopping",
+            "review_status": "to_review",
         },
     )
     transaction_id = create_response.json()["id"]
@@ -714,8 +714,8 @@ async def test_split_transaction_maintains_balance(
         headers={"Authorization": f"Bearer {user_token['access_token']}"},
         json={
             "splits": [
-                {"amount": "-30.00", "description": "Split 1"},
-                {"amount": "-15.00", "description": "Split 2"},  # Sum is -45, not -50
+                {"amount": "-30.00", "user_description": "Split 1"},
+                {"amount": "-15.00", "user_description": "Split 2"},  # Sum is -45, not -50
             ]
         },
     )
@@ -739,8 +739,8 @@ async def test_cannot_split_already_split_transaction(
             "transaction_date": str(date.today()),
             "amount": "-50.00",
             "currency": "USD",
-            "description": "Shopping",
-            "transaction_type": "expense",
+            "original_description": "Shopping",
+            "review_status": "to_review",
         },
     )
     transaction_id = create_response.json()["id"]
@@ -751,8 +751,8 @@ async def test_cannot_split_already_split_transaction(
         headers={"Authorization": f"Bearer {user_token['access_token']}"},
         json={
             "splits": [
-                {"amount": "-30.00", "description": "Split 1"},
-                {"amount": "-20.00", "description": "Split 2"},
+                {"amount": "-30.00", "user_description": "Split 1"},
+                {"amount": "-20.00", "user_description": "Split 2"},
             ]
         },
     )
@@ -763,8 +763,8 @@ async def test_cannot_split_already_split_transaction(
         headers={"Authorization": f"Bearer {user_token['access_token']}"},
         json={
             "splits": [
-                {"amount": "-25.00", "description": "Split 3"},
-                {"amount": "-25.00", "description": "Split 4"},
+                {"amount": "-25.00", "user_description": "Split 3"},
+                {"amount": "-25.00", "user_description": "Split 4"},
             ]
         },
     )
@@ -855,8 +855,8 @@ async def test_cannot_create_transaction_in_non_member_account(
             "transaction_date": str(date.today()),
             "amount": "-25.00",
             "currency": "USD",
-            "description": "Unauthorized transaction",
-            "transaction_type": "expense",
+            "original_description": "Unauthorized transaction",
+            "review_status": "to_review",
         },
     )
 
@@ -884,8 +884,8 @@ async def test_cannot_access_another_users_transaction(
             "transaction_date": str(date.today()),
             "amount": "-25.00",
             "currency": "USD",
-            "description": "Test transaction",
-            "transaction_type": "expense",
+            "original_description": "Test transaction",
+            "review_status": "to_review",
         },
     )
     transaction_id = create_response.json()["id"]
@@ -945,8 +945,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-75.50",
                 "currency": "USD",
-                "description": "Dinner at restaurant",
-                "transaction_type": "expense",
+                "original_description": "Dinner at restaurant",
+                "review_status": "to_review",
                 "card_id": str(test_card.id),
             },
         )
@@ -971,8 +971,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-25.00",
                 "currency": "USD",
-                "description": "Cash payment",
-                "transaction_type": "expense",
+                "original_description": "Cash payment",
+                "review_status": "to_review",
             },
         )
 
@@ -996,8 +996,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-50.00",
                 "currency": "USD",
-                "description": "Test",
-                "transaction_type": "expense",
+                "original_description": "Test",
+                "review_status": "to_review",
                 "card_id": fake_card_id,
             },
         )
@@ -1021,8 +1021,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-100.00",
                 "currency": "USD",
-                "description": "Shopping",
-                "transaction_type": "expense",
+                "original_description": "Shopping",
+                "review_status": "to_review",
                 "card_id": str(test_card.id),
             },
         )
@@ -1058,8 +1058,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-50.00",
                 "currency": "USD",
-                "description": "Test",
-                "transaction_type": "expense",
+                "original_description": "Test",
+                "review_status": "to_review",
             },
         )
 
@@ -1095,8 +1095,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-50.00",
                 "currency": "USD",
-                "description": "Test",
-                "transaction_type": "expense",
+                "original_description": "Test",
+                "review_status": "to_review",
                 "card_id": str(test_card.id),
             },
         )
@@ -1130,8 +1130,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-50.00",
                 "currency": "USD",
-                "description": "Test",
-                "transaction_type": "expense",
+                "original_description": "Test",
+                "review_status": "to_review",
             },
         )
 
@@ -1164,8 +1164,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-100.00",
                 "currency": "USD",
-                "description": "With card 1",
-                "transaction_type": "expense",
+                "original_description": "With card 1",
+                "review_status": "to_review",
                 "card_id": str(test_card.id),
             },
         )
@@ -1177,8 +1177,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-50.00",
                 "currency": "USD",
-                "description": "Cash payment",
-                "transaction_type": "expense",
+                "original_description": "Cash payment",
+                "review_status": "to_review",
             },
         )
 
@@ -1189,8 +1189,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-75.00",
                 "currency": "USD",
-                "description": "With card 2",
-                "transaction_type": "expense",
+                "original_description": "With card 2",
+                "review_status": "to_review",
                 "card_id": str(test_card.id),
             },
         )
@@ -1226,8 +1226,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-100.00",
                 "currency": "USD",
-                "description": "Credit card purchase",
-                "transaction_type": "expense",
+                "original_description": "Credit card purchase",
+                "review_status": "to_review",
                 "card_id": str(test_card.id),
             },
         )
@@ -1239,8 +1239,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-50.00",
                 "currency": "USD",
-                "description": "Cash payment",
-                "transaction_type": "expense",
+                "original_description": "Cash payment",
+                "review_status": "to_review",
             },
         )
 
@@ -1276,8 +1276,8 @@ class TestTransactionCardIntegration:
                 "transaction_date": str(date.today()),
                 "amount": "-25.00",
                 "currency": "USD",
-                "description": "Cash only",
-                "transaction_type": "expense",
+                "original_description": "Cash only",
+                "review_status": "to_review",
             },
         )
 

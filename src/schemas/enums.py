@@ -79,7 +79,7 @@ class TransactionSortField(str, Enum):
 
     TRANSACTION_DATE = "transaction_date"
     AMOUNT = "amount"
-    DESCRIPTION = "description"
+    REVIEW_STATUS = "review_status"
     CREATED_AT = "created_at"
 
 

@@ -22,7 +22,13 @@ from core.exceptions import (
     NotFoundError,
     ValidationError,
 )
-from models import AuditAction, PermissionLevel, Transaction, User
+from models import (
+    AuditAction,
+    PermissionLevel,
+    Transaction,
+    TransactionReviewStatus,
+    User,
+)
 from repositories import AccountRepository, CardRepository, TransactionRepository
 from schemas import (
     PaginationParams,
@@ -161,16 +167,18 @@ class TransactionService:
                 )
                 raise NotFoundError("Card")
 
+        # Create transaction with user_description defaulting to original_description
         transaction = Transaction(
             account_id=account_id,
             transaction_date=data.transaction_date,
             amount=data.amount,
             currency=data.currency,
-            description=data.description,
+            original_description=data.original_description,
+            user_description=data.original_description,  # Default to original
             merchant=data.merchant,
             card_id=data.card_id,
-            transaction_type=data.transaction_type,
-            user_notes=data.user_notes,
+            comments=data.comments,
+            review_status=data.review_status,
             value_date=data.value_date,
             created_by=current_user.id,
             updated_by=current_user.id,
@@ -196,15 +204,15 @@ class TransactionService:
             action=AuditAction.CREATE,
             entity_type="transaction",
             entity_id=transaction.id,
-            description=f"Created transaction: {data.description} ({data.amount} {data.currency})",
+            description=f"Created transaction: {data.original_description} ({data.amount} {data.currency})",
             new_values={
                 "transaction_date": str(data.transaction_date),
                 "amount": str(data.amount),
                 "currency": data.currency,
-                "description": data.description,
+                "original_description": data.original_description,
                 "merchant": data.merchant,
                 "card_id": str(data.card_id) if data.card_id else None,
-                "transaction_type": data.transaction_type.value,
+                "review_status": data.review_status.value,
             },
             extra_metadata={
                 "account_id": str(account_id),
@@ -434,11 +442,12 @@ class TransactionService:
         old_values = {
             "transaction_date": str(existing.transaction_date),
             "amount": str(existing.amount),
-            "description": existing.description,
+            "original_description": existing.original_description,
+            "user_description": existing.user_description,
             "merchant": existing.merchant,
             "card_id": str(existing.card_id) if existing.card_id else None,
-            "transaction_type": existing.transaction_type.value,
-            "user_notes": existing.user_notes,
+            "comments": existing.comments,
+            "review_status": existing.review_status.value,
             "value_date": str(existing.value_date) if existing.value_date else None,
         }
 
@@ -454,11 +463,12 @@ class TransactionService:
         new_values = {
             "transaction_date": str(updated.transaction_date),
             "amount": str(updated.amount),
-            "description": updated.description,
+            "original_description": updated.original_description,
+            "user_description": updated.user_description,
             "merchant": updated.merchant,
             "card_id": str(updated.card_id) if updated.card_id else None,
-            "transaction_type": updated.transaction_type.value,
-            "user_notes": updated.user_notes,
+            "comments": updated.comments,
+            "review_status": updated.review_status.value,
             "value_date": str(updated.value_date) if updated.value_date else None,
         }
 
@@ -587,11 +597,11 @@ class TransactionService:
             action=AuditAction.DELETE,
             entity_type="transaction",
             entity_id=transaction_id,
-            description=f"Deleted transaction: {existing.description}",
+            description=f"Deleted transaction: {existing.original_description}",
             old_values={
                 "transaction_date": str(existing.transaction_date),
                 "amount": str(existing.amount),
-                "description": existing.description,
+                "original_description": existing.original_description,
             },
             extra_metadata={
                 "account_id": str(existing.account_id),
@@ -705,10 +715,11 @@ class TransactionService:
                 value_date=parent.value_date,
                 amount=Decimal(str(split_data["amount"])),
                 currency=parent.currency,
-                description=split_data["description"],
+                original_description=parent.original_description,
+                user_description=split_data.get("user_description"),
                 merchant=split_data.get("merchant"),
-                transaction_type=parent.transaction_type,
-                user_notes=split_data.get("user_notes"),
+                comments=split_data.get("comments"),
+                review_status=TransactionReviewStatus.to_review,
                 created_by=current_user.id,
                 updated_by=current_user.id,
             )
@@ -730,7 +741,10 @@ class TransactionService:
             new_values={
                 "children": [str(c.id) for c in children],
                 "split_details": [
-                    {"amount": str(s["amount"]), "description": s["description"]}
+                    {
+                        "amount": str(s["amount"]),
+                        "user_description": s.get("user_description"),
+                    }
                     for s in splits
                 ],
             },

@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from models import CardType, TransactionType
+from models import CardType, TransactionReviewStatus
 from .card import CardEmbeddedResponse
 from .common import SortOrder, SortParams
 from .enums import TransactionSortField
@@ -29,8 +29,7 @@ class TransactionBase(BaseModel):
         transaction_date: Date when transaction occurred
         amount: Transaction amount (positive or negative, non-zero)
         currency: ISO 4217 currency code (must match account)
-        description: Transaction description (1-500 chars)
-        transaction_type: Type of transaction (debit, credit, etc.)
+        original_description: Original transaction description (immutable, 1-500 chars)
     """
 
     transaction_date: date = Field(
@@ -50,16 +49,11 @@ class TransactionBase(BaseModel):
         examples=["USD", "EUR", "GBP"],
     )
 
-    description: str = Field(
+    original_description: str = Field(
         min_length=1,
         max_length=500,
-        description="Transaction description",
+        description="Original transaction description (immutable after creation)",
         examples=["Grocery shopping at Whole Foods", "Salary deposit", "Electric bill"],
-    )
-
-    transaction_type: TransactionType = Field(
-        description="Type of transaction",
-        examples=[TransactionType.income, TransactionType.expense],
     )
 
     @field_validator("currency")
@@ -90,13 +84,13 @@ class TransactionBase(BaseModel):
 
         return value
 
-    @field_validator("description")
+    @field_validator("original_description")
     @classmethod
-    def validate_description(cls, value: str) -> str:
-        """Validate and trim description."""
+    def validate_original_description(cls, value: str) -> str:
+        """Validate and trim original description."""
         value = value.strip()
         if not value:
-            raise ValueError("Description cannot be empty or only whitespace")
+            raise ValueError("Original description cannot be empty or only whitespace")
         return value
 
 
@@ -108,11 +102,11 @@ class TransactionCreate(TransactionBase):
         transaction_date: Date when transaction occurred
         amount: Transaction amount
         currency: Currency code
-        description: Transaction description
-        transaction_type: Transaction type
+        original_description: Original transaction description (immutable)
         merchant: Merchant name (optional, 1-100 chars)
         value_date: Date transaction value applied (optional)
-        user_notes: User comments (optional, max 1000 chars)
+        comments: User comments (optional, max 1000 chars)
+        review_status: Review status (defaults to to_review)
         card_id: Card used for transaction (optional)
     """
 
@@ -135,11 +129,16 @@ class TransactionCreate(TransactionBase):
         examples=["2025-01-16"],
     )
 
-    user_notes: str | None = Field(
+    comments: str | None = Field(
         default=None,
         max_length=1000,
         description="User comments on transaction",
         examples=["Split with roommate", "Business expense - reimbursable"],
+    )
+
+    review_status: TransactionReviewStatus = Field(
+        default=TransactionReviewStatus.to_review,
+        description="Review status of transaction",
     )
 
     @field_validator("merchant")
@@ -152,10 +151,10 @@ class TransactionCreate(TransactionBase):
                 return None
         return value
 
-    @field_validator("user_notes")
+    @field_validator("comments")
     @classmethod
-    def validate_user_notes(cls, value: str | None) -> str | None:
-        """Validate and trim user notes."""
+    def validate_comments(cls, value: str | None) -> str | None:
+        """Validate and trim comments."""
         if value is not None:
             value = value.strip()
             if not value:
@@ -168,15 +167,18 @@ class TransactionUpdate(BaseModel):
     Schema for updating transaction.
 
     All fields are optional to support partial updates (PATCH).
-    Currency and account_id cannot be changed.
+    Currency, account_id, and original_description cannot be changed.
+
+    Note: original_description is intentionally NOT included as it is immutable
+    after creation. Use user_description for user-editable description.
 
     Attributes:
         transaction_date: New date (optional)
         amount: New amount (optional)
-        description: New description (optional)
+        user_description: New user description (optional)
         merchant: New merchant (optional)
-        transaction_type: New type (optional)
-        user_notes: New notes (optional)
+        comments: New comments (optional)
+        review_status: New review status (optional)
         value_date: New value date (optional)
         card_id: Card used for transaction (optional)
     """
@@ -196,11 +198,11 @@ class TransactionUpdate(BaseModel):
         description="New transaction amount (non-zero)",
     )
 
-    description: str | None = Field(
+    user_description: str | None = Field(
         default=None,
         min_length=1,
         max_length=500,
-        description="New description",
+        description="New user description (user-editable)",
     )
 
     merchant: str | None = Field(
@@ -210,15 +212,15 @@ class TransactionUpdate(BaseModel):
         description="New merchant name",
     )
 
-    transaction_type: TransactionType | None = Field(
-        default=None,
-        description="New transaction type",
-    )
-
-    user_notes: str | None = Field(
+    comments: str | None = Field(
         default=None,
         max_length=1000,
-        description="New user notes",
+        description="New user comments",
+    )
+
+    review_status: TransactionReviewStatus | None = Field(
+        default=None,
+        description="New review status",
     )
 
     value_date: date | None = Field(
@@ -239,14 +241,14 @@ class TransactionUpdate(BaseModel):
                 raise ValueError("Amount is too large")
         return value
 
-    @field_validator("description")
+    @field_validator("user_description")
     @classmethod
-    def validate_description(cls, value: str | None) -> str | None:
-        """Validate description if provided."""
+    def validate_user_description(cls, value: str | None) -> str | None:
+        """Validate user description if provided."""
         if value is not None:
             value = value.strip()
             if not value:
-                raise ValueError("Description cannot be empty")
+                raise ValueError("User description cannot be empty")
         return value
 
     @field_validator("merchant")
@@ -259,10 +261,10 @@ class TransactionUpdate(BaseModel):
                 return None
         return value
 
-    @field_validator("user_notes")
+    @field_validator("comments")
     @classmethod
-    def validate_user_notes(cls, value: str | None) -> str | None:
-        """Validate user notes if provided."""
+    def validate_comments(cls, value: str | None) -> str | None:
+        """Validate comments if provided."""
         if value is not None:
             value = value.strip()
             if not value:
@@ -284,10 +286,11 @@ class TransactionResponse(TransactionBase):
         value_date: Value date
         amount: Transaction amount
         currency: Currency code
-        description: Description
+        original_description: Original description (immutable)
+        user_description: User-editable description
         merchant: Merchant name
-        transaction_type: Transaction type
-        user_notes: User notes
+        comments: User comments
+        review_status: Review status
         parent_transaction_id: Parent UUID if split child
         is_split_parent: Whether transaction has children
         is_split_child: Whether transaction is a split child
@@ -311,6 +314,11 @@ class TransactionResponse(TransactionBase):
         description="Card details if card was used for this transaction",
     )
 
+    user_description: str | None = Field(
+        default=None,
+        description="User-editable description",
+    )
+
     merchant: str | None = Field(
         default=None,
         description="Merchant name",
@@ -321,9 +329,13 @@ class TransactionResponse(TransactionBase):
         description="Date transaction value applied",
     )
 
-    user_notes: str | None = Field(
+    comments: str | None = Field(
         default=None,
         description="User comments",
+    )
+
+    review_status: TransactionReviewStatus = Field(
+        description="Review status of transaction",
     )
 
     parent_transaction_id: uuid.UUID | None = Field(
@@ -383,10 +395,11 @@ class TransactionListResponse(BaseModel):
         transaction_date: Transaction date
         amount: Transaction amount
         currency: Currency code
-        description: Description
+        original_description: Original description
+        user_description: User-editable description
         merchant: Merchant name
         card: Card details if card was used
-        transaction_type: Transaction type
+        review_status: Review status
         is_split_parent: Whether has children
         is_split_child: Whether is split child
     """
@@ -395,10 +408,11 @@ class TransactionListResponse(BaseModel):
     transaction_date: date
     amount: Decimal
     currency: str
-    description: str
+    original_description: str
+    user_description: str | None = None
     merchant: str | None = None
     card: CardEmbeddedResponse | None = None
-    transaction_type: TransactionType
+    review_status: TransactionReviewStatus
     is_split_parent: bool = False
     is_split_child: bool = False
 
@@ -426,20 +440,22 @@ class TransactionEmbeddedResponse(BaseModel):
         transaction_date: Transaction date
         amount: Transaction amount
         currency: Currency code
-        description: Description
+        original_description: Original description
+        user_description: User-editable description
         merchant: Merchant name
         card: Card details if card was used
-        transaction_type: Transaction type
+        review_status: Review status
     """
 
     id: uuid.UUID
     transaction_date: date
     amount: Decimal
     currency: str
-    description: str
+    original_description: str
+    user_description: str | None = None
     merchant: str | None = None
     card: CardEmbeddedResponse | None = None
-    transaction_type: TransactionType
+    review_status: TransactionReviewStatus
 
 
 class TransactionFilterParams(BaseModel):
@@ -454,9 +470,9 @@ class TransactionFilterParams(BaseModel):
         date_to: Filter to this date (inclusive)
         amount_min: Minimum amount (inclusive)
         amount_max: Maximum amount (inclusive)
-        description: Fuzzy search on description
+        description: Fuzzy search on description (both original and user)
         merchant: Fuzzy search on merchant
-        transaction_type: Filter by type
+        review_status: Filter by review status
         card_id: Filter by specific card UUID
         card_type: Filter by card type (credit_card or debit_card)
     """
@@ -484,7 +500,7 @@ class TransactionFilterParams(BaseModel):
     description: str | None = Field(
         default=None,
         max_length=500,
-        description="Fuzzy search on description (handles typos)",
+        description="Fuzzy search on description (original and user)",
     )
 
     merchant: str | None = Field(
@@ -493,9 +509,9 @@ class TransactionFilterParams(BaseModel):
         description="Fuzzy search on merchant (handles typos)",
     )
 
-    transaction_type: TransactionType | None = Field(
+    review_status: TransactionReviewStatus | None = Field(
         default=None,
-        description="Filter by transaction type",
+        description="Filter by review status",
     )
 
     card_id: uuid.UUID | None = Field(
@@ -538,9 +554,9 @@ class TransactionSplitCreateItem(BaseModel):
 
     Attributes:
         amount: Split amount
-        description: Split description
+        user_description: Split user description
         merchant: Split merchant (optional)
-        user_notes: Split notes (optional)
+        comments: Split comments (optional)
     """
 
     amount: Decimal = Field(
@@ -548,10 +564,10 @@ class TransactionSplitCreateItem(BaseModel):
         examples=["-30.00", "-20.50"],
     )
 
-    description: str = Field(
+    user_description: str = Field(
         min_length=1,
         max_length=500,
-        description="Split description",
+        description="User description for this split",
         examples=["Groceries", "Household items"],
     )
 
@@ -562,10 +578,10 @@ class TransactionSplitCreateItem(BaseModel):
         description="Merchant name for this split",
     )
 
-    user_notes: str | None = Field(
+    comments: str | None = Field(
         default=None,
         max_length=1000,
-        description="Notes for this split",
+        description="Comments for this split",
     )
 
     @field_validator("amount")
@@ -578,13 +594,13 @@ class TransactionSplitCreateItem(BaseModel):
             raise ValueError("Amount must have at most 2 decimal places")
         return value
 
-    @field_validator("description")
+    @field_validator("user_description")
     @classmethod
-    def validate_description(cls, value: str) -> str:
-        """Validate description."""
+    def validate_user_description(cls, value: str) -> str:
+        """Validate user description."""
         value = value.strip()
         if not value:
-            raise ValueError("Description cannot be empty")
+            raise ValueError("User description cannot be empty")
         return value
 
 
