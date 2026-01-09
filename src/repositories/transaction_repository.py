@@ -13,7 +13,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import ColumnElement, UnaryExpression, asc, desc, func, select
+from sqlalchemy import ColumnElement, UnaryExpression, asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
@@ -92,19 +92,29 @@ class TransactionRepository(BaseRepository[Transaction]):
         if params.amount_max is not None:
             filters.append(Transaction.amount <= params.amount_max)
 
-        # Fuzzy text search on description (pg_trgm similarity)
+        # Fuzzy text search on description (search both original and user descriptions)
         if params.description:
             filters.append(
-                func.similarity(Transaction.description, params.description) > 0.3
+                or_(
+                    func.similarity(
+                        Transaction.original_description, params.description
+                    )
+                    > 0.3,
+                    func.similarity(
+                        func.coalesce(Transaction.user_description, ""),
+                        params.description,
+                    )
+                    > 0.3,
+                )
             )
 
         # Fuzzy text search on merchant (pg_trgm similarity)
         if params.merchant:
             filters.append(func.similarity(Transaction.merchant, params.merchant) > 0.3)
 
-        # Transaction type filter
-        if params.transaction_type is not None:
-            filters.append(Transaction.transaction_type == params.transaction_type)
+        # Review status filter
+        if params.review_status is not None:
+            filters.append(Transaction.review_status == params.review_status)
 
         # Card ID filter
         if params.card_id is not None:
