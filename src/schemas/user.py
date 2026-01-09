@@ -19,24 +19,6 @@ from .common import SortOrder, SortParams
 from .enums import UserSortField
 
 
-class UserSortParams(SortParams[UserSortField]):
-    """
-    Sorting parameters for user list queries.
-
-    Provides type-safe sorting with validation at schema level.
-    Default sort: created_at descending (newest first).
-    """
-
-    sort_by: UserSortField = Field(
-        default=UserSortField.CREATED_AT,
-        description="Field to sort by",
-    )
-    sort_order: SortOrder = Field(
-        default=SortOrder.DESC,
-        description="Sort direction",
-    )
-
-
 class UserBase(BaseModel):
     """
     Base user schema with common fields.
@@ -52,6 +34,16 @@ class UserBase(BaseModel):
         max_length=50,
         description="User's username (3-50 characters)",
     )
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        """Validate username format."""
+        if not value.replace("_", "").replace("-", "").isalnum():
+            raise ValueError(
+                "Username can only contain letters, numbers, underscores, and hyphens"
+            )
+        return value
 
 
 class UserCreate(UserBase):
@@ -76,16 +68,6 @@ class UserCreate(UserBase):
         is_valid, error_message = validate_password_strength(value)
         if not is_valid:
             raise ValueError(error_message)
-        return value
-
-    @field_validator("username")
-    @classmethod
-    def validate_username(cls, value: str) -> str:
-        """Validate username format."""
-        if not value.replace("_", "").replace("-", "").isalnum():
-            raise ValueError(
-                "Username can only contain letters, numbers, underscores, and hyphens"
-            )
         return value
 
     model_config = ConfigDict(
@@ -157,40 +139,6 @@ class UserUpdate(BaseModel):
     )
 
 
-class UserPasswordChange(BaseModel):
-    """
-    Schema for changing user password.
-
-    Attributes:
-        current_password: User's current password (for verification)
-        new_password: New password (validated for strength)
-    """
-
-    current_password: str = Field(description="Current password for verification")
-    new_password: str = Field(
-        min_length=8,
-        description="New password (min 8 characters, must meet strength requirements)",
-    )
-
-    @field_validator("new_password")
-    @classmethod
-    def validate_new_password(cls, value: str) -> str:
-        """Validate new password strength requirements."""
-        is_valid, error_message = validate_password_strength(value)
-        if not is_valid:
-            raise ValueError(error_message)
-        return value
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "current_password": "OldSecurePass123!",
-                "new_password": "NewSecurePass456!",
-            }
-        }
-    )
-
-
 class UserResponse(BaseModel):
     """
     Schema for user response (detailed user information).
@@ -237,7 +185,7 @@ class UserResponse(BaseModel):
     )
 
 
-class UserEmbedded(BaseModel):
+class UserEmbeddedResponse(BaseModel):
     """
     Minimal user representation for embedding in other entities.
 
@@ -253,7 +201,7 @@ class UserEmbedded(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class UserListItem(BaseModel):
+class UserListResponse(BaseModel):
     """
     Schema for user list items (summary information).
 
@@ -309,6 +257,58 @@ class UserFilterParams(BaseModel):
             "example": {
                 "is_admin": False,
                 "search": "john",
+            }
+        }
+    )
+
+
+class UserSortParams(SortParams[UserSortField]):
+    """
+    Sorting parameters for user list queries.
+
+    Provides type-safe sorting with validation at schema level.
+    Default sort: created_at descending (newest first).
+    """
+
+    sort_by: UserSortField = Field(
+        default=UserSortField.CREATED_AT,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.DESC,
+        description="Sort direction",
+    )
+
+
+class UserPasswordChange(BaseModel):
+    """
+    Schema for changing user password.
+
+    Attributes:
+        current_password: User's current password (for verification)
+        new_password: New password (validated for strength)
+    """
+
+    current_password: str = Field(description="Current password for verification")
+    new_password: str = Field(
+        min_length=8,
+        description="New password (min 8 characters, must meet strength requirements)",
+    )
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, value: str) -> str:
+        """Validate new password strength requirements."""
+        is_valid, error_message = validate_password_strength(value)
+        if not is_valid:
+            raise ValueError(error_message)
+        return value
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "current_password": "OldSecurePass123!",
+                "new_password": "NewSecurePass456!",
             }
         }
     )

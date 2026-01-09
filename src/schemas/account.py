@@ -17,31 +17,13 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from schwifty import IBAN
 
 from .account_type import (
-    AccountTypeEmbedded,
+    AccountTypeEmbeddedResponse,
 )
 from .common import SortOrder, SortParams
 from .enums import AccountSortField
 from .financial_institution import (
-    FinancialInstitutionEmbedded,
+    FinancialInstitutionEmbeddedResponse,
 )
-
-
-class AccountSortParams(SortParams[AccountSortField]):
-    """
-    Sorting parameters for account list queries.
-
-    Provides type-safe sorting with validation at schema level.
-    Default sort: created_at descending (newest first).
-    """
-
-    sort_by: AccountSortField = Field(
-        default=AccountSortField.CREATED_AT,
-        description="Field to sort by",
-    )
-    sort_order: SortOrder = Field(
-        default=SortOrder.DESC,
-        description="Sort direction",
-    )
 
 
 class AccountBase(BaseModel):
@@ -338,9 +320,7 @@ class AccountResponse(AccountBase):
     Attributes:
         id: Account UUID
         user_id: Owner's user ID
-        account_type_id: Account type ID
         account_type: Account type details (key, name, icon, etc.)
-        financial_institution_id: Financial institution ID
         financial_institution: Financial institution details (name, logo, etc.)
         account_name: Account name
         currency: Currency code
@@ -357,11 +337,11 @@ class AccountResponse(AccountBase):
     id: uuid.UUID = Field(description="Account unique identifier")
     user_id: uuid.UUID = Field(description="Owner's user ID")
 
-    account_type: AccountTypeEmbedded = Field(
+    account_type: AccountTypeEmbeddedResponse = Field(
         description="Account type details (key, name, icon, etc.)"
     )
 
-    financial_institution: FinancialInstitutionEmbedded = Field(
+    financial_institution: FinancialInstitutionEmbeddedResponse = Field(
         description="Financial institution details (name, logo, etc.)"
     )
 
@@ -383,22 +363,7 @@ class AccountResponse(AccountBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AccountEmbedded(BaseModel):
-    """
-    Minimal account representation for embedding in other entities.
-
-    Used in Card responses to show the linked account without
-    requiring a separate API call.
-    """
-
-    id: uuid.UUID = Field(description="Account UUID")
-    account_name: str = Field(description="Account display name")
-    currency: str = Field(description="ISO 4217 currency code")
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class AccountListItem(BaseModel):
+class AccountListResponse(BaseModel):
     """
     Schema for account list item (optimized response).
 
@@ -419,13 +384,28 @@ class AccountListItem(BaseModel):
 
     id: uuid.UUID
     account_name: str
-    account_type: AccountTypeEmbedded
+    account_type: AccountTypeEmbeddedResponse
     currency: str
     current_balance: Decimal
     color_hex: str
     icon_url: str | None
-    financial_institution: FinancialInstitutionEmbedded
+    financial_institution: FinancialInstitutionEmbeddedResponse
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AccountEmbeddedResponse(BaseModel):
+    """
+    Minimal account representation for embedding in other entities.
+
+    Used in Card responses to show the linked account without
+    requiring a separate API call.
+    """
+
+    id: uuid.UUID = Field(description="Account UUID")
+    account_name: str = Field(description="Account display name")
+    currency: str = Field(description="ISO 4217 currency code")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -449,4 +429,22 @@ class AccountFilterParams(BaseModel):
     financial_institution_id: uuid.UUID | None = Field(
         default=None,
         description="Filter by financial institution",
+    )
+
+
+class AccountSortParams(SortParams[AccountSortField]):
+    """
+    Sorting parameters for account list queries.
+
+    Provides type-safe sorting with validation at schema level.
+    Default sort: created_at descending (newest first).
+    """
+
+    sort_by: AccountSortField = Field(
+        default=AccountSortField.CREATED_AT,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.DESC,
+        description="Sort direction",
     )

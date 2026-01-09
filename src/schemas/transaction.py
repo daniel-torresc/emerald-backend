@@ -16,27 +16,9 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from models import CardType, TransactionType
-from .card import CardEmbedded
+from .card import CardEmbeddedResponse
 from .common import SortOrder, SortParams
 from .enums import TransactionSortField
-
-
-class TransactionSortParams(SortParams[TransactionSortField]):
-    """
-    Sorting parameters for transaction list queries.
-
-    Provides type-safe sorting with validation at schema level.
-    Default sort: transaction_date descending (newest first).
-    """
-
-    sort_by: TransactionSortField = Field(
-        default=TransactionSortField.TRANSACTION_DATE,
-        description="Field to sort by",
-    )
-    sort_order: SortOrder = Field(
-        default=SortOrder.DESC,
-        description="Sort direction",
-    )
 
 
 class TransactionBase(BaseModel):
@@ -324,7 +306,7 @@ class TransactionResponse(TransactionBase):
         description="Card UUID if card was used for this transaction",
     )
 
-    card: CardEmbedded | None = Field(
+    card: CardEmbeddedResponse | None = Field(
         default=None,
         description="Card details if card was used for this transaction",
     )
@@ -349,6 +331,11 @@ class TransactionResponse(TransactionBase):
         description="Parent transaction UUID if this is a split child",
     )
 
+    parent_transaction: "TransactionEmbeddedResponse | None" = Field(
+        default=None,
+        description="Parent transaction if this is a split child",
+    )
+
     is_split_parent: bool = Field(
         default=False,
         description="Whether this transaction has child splits",
@@ -369,7 +356,7 @@ class TransactionResponse(TransactionBase):
 
     @field_validator("card", mode="before")
     @classmethod
-    def convert_card(cls, card) -> CardEmbedded | None:
+    def convert_card(cls, card) -> CardEmbeddedResponse | None:
         """
         Convert Card model to CardEmbedded or None.
 
@@ -379,13 +366,13 @@ class TransactionResponse(TransactionBase):
         if card is None:
             return None
         if hasattr(card, "id"):  # SQLAlchemy model
-            return CardEmbedded.model_validate(card)
+            return CardEmbeddedResponse.model_validate(card)
         return card
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class TransactionListItem(BaseModel):
+class TransactionListResponse(BaseModel):
     """
     Lighter schema for transaction list responses.
 
@@ -410,106 +397,49 @@ class TransactionListItem(BaseModel):
     currency: str
     description: str
     merchant: str | None = None
-    card: CardEmbedded | None = None
+    card: CardEmbeddedResponse | None = None
     transaction_type: TransactionType
     is_split_parent: bool = False
     is_split_child: bool = False
 
     @field_validator("card", mode="before")
     @classmethod
-    def convert_card(cls, card) -> CardEmbedded | None:
+    def convert_card(cls, card) -> CardEmbeddedResponse | None:
         """Convert Card model to CardEmbedded or None."""
         if card is None:
             return None
         if hasattr(card, "id"):  # SQLAlchemy model
-            return CardEmbedded.model_validate(card)
+            return CardEmbeddedResponse.model_validate(card)
         return card
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class SplitItem(BaseModel):
+class TransactionEmbeddedResponse(BaseModel):
     """
-    Schema for a single split item.
+    Lighter schema for transaction embedded responses.
+
+    Includes only essential fields for list display.
 
     Attributes:
-        amount: Split amount
-        description: Split description
-        merchant: Split merchant (optional)
-        user_notes: Split notes (optional)
+        id: Transaction UUID
+        transaction_date: Transaction date
+        amount: Transaction amount
+        currency: Currency code
+        description: Description
+        merchant: Merchant name
+        card: Card details if card was used
+        transaction_type: Transaction type
     """
 
-    amount: Decimal = Field(
-        description="Split amount (must sum to parent amount)",
-        examples=["-30.00", "-20.50"],
-    )
-
-    description: str = Field(
-        min_length=1,
-        max_length=500,
-        description="Split description",
-        examples=["Groceries", "Household items"],
-    )
-
-    merchant: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=100,
-        description="Merchant name for this split",
-    )
-
-    user_notes: str | None = Field(
-        default=None,
-        max_length=1000,
-        description="Notes for this split",
-    )
-
-    @field_validator("amount")
-    @classmethod
-    def validate_amount(cls, value: Decimal) -> Decimal:
-        """Validate split amount."""
-        if value == 0:
-            raise ValueError("Split amount cannot be zero")
-        if value.as_tuple().exponent < -2:
-            raise ValueError("Amount must have at most 2 decimal places")
-        return value
-
-    @field_validator("description")
-    @classmethod
-    def validate_description(cls, value: str) -> str:
-        """Validate description."""
-        value = value.strip()
-        if not value:
-            raise ValueError("Description cannot be empty")
-        return value
-
-
-class TransactionSplitRequest(BaseModel):
-    """
-    Schema for splitting a transaction.
-
-    Attributes:
-        splits: List of split items (min 2, amounts must sum to parent)
-    """
-
-    splits: list[SplitItem] = Field(
-        min_length=2,
-        description="List of splits (must sum to parent amount)",
-        examples=[
-            [
-                {"amount": "-30.00", "description": "Groceries"},
-                {"amount": "-20.50", "description": "Household items"},
-            ]
-        ],
-    )
-
-    @field_validator("splits")
-    @classmethod
-    def validate_splits(cls, value: list[SplitItem]) -> list[SplitItem]:
-        """Validate at least 2 splits."""
-        if len(value) < 2:
-            raise ValueError("At least 2 splits are required")
-        return value
+    id: uuid.UUID
+    transaction_date: date
+    amount: Decimal
+    currency: str
+    description: str
+    merchant: str | None = None
+    card: CardEmbeddedResponse | None = None
+    transaction_type: TransactionType
 
 
 class TransactionFilterParams(BaseModel):
@@ -582,3 +512,107 @@ class TransactionFilterParams(BaseModel):
         default=None,
         description="Filter by specific account UUID",
     )
+
+
+class TransactionSortParams(SortParams[TransactionSortField]):
+    """
+    Sorting parameters for transaction list queries.
+
+    Provides type-safe sorting with validation at schema level.
+    Default sort: transaction_date descending (newest first).
+    """
+
+    sort_by: TransactionSortField = Field(
+        default=TransactionSortField.TRANSACTION_DATE,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.DESC,
+        description="Sort direction",
+    )
+
+
+class TransactionSplitCreateItem(BaseModel):
+    """
+    Schema for a single split item.
+
+    Attributes:
+        amount: Split amount
+        description: Split description
+        merchant: Split merchant (optional)
+        user_notes: Split notes (optional)
+    """
+
+    amount: Decimal = Field(
+        description="Split amount (must sum to parent amount)",
+        examples=["-30.00", "-20.50"],
+    )
+
+    description: str = Field(
+        min_length=1,
+        max_length=500,
+        description="Split description",
+        examples=["Groceries", "Household items"],
+    )
+
+    merchant: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="Merchant name for this split",
+    )
+
+    user_notes: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Notes for this split",
+    )
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, value: Decimal) -> Decimal:
+        """Validate split amount."""
+        if value == 0:
+            raise ValueError("Split amount cannot be zero")
+        if value.as_tuple().exponent < -2:
+            raise ValueError("Amount must have at most 2 decimal places")
+        return value
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, value: str) -> str:
+        """Validate description."""
+        value = value.strip()
+        if not value:
+            raise ValueError("Description cannot be empty")
+        return value
+
+
+class TransactionSplitCreate(BaseModel):
+    """
+    Schema for splitting a transaction.
+
+    Attributes:
+        splits: List of split items (min 2, amounts must sum to parent)
+    """
+
+    splits: list[TransactionSplitCreateItem] = Field(
+        min_length=2,
+        description="List of splits (must sum to parent amount)",
+        examples=[
+            [
+                {"amount": "-30.00", "description": "Groceries"},
+                {"amount": "-20.50", "description": "Household items"},
+            ]
+        ],
+    )
+
+    @field_validator("splits")
+    @classmethod
+    def validate_splits(
+        cls, value: list[TransactionSplitCreateItem]
+    ) -> list[TransactionSplitCreateItem]:
+        """Validate at least 2 splits."""
+        if len(value) < 2:
+            raise ValueError("At least 2 splits are required")
+        return value

@@ -18,24 +18,6 @@ from .common import SortOrder, SortParams
 from .enums import AuditLogSortField
 
 
-class AuditLogSortParams(SortParams[AuditLogSortField]):
-    """
-    Sorting parameters for audit log list queries.
-
-    Provides type-safe sorting with validation at schema level.
-    Default sort: created_at descending (newest first).
-    """
-
-    sort_by: AuditLogSortField = Field(
-        default=AuditLogSortField.CREATED_AT,
-        description="Field to sort by",
-    )
-    sort_order: SortOrder = Field(
-        default=SortOrder.DESC,
-        description="Sort direction",
-    )
-
-
 class AuditLogResponse(BaseModel):
     """
     Schema for audit log response.
@@ -122,7 +104,7 @@ class AuditLogResponse(BaseModel):
     )
 
 
-class AuditLogListItem(BaseModel):
+class AuditLogListResponse(BaseModel):
     """
     Schema for audit log response.
 
@@ -258,4 +240,22 @@ class AuditLogFilterParams(BaseModel):
                 "end_date": "2024-12-31T23:59:59Z",
             }
         }
+    )
+
+
+class AuditLogSortParams(SortParams[AuditLogSortField]):
+    """
+    Sorting parameters for audit log list queries.
+
+    Provides type-safe sorting with validation at schema level.
+    Default sort: created_at descending (newest first).
+    """
+
+    sort_by: AuditLogSortField = Field(
+        default=AuditLogSortField.CREATED_AT,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.DESC,
+        description="Sort direction",
     )

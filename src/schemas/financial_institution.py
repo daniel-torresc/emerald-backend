@@ -22,24 +22,6 @@ from .common import SortOrder, SortParams
 from .enums import FinancialInstitutionSortField
 
 
-class FinancialInstitutionSortParams(SortParams[FinancialInstitutionSortField]):
-    """
-    Sorting parameters for financial institution list queries.
-
-    Provides type-safe sorting with validation at schema level.
-    Default sort: name ascending (alphabetical order).
-    """
-
-    sort_by: FinancialInstitutionSortField = Field(
-        default=FinancialInstitutionSortField.NAME,
-        description="Field to sort by",
-    )
-    sort_order: SortOrder = Field(
-        default=SortOrder.ASC,
-        description="Sort direction",
-    )
-
-
 class FinancialInstitutionBase(BaseModel):
     """
     Base financial institution schema with common fields.
@@ -348,7 +330,7 @@ class FinancialInstitutionResponse(FinancialInstitutionBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class FinancialInstitutionEmbedded(BaseModel):
+class FinancialInstitutionEmbeddedResponse(BaseModel):
     """
     Minimal financial institution representation for embedding.
 
@@ -364,7 +346,7 @@ class FinancialInstitutionEmbedded(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class FinancialInstitutionListItem(BaseModel):
+class FinancialInstitutionListResponse(BaseModel):
     """
     Schema for financial institution list item.
 
@@ -429,3 +411,21 @@ class FinancialInstitutionFilterParams(BaseModel):
             return None
         value = value.strip()
         return value if value else None
+
+
+class FinancialInstitutionSortParams(SortParams[FinancialInstitutionSortField]):
+    """
+    Sorting parameters for financial institution list queries.
+
+    Provides type-safe sorting with validation at schema level.
+    Default sort: name ascending (alphabetical order).
+    """
+
+    sort_by: FinancialInstitutionSortField = Field(
+        default=FinancialInstitutionSortField.NAME,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.ASC,
+        description="Sort direction",
+    )

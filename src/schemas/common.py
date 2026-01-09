@@ -48,27 +48,6 @@ class SortParams(BaseModel, Generic[SortFieldType]):
     )
 
 
-class SearchResult(BaseModel, Generic[DataT]):
-    """
-    Internal search result container.
-
-    Used for service-to-route communication. Not exposed directly to API.
-    Routes convert this to PaginatedResponse for HTTP responses.
-
-    Type Parameters:
-        DataT: Type of items in the items list (typically SQLAlchemy models)
-
-    Attributes:
-        items: List of model instances for current page
-        total: Total count of items matching filters (without pagination)
-    """
-
-    items: list[DataT]
-    total: int
-
-    model_config = ConfigDict(from_attributes=True, arbitrary_types_allowed=True)
-
-
 class PaginationParams(BaseModel):
     """
     Query parameters for paginated list endpoints.
@@ -181,24 +160,6 @@ class ResponseMeta(BaseModel):
         default=None,
         description="Unique request ID for tracing",
     )
-
-
-class SuccessResponse(BaseModel, Generic[DataT]):
-    """
-    Generic success response wrapper.
-
-    Used for single-item endpoints and non-paginated responses.
-
-    Type Parameters:
-        DataT: Type of the data object
-
-    Attributes:
-        data: Response data
-        meta: Response metadata
-    """
-
-    data: DataT
-    meta: ResponseMeta
 
 
 class ErrorDetail(BaseModel):

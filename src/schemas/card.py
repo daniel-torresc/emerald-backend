@@ -17,28 +17,10 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from models import CardType
-from .account import AccountEmbedded
+from .account import AccountEmbeddedResponse
 from .common import SortOrder, SortParams
 from .enums import CardSortField
-from .financial_institution import FinancialInstitutionEmbedded
-
-
-class CardSortParams(SortParams[CardSortField]):
-    """
-    Sorting parameters for card list queries.
-
-    Provides type-safe sorting with validation at schema level.
-    Default sort: created_at descending (newest first).
-    """
-
-    sort_by: CardSortField = Field(
-        default=CardSortField.CREATED_AT,
-        description="Field to sort by",
-    )
-    sort_order: SortOrder = Field(
-        default=SortOrder.DESC,
-        description="Sort direction",
-    )
+from .financial_institution import FinancialInstitutionEmbeddedResponse
 
 
 class CardBase(BaseModel):
@@ -229,10 +211,10 @@ class CardResponse(BaseModel):
     notes: str | None = Field(description="User's personal notes")
 
     # Relationships (always present for required FK, optional for nullable FK)
-    account: AccountEmbedded = Field(
+    account: AccountEmbeddedResponse = Field(
         description="Account this card is linked to (always present)"
     )
-    financial_institution: FinancialInstitutionEmbedded | None = Field(
+    financial_institution: FinancialInstitutionEmbeddedResponse | None = Field(
         description="Financial institution that issued the card (optional)"
     )
 
@@ -243,7 +225,7 @@ class CardResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class CardListItem(BaseModel):
+class CardListResponse(BaseModel):
     """
     Schema for card list items (GET /api/v1/cards).
 
@@ -258,37 +240,17 @@ class CardListItem(BaseModel):
     card_network: str | None = Field(description="Payment network")
 
     # Simplified relationships
-    account: AccountEmbedded = Field(description="Account this card is linked to")
-    financial_institution: FinancialInstitutionEmbedded | None = Field(
+    account: AccountEmbeddedResponse = Field(
+        description="Account this card is linked to"
+    )
+    financial_institution: FinancialInstitutionEmbeddedResponse | None = Field(
         description="Financial institution that issued the card"
     )
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class CardFilterParams(BaseModel):
-    """
-    Query parameters for filtering cards.
-
-    All fields are optional - if not provided, no filter is applied.
-
-    Attributes:
-        card_type: Filter by card type (credit_card or debit_card)
-        account_id: Filter by account ID
-    """
-
-    card_type: CardType | None = Field(
-        default=None,
-        description="Filter by card type (credit_card or debit_card)",
-    )
-
-    account_id: uuid.UUID | None = Field(
-        default=None,
-        description="Filter by account ID",
-    )
-
-
-class CardEmbedded(BaseModel):
+class CardEmbeddedResponse(BaseModel):
     """
     Minimal card representation embedded in transaction responses.
 
@@ -317,3 +279,43 @@ class CardEmbedded(BaseModel):
     )
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CardFilterParams(BaseModel):
+    """
+    Query parameters for filtering cards.
+
+    All fields are optional - if not provided, no filter is applied.
+
+    Attributes:
+        card_type: Filter by card type (credit_card or debit_card)
+        account_id: Filter by account ID
+    """
+
+    card_type: CardType | None = Field(
+        default=None,
+        description="Filter by card type (credit_card or debit_card)",
+    )
+
+    account_id: uuid.UUID | None = Field(
+        default=None,
+        description="Filter by account ID",
+    )
+
+
+class CardSortParams(SortParams[CardSortField]):
+    """
+    Sorting parameters for card list queries.
+
+    Provides type-safe sorting with validation at schema level.
+    Default sort: created_at descending (newest first).
+    """
+
+    sort_by: CardSortField = Field(
+        default=CardSortField.CREATED_AT,
+        description="Field to sort by",
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.DESC,
+        description="Sort direction",
+    )
