@@ -14,7 +14,7 @@ from fastapi import APIRouter, Request, status
 
 from schemas import (
     AccountShareCreate,
-    AccountShareListItem,
+    AccountShareListResponse,
     AccountShareResponse,
     AccountShareUpdate,
 )
@@ -92,7 +92,7 @@ async def create_share(
 
 @router.get(
     "",
-    response_model=list[AccountShareListItem],
+    response_model=list[AccountShareListResponse],
     summary="List account shares",
     description="""
     List all shares for an account.
@@ -111,7 +111,7 @@ async def list_shares(
     account_id: uuid.UUID,
     current_user: CurrentUser,
     account_service: AccountServiceDep,
-) -> list[AccountShareListItem]:
+) -> list[AccountShareListResponse]:
     """
     List all shares for an account.
 
@@ -134,7 +134,7 @@ async def list_shares(
         current_user=current_user,
     )
 
-    return [AccountShareListItem.model_validate(share) for share in shares]
+    return [AccountShareListResponse.model_validate(share) for share in shares]
 
 
 @router.put(

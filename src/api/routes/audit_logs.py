@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Request
 
 from schemas import (
     AuditLogFilterParams,
-    AuditLogListItem,
+    AuditLogListResponse,
     AuditLogSortParams,
     PaginatedResponse,
     PaginationMeta,
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
 @router.get(
     "/users",
-    response_model=PaginatedResponse[AuditLogListItem],
+    response_model=PaginatedResponse[AuditLogListResponse],
     summary="Get all audit logs",
     description="Get all audit logs with filtering (admin only)",
 )
@@ -38,7 +38,7 @@ async def get_all_audit_logs(
     filters: AuditLogFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
     sorting: AuditLogSortParams = Depends(),
-) -> PaginatedResponse[AuditLogListItem]:
+) -> PaginatedResponse[AuditLogListResponse]:
     """
     Get all audit logs with filtering (admin only).
 
@@ -71,7 +71,7 @@ async def get_all_audit_logs(
     )
 
     return PaginatedResponse(
-        data=[AuditLogListItem.model_validate(log) for log in logs],
+        data=[AuditLogListResponse.model_validate(log) for log in logs],
         meta=PaginationMeta(
             total=count,
             page=pagination.page,
