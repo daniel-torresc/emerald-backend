@@ -17,7 +17,7 @@ from .enums import (
     CardType,
     InstitutionType,
     PermissionLevel,
-    TransactionType,
+    TransactionReviewStatus,
 )
 from .financial_institution import FinancialInstitution
 from .mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
@@ -50,7 +50,7 @@ __all__ = [
     "CardType",
     # Transaction models
     "Transaction",
-    "TransactionType",
+    "TransactionReviewStatus",
     # Master data models
     "FinancialInstitution",
     "InstitutionType",

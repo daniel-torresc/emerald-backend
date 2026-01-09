@@ -81,45 +81,46 @@ class PermissionLevel(str, enum.Enum):
     viewer = "viewer"
 
 
-class TransactionType(str, enum.Enum):
+class TransactionReviewStatus(str, enum.Enum):
     """
-    Financial transaction types.
+    Review status for transactions.
 
-    Supported transaction types: income (money in), expense (money out),
-    and transfer (between own accounts).
+    Tracks whether a transaction has been reviewed by the user.
+    New transactions default to TO_REVIEW status.
 
     Attributes:
-        income: Money in - salary, deposits, refunds, transfers in
-            - Increases account balance
-            - Examples: salary deposits, refunds, incoming transfers
-            - Amount is typically positive
+        to_review: Transaction needs user review (default for new transactions)
+            - Set automatically when transaction is created
+            - Indicates user hasn't reviewed/verified the transaction
+            - Used for filtering transactions that need attention
 
-        expense: Money out - purchases, bills, withdrawals, payments
-            - Decreases account balance
-            - Examples: grocery purchases, bill payments, cash withdrawals
-            - Amount is typically negative
+        reviewed: Transaction has been reviewed by user
+            - User has verified the transaction details
+            - May have edited description, added notes, etc.
+            - Indicates transaction is finalized
 
-        transfer: Movement of money between user's own accounts
-            - For internal transfers between accounts
-            - One account debited, another credited
-            - Neutral impact on total net worth
+    Future extensions may include:
+        - pending_payment: Awaiting payment confirmation
+        - disputed: Transaction is being disputed
+        - reconciled: Matched with bank statement
 
     Usage:
         transaction = Transaction(
-            description="Salary Deposit",
-            transaction_type=TransactionType.income,
-            amount=5000.00,
+            original_description="Amazon Purchase",
+            review_status=TransactionReviewStatus.to_review,
             ...
         )
 
+        # After user reviews
+        transaction.review_status = TransactionReviewStatus.reviewed
+
     Note:
-        Transaction type affects how transactions are displayed and analyzed
-        in reports and budgets. Choose the most appropriate type.
+        Review status is used for filtering and workflow management.
+        Users can filter to see only transactions that need review.
     """
 
-    income = "income"
-    expense = "expense"
-    transfer = "transfer"
+    to_review = "to_review"
+    reviewed = "reviewed"
 
     @classmethod
     def to_dict_list(cls) -> list[dict[str, str]]:
@@ -131,9 +132,8 @@ class TransactionType(str, enum.Enum):
 
         Example:
             [
-                {"key": "income", "label": "Income"},
-                {"key": "expense", "label": "Expense"},
-                {"key": "transfer", "label": "Transfer"}
+                {"key": "to_review", "label": "To Review"},
+                {"key": "reviewed", "label": "Reviewed"}
             ]
         """
         return [
