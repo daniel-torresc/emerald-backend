@@ -47,7 +47,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .account import Account
 from .base import Base
 from .card import Card
-from .enums import TransactionType
+from .enums import TransactionReviewStatus
 from .mixins import AuditFieldsMixin, SoftDeleteMixin, TimestampMixin
 
 # =============================================================================
@@ -67,14 +67,15 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         account_id: Account this transaction belongs to (foreign key to accounts)
         card_id: Card used for this transaction (foreign key to cards, optional)
         parent_transaction_id: Parent transaction if this is a split (foreign key to transactions)
-        date: Transaction date (when transaction occurred)
+        transaction_date: Transaction date (when transaction occurred)
         value_date: Date transaction value applied (can differ from date)
         amount: Transaction amount (positive or negative, non-zero)
         currency: ISO 4217 currency code (3 uppercase letters, must match account)
-        description: Transaction description/narrative (1-500 chars)
+        original_description: Original transaction description as imported (immutable, 1-500 chars)
+        user_description: User-editable description (defaults to original, 1-500 chars)
         merchant: Merchant name (1-100 chars, optional)
-        transaction_type: Type of transaction (debit, credit, transfer, etc.)
-        user_notes: Optional user comments (max 1000 chars)
+        comments: Optional user comments (max 1000 chars)
+        review_status: Review status (to_review, reviewed)
         created_at: When transaction was created
         updated_at: When transaction was last updated
         deleted_at: When transaction was soft-deleted (NULL if active)
@@ -88,23 +89,20 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         child_transactions: List of child transactions if this is a split parent
 
     Validation:
-        - date: Valid date, configurable if future dates allowed
+        - transaction_date: Valid date, configurable if future dates allowed
         - value_date: Valid date if provided
         - amount: Decimal(15,2), can be zero (e.g., fee waivers, promotional credits)
         - currency: Must match account.currency (enforced in service layer)
         - currency: Must match ISO 4217 format (3 uppercase letters)
-        - description: 1-500 characters, required
+        - original_description: 1-500 characters, required, immutable after creation
+        - user_description: 1-500 characters, optional, user-editable
         - merchant: 1-100 characters if provided
-        - transaction_type: Must be valid TransactionType enum value
-        - user_notes: Max 1000 characters
+        - review_status: Must be valid TransactionReviewStatus enum value
+        - comments: Max 1000 characters
 
-    Transaction Types:
-        - DEBIT: Money out (expenses, withdrawals, payments)
-        - CREDIT: Money in (income, deposits, refunds)
-        - TRANSFER: Movement between accounts
-        - FEE: Bank fees, service charges
-        - INTEREST: Interest earned or paid
-        - OTHER: Miscellaneous transactions
+    Review Status:
+        - TO_REVIEW: Transaction needs user review (default for new transactions)
+        - REVIEWED: Transaction has been reviewed by user
 
     Transaction Splitting:
         Parent transaction:
@@ -115,8 +113,8 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
 
         Child transaction:
             - Has parent_transaction_id set to parent.id
-            - Inherits: account_id, currency, date, value_date
-            - Independent: amount, description, merchant
+            - Inherits: account_id, currency, date, value_date, original_description
+            - Independent: amount, user_description, merchant
             - Can be queried via transaction.parent_transaction
 
         Validation:
@@ -147,25 +145,26 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
     Indexes:
         Defined in migration for performance:
         - account_id (for listing account's transactions)
-        - date (for date range queries)
-        - transaction_type (for filtering by type)
+        - transaction_date (for date range queries)
+        - review_status (for filtering by status)
         - parent_transaction_id (for split queries, partial WHERE NOT NULL)
         - deleted_at (for soft delete filtering)
-        - Composite: (account_id, date) for common queries
+        - Composite: (account_id, transaction_date) for common queries
         - Composite: (account_id, deleted_at) for balance calculations
         - GIN: merchant (for fuzzy search)
-        - GIN: description (for fuzzy search)
+        - GIN: original_description (for fuzzy search)
 
     Example:
         # Simple transaction
         transaction = Transaction(
             account_id=account.id,
-            date=date.today(),
+            transaction_date=date.today(),
             amount=Decimal("-50.25"),
             currency="USD",
-            description="Grocery Shopping",
+            original_description="Grocery Shopping",
+            user_description="Weekly groceries at Whole Foods",
             merchant="Whole Foods",
-            transaction_type=TransactionType.DEBIT,
+            review_status=TransactionReviewStatus.to_review,
             created_by=user.id,
             updated_by=user.id,
         )
@@ -174,11 +173,12 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         child = Transaction(
             account_id=account.id,
             parent_transaction_id=parent.id,
-            date=parent.date,
+            transaction_date=parent.transaction_date,
             amount=Decimal("-30.00"),
             currency="USD",
-            description="Groceries",
-            transaction_type=TransactionType.DEBIT,
+            original_description=parent.original_description,
+            user_description="Groceries",
+            review_status=TransactionReviewStatus.to_review,
             created_by=user.id,
             updated_by=user.id,
         )
@@ -230,9 +230,14 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         nullable=False,
     )
 
-    description: Mapped[str] = mapped_column(
+    original_description: Mapped[str] = mapped_column(
         String(500),
         nullable=False,
+    )
+
+    user_description: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
     )
 
     merchant: Mapped[str | None] = mapped_column(
@@ -240,14 +245,15 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         nullable=True,
     )
 
-    transaction_type: Mapped[TransactionType] = mapped_column(
-        nullable=False,
-        index=True,
-    )
-
-    user_notes: Mapped[str | None] = mapped_column(
+    comments: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+
+    review_status: Mapped[TransactionReviewStatus] = mapped_column(
+        nullable=False,
+        default=TransactionReviewStatus.to_review,
+        index=True,
     )
 
     # Relationships
@@ -304,5 +310,5 @@ class Transaction(Base, TimestampMixin, SoftDeleteMixin, AuditFieldsMixin):
         return (
             f"Transaction(id={self.id}, account_id={self.account_id}, "
             f"transaction_date={self.transaction_date}, amount={self.amount} {self.currency}, "
-            f"type={self.transaction_type.value})"
+            f"status={self.review_status.value})"
         )
