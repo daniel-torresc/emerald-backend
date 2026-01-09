@@ -22,7 +22,7 @@ from schemas import (
     PaginationMeta,
     PaginationParams,
     UserFilterParams,
-    UserListItem,
+    UserListResponse,
     UserResponse,
     UserSortParams,
     UserUpdate,
@@ -171,7 +171,7 @@ async def get_user_by_id(
 
 @router.get(
     "",
-    response_model=PaginatedResponse[UserListItem],
+    response_model=PaginatedResponse[UserListResponse],
     summary="List all users",
     description="List all users with pagination, filtering, and sorting (admin only)",
 )
@@ -182,7 +182,7 @@ async def list_users(
     pagination: PaginationParams = Depends(),
     filters: UserFilterParams = Depends(),
     sorting: UserSortParams = Depends(),
-) -> PaginatedResponse[UserListItem]:
+) -> PaginatedResponse[UserListResponse]:
     """
     List all users with pagination and filtering.
 
@@ -221,7 +221,7 @@ async def list_users(
     )
 
     return PaginatedResponse(
-        data=[UserListItem.model_validate(u) for u in users],
+        data=[UserListResponse.model_validate(u) for u in users],
         meta=PaginationMeta(
             total=count,
             page=pagination.page,

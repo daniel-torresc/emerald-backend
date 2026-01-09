@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Request, status
 from schemas import (
     AccountCreate,
     AccountFilterParams,
-    AccountListItem,
+    AccountListResponse,
     AccountResponse,
     AccountSortParams,
     AccountUpdate,
@@ -121,7 +121,7 @@ async def create_account(
 
 @router.get(
     "",
-    response_model=PaginatedResponse[AccountListItem],
+    response_model=PaginatedResponse[AccountListResponse],
     summary="List user's accounts",
     description="""
     List all accounts for the authenticated user with pagination and filtering.
@@ -167,7 +167,7 @@ async def list_accounts(
     filters: AccountFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
     sorting: AccountSortParams = Depends(),
-) -> PaginatedResponse[AccountListItem]:
+) -> PaginatedResponse[AccountListResponse]:
     """
     List user's accounts with pagination and filtering.
 
@@ -192,7 +192,7 @@ async def list_accounts(
     )
 
     return PaginatedResponse(
-        data=[AccountListItem.model_validate(a) for a in accounts],
+        data=[AccountListResponse.model_validate(a) for a in accounts],
         meta=PaginationMeta(
             total=count,
             page=pagination.page,

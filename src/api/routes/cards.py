@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Request, status
 from schemas import (
     CardCreate,
     CardFilterParams,
-    CardListItem,
+    CardListResponse,
     CardResponse,
     CardSortParams,
     CardUpdate,
@@ -29,14 +29,14 @@ from ..dependencies import CardServiceDep, CurrentUser
 router = APIRouter(prefix="/cards", tags=["Cards"])
 
 
-@router.get("", response_model=PaginatedResponse[CardListItem])
+@router.get("", response_model=PaginatedResponse[CardListResponse])
 async def list_cards(
     current_user: CurrentUser,
     service: CardServiceDep,
     filters: CardFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
     sorting: CardSortParams = Depends(),
-) -> PaginatedResponse[CardListItem]:
+) -> PaginatedResponse[CardListResponse]:
     """
     List all cards for the authenticated user.
 
@@ -68,7 +68,7 @@ async def list_cards(
     )
 
     return PaginatedResponse(
-        data=[CardListItem.model_validate(c) for c in cards],
+        data=[CardListResponse.model_validate(c) for c in cards],
         meta=PaginationMeta(
             total=count,
             page=pagination.page,

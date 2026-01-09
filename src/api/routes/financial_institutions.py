@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request, status
 from schemas import (
     FinancialInstitutionCreate,
     FinancialInstitutionFilterParams,
-    FinancialInstitutionListItem,
+    FinancialInstitutionListResponse,
     FinancialInstitutionResponse,
     FinancialInstitutionSortParams,
     FinancialInstitutionUpdate,
@@ -89,7 +89,7 @@ async def create_institution(
 
 @router.get(
     "",
-    response_model=PaginatedResponse[FinancialInstitutionListItem],
+    response_model=PaginatedResponse[FinancialInstitutionListResponse],
     summary="List financial institutions",
     description="List financial institutions with optional filtering, pagination, and sorting",
 )
@@ -99,7 +99,7 @@ async def list_institutions(
     filters: FinancialInstitutionFilterParams = Depends(),
     pagination: PaginationParams = Depends(),
     sorting: FinancialInstitutionSortParams = Depends(),
-) -> PaginatedResponse[FinancialInstitutionListItem]:
+) -> PaginatedResponse[FinancialInstitutionListResponse]:
     """
     List financial institutions with filtering.
 
@@ -130,7 +130,7 @@ async def list_institutions(
 
     return PaginatedResponse(
         data=[
-            FinancialInstitutionListItem.model_validate(fi)
+            FinancialInstitutionListResponse.model_validate(fi)
             for fi in financial_institutions
         ],
         meta=PaginationMeta(

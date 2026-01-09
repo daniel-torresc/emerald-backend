@@ -19,7 +19,7 @@ from starlette.requests import Request
 
 from schemas import (
     AccountTypeCreate,
-    AccountTypeListItem,
+    AccountTypeListResponse,
     AccountTypeResponse,
     AccountTypeUpdate,
     CurrenciesResponse,
@@ -116,14 +116,14 @@ async def create_account_type(
 
 @router.get(
     "/account-types",
-    response_model=list[AccountTypeListItem],
+    response_model=list[AccountTypeListResponse],
     summary="List account types",
     description="List account types with optional filtering by active status",
 )
 async def list_account_types(
     current_user: CurrentUser,
     service: AccountTypeServiceDep,
-) -> list[AccountTypeListItem]:
+) -> list[AccountTypeListResponse]:
     """
     List all account types.
 
@@ -137,7 +137,7 @@ async def list_account_types(
     account_types = await service.list_account_types()
 
     return [
-        AccountTypeListItem.model_validate(account_type)
+        AccountTypeListResponse.model_validate(account_type)
         for account_type in account_types
     ]
 

@@ -22,10 +22,10 @@ from schemas import (
     PaginationParams,
     TransactionCreate,
     TransactionFilterParams,
-    TransactionListItem,
+    TransactionListResponse,
     TransactionResponse,
     TransactionSortParams,
-    TransactionSplitRequest,
+    TransactionSplitCreate,
     TransactionUpdate,
 )
 from ..dependencies import CurrentUser, TransactionServiceDep
@@ -105,7 +105,7 @@ async def create_transaction(
 
 @router.get(
     "",
-    response_model=PaginatedResponse[TransactionListItem],
+    response_model=PaginatedResponse[TransactionListResponse],
     summary="List and search transactions",
     description="""
     List transactions for an account with advanced search and filtering.
@@ -135,7 +135,7 @@ async def list_transactions(
     pagination: PaginationParams = Depends(),
     filters: TransactionFilterParams = Depends(),
     sorting: TransactionSortParams = Depends(),
-) -> PaginatedResponse[TransactionListItem]:
+) -> PaginatedResponse[TransactionListResponse]:
     """
     List and search transactions for an account.
 
@@ -170,7 +170,7 @@ async def list_transactions(
     )
 
     return PaginatedResponse(
-        data=[TransactionListItem.model_validate(t) for t in transactions],
+        data=[TransactionListResponse.model_validate(t) for t in transactions],
         meta=PaginationMeta(
             total=count,
             page=pagination.page,
@@ -337,7 +337,7 @@ async def delete_transaction(
 
 @router.post(
     "/{transaction_id}/split",
-    response_model=list[TransactionListItem],
+    response_model=list[TransactionListResponse],
     status_code=status.HTTP_200_OK,
     summary="Split transaction",
     description="""
@@ -364,9 +364,9 @@ async def split_transaction(
     request: Request,
     current_user: CurrentUser,
     transaction_id: uuid.UUID,
-    data: TransactionSplitRequest,
+    data: TransactionSplitCreate,
     transaction_service: TransactionServiceDep,
-) -> list[TransactionListItem]:
+) -> list[TransactionListResponse]:
     """
     Split transaction into multiple parts.
 
@@ -398,7 +398,7 @@ async def split_transaction(
         user_agent=user_agent,
     )
 
-    return [TransactionListItem.model_validate(child) for child in new_transactions]
+    return [TransactionListResponse.model_validate(child) for child in new_transactions]
 
 
 @router.post(

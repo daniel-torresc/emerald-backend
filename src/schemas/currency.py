@@ -38,12 +38,6 @@ class Currency(BaseModel):
         return cls(code=code.upper(), symbol=symbol, name=name)
 
 
-class CurrencyResponse(BaseModel):
-    """Response schema for single currency."""
-
-    currency: Currency = Field(description="Currency data")
-
-
 class CurrenciesResponse(BaseModel):
     """Response schema for currency list."""
 

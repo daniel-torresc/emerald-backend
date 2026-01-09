@@ -218,7 +218,7 @@ class AccountTypeResponse(AccountTypeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AccountTypeEmbedded(BaseModel):
+class AccountTypeEmbeddedResponse(BaseModel):
     """
     Minimal account type representation for embedding.
 
@@ -237,7 +237,7 @@ class AccountTypeEmbedded(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AccountTypeListItem(BaseModel):
+class AccountTypeListResponse(BaseModel):
     """
     Schema for account type list item.
 
